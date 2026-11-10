@@ -4,6 +4,7 @@ khora is a unification layer for prototyping, developing, scaling and integratin
 
 There is no implementation code yet. The design lives in [`docs/`](docs/):
 
+- [`docs/architecture.canvas`](docs/architecture.canvas): the whole architecture on one Obsidian canvas (a map of the docs below, not a source of truth).
 - [`docs/PRD.md`](docs/PRD.md): product requirements (draft).
 - [`docs/adr/`](docs/adr/): architecture decision records (proposed).
   - [Query model and propagation](docs/adr/query-model-and-propagation.md) (ADR-0XX)

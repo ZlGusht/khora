@@ -1,0 +1,919 @@
+{
+ "nodes": [
+  {
+   "id": "g_open",
+   "type": "group",
+   "label": "Open threads",
+   "x": 2560,
+   "y": 866,
+   "width": 560,
+   "height": 1186,
+   "color": "1"
+  },
+  {
+   "id": "g_sys",
+   "type": "group",
+   "label": "Domain systems: content hosted on the kernel (docs/systems)",
+   "x": 0,
+   "y": 6142,
+   "width": 1940,
+   "height": 966,
+   "color": "3"
+  },
+  {
+   "id": "g_dist",
+   "type": "group",
+   "label": "Distribution across deployments: ADR-0XZ d38–41, 0YB d4 (interop: review)",
+   "x": 0,
+   "y": 5352,
+   "width": 1080,
+   "height": 490,
+   "color": "5"
+  },
+  {
+   "id": "g_rights",
+   "type": "group",
+   "label": "Rights and access: ADR-0XZ d22–37, 42 (+ 0YA d11–14)",
+   "x": 1220,
+   "y": 4080,
+   "width": 1080,
+   "height": 916,
+   "color": "6"
+  },
+  {
+   "id": "g_scope",
+   "type": "group",
+   "label": "Scopes, views and khoras: ADR-0XZ d1–21",
+   "x": 0,
+   "y": 4080,
+   "width": 1080,
+   "height": 1072,
+   "color": "4"
+  },
+  {
+   "id": "g_beh",
+   "type": "group",
+   "label": "Behavior and effects: ADR-0YA",
+   "x": 1220,
+   "y": 2434,
+   "width": 1080,
+   "height": 1354,
+   "color": "3"
+  },
+  {
+   "id": "g_log",
+   "type": "group",
+   "label": "Action log, processes and reactivity: ADR-0YB (provisional)",
+   "x": 0,
+   "y": 2434,
+   "width": 1080,
+   "height": 1446,
+   "color": "2"
+  },
+  {
+   "id": "g_query",
+   "type": "group",
+   "label": "Query model: ADR-0XX",
+   "x": 1220,
+   "y": 866,
+   "width": 1080,
+   "height": 1046,
+   "color": "4"
+  },
+  {
+   "id": "g_schema",
+   "type": "group",
+   "label": "Schema, entities and sources: ADR-0XY (+ 0XZ identity, 0YA invoke)",
+   "x": 0,
+   "y": 866,
+   "width": 1080,
+   "height": 1368,
+   "color": "5"
+  },
+  {
+   "id": "g_prd",
+   "type": "group",
+   "label": "Product: PRD (draft, launch target Q4 2026)",
+   "x": 0,
+   "y": 0,
+   "width": 1980,
+   "height": 606,
+   "color": "6"
+  },
+  {
+   "id": "title",
+   "type": "text",
+   "x": 0,
+   "y": -620,
+   "width": 1400,
+   "height": 520,
+   "text": "# khora architecture\n\nA map of the whole design as of 10.11.2026, gathered from `docs/` in ZlGusht/khora. The documents are the source of truth; this canvas only summarizes and links them.\n\n- **Top:** product intent ([[docs/PRD|PRD]]).\n- **Middle:** the kernel, one group per concern, labeled with the ADR that decides it.\n- **Bottom:** domain systems. They are content hosted on the kernel, not part of it.\n- **Right:** open threads: pending amendments and the biggest open questions.\n\nStatus: the PRD is a draft; ADR-0XX, 0XY, 0XZ and 0YA are *Proposed*; ADR-0YB is *Provisional*. There is no implementation code yet.\nEdges read as \"uses / feeds / is built on\". Colors: groups only; red marks open threads."
+  },
+  {
+   "id": "spine",
+   "type": "text",
+   "x": 1480,
+   "y": -620,
+   "width": 1500,
+   "height": 520,
+   "text": "## The spine in one paragraph\n\nEverything is an **entity** of a **kind**; only the kernel schema is fixed, the rest is data in the schema store (0XY). Entities are virtual: **sources** claim what they hold, and a **planner** turns a **Query** (data, not text) into fragments negotiated with each source (0XY). Queries are trees of operators around one general operator, **Propagate**, whose meaning is set by an **algebra** (0XX). The **action log** is the source of truth for internal entities; datastores, indexes, access labels, lenses and process state are **projections** of it, and every read is pinned to a **frontier** (0YB, 0XZ). Logic is data: **behaviors** are entities; pure ones run in queries, **operations** are invoked by principals and recorded as actions, **controllers** react via **subscriptions** (0YA, 0YB). Structure is **scopes** (subgraphs with facets); a **khora** is a scope formed around a center; **rights** originate in creation and pass by **grants**, private by default, enforced by the planner (0XZ)."
+  },
+  {
+   "id": "prd_problem",
+   "type": "text",
+   "text": "## Problem and answer\n- Top-down, tightly scoped software causes data discrepancies, stale interaction schemes and fragile autonomous systems.\n- These get treated as symptoms, not root causes.\n- khora treats everything as data, grows out instead of being built, and lets scale compound value.\n- It stores and manipulates meaning at its core.\n- \"It does not solve those problems; it does not cause them.\"\n- Persona: knowledge worker, intermediate technical skill, tired of hopping between apps.\n\n[[docs/PRD|PRD]]",
+   "x": 50,
+   "y": 80,
+   "width": 440,
+   "height": 476
+  },
+  {
+   "id": "prd_p0",
+   "type": "text",
+   "text": "## P0 (MVP)\n- **Scoping:** data is discoverable and navigable; scopes visible and explainable.\n- **Interoperability:** data usable across systems regardless of scope.\n- **Interaction:** through representations, not raw entities; data feels alive.\n- **Provenance:** every action in an interactive log, with who did what.\n- **Computations:** data exposed functionally.\n- **Modeling:** a complete structural ontology kernel.",
+   "x": 530,
+   "y": 80,
+   "width": 440,
+   "height": 360
+  },
+  {
+   "id": "prd_p1",
+   "type": "text",
+   "text": "## P1 / P2\n- **P1 collaboration:** many khoras work as one; multiple principals.\n- **P1 self-containment:** a minimal firmware boots khora from data; all other logic is modeled data.\n- **P2 physical world:** physical objects and attributes, interchangeable with digital ones.\n\n## Scale\n- Trillions to quadrillions of entities per khora.\n- Thousands of khoras working together.",
+   "x": 1010,
+   "y": 80,
+   "width": 440,
+   "height": 384
+  },
+  {
+   "id": "prd_risks",
+   "type": "text",
+   "text": "## Non-goals, risks, open questions\n- **Non-goals:** domain systems are content, not core; LLMs are consumers, not core.\n- **Risks:** performance (high/medium), volume (high/low), intractability (medium/high).\n- **Mitigations:** caching, weighting, indexing, tiered storage, bottom-up approaches, heuristics.\n- **Open:** efficient cross-database queries? Which top-down ontology regularities can be exploited?\n- **Still #TODO:** research, market, metrics, security, UX, technical spec, timeline.",
+   "x": 1490,
+   "y": 80,
+   "width": 440,
+   "height": 386
+  },
+  {
+   "id": "kernel_label",
+   "type": "text",
+   "x": 0,
+   "y": 726,
+   "width": 1400,
+   "height": 100,
+   "text": "# Kernel\nOne group per concern. Decision numbers refer to the ADR in the group label."
+  },
+  {
+   "id": "firmware",
+   "type": "text",
+   "text": "## Firmware and kernel schema\n- The firmware holds the fixed kernel schema and the location of the schema store (d8).\n- The upper ontology (open choice) and domain schemas are data in the pinned schema store.\n- Mixins and the rest of the kernel schema are still open.\n- P1 target: firmware boots khora from data.",
+   "x": 50,
+   "y": 946,
+   "width": 470,
+   "height": 256
+  },
+  {
+   "id": "schema_store",
+   "type": "text",
+   "text": "## Schema store and claims\n- **Kind:** what an entity is. **Claim:** who holds it (d9).\n- Sources register claims: kinds, attributes, relations, capabilities, and (0YA d8) operations they can execute.\n- Schema and claims are versioned by log position; moving a kind is an action with a cutover (d10).\n- The planner keeps the schema in memory as its catalog; asks \"who has this?\" only on a miss.\n- Conflicting claims surface as conflicts, never picked silently.",
+   "x": 560,
+   "y": 946,
+   "width": 470,
+   "height": 360
+  },
+  {
+   "id": "entities",
+   "type": "text",
+   "text": "## Entities and identity\n- Everything is an entity; entities are **virtual**: they exist through their kind, wherever the data is held.\n- Kinds of origin: internal, external (synced proxies), computed, aggregators.\n- One global id, mapped to each source's key (0XY d5).\n- Immutable content: id = hash. Everything else: issuer + local id; principals have DIDs (0XZ d39).\n- Real-world things carry external ids (cadastre, LEI, ORCID).\n- Uncertain matches: same-as relation with confidence, never a silent merge.",
+   "x": 50,
+   "y": 1346,
+   "width": 470,
+   "height": 412
+  },
+  {
+   "id": "source_contract",
+   "type": "text",
+   "text": "## EntitySource contract (d1–4)\n```\ncapabilities()\nnegotiate(fragment): Pushdown\nexecute(fragment, ctx): Stream<Batch>, ResultMeta\nchanges?(since)          // capability\ninvoke?(op, args, ctx)   // capability, 0YA d8\nctx = { principal, snapshot, deadline, annotations }\n```\n- Datastores, external sources, computed entities, aggregators: one contract.\n- Pushdown per operation: exact / inexact / unsupported; never silently dropped.\n- Advanced capabilities are named, each with its own contract tests.",
+   "x": 560,
+   "y": 1346,
+   "width": 470,
+   "height": 464
+  },
+  {
+   "id": "planner",
+   "type": "text",
+   "text": "## Planner\n- Turns a Query into a plan and distributes fragments across sources.\n- Inlines computed entities defined by a Query, like views; opaque ones run whole.\n- Runs whatever a source could not; reports what it cannot.\n- Enforces access: `ctx.principal`, labels pushed down as filters (0XZ d36).\n- Candidates: Arrow batches; DataFusion / Calcite / custom; Substrait as wire format.",
+   "x": 50,
+   "y": 1850,
+   "width": 470,
+   "height": 334
+  },
+  {
+   "id": "time",
+   "type": "text",
+   "text": "## Time\n- Every read is pinned to a snapshot (d6).\n- Record time is a log position; each source reports the last position it applied (d7, generalized by 0YB d1).\n- Amended by 0XZ d38: a snapshot is a **frontier**, one position per log.\n- Valid time is an advanced capability.\n- Honest absence: \"cannot evaluate\", never \"pass\"; \"unknown\", never \"unaffected\".",
+   "x": 560,
+   "y": 1850,
+   "width": 470,
+   "height": 308
+  },
+  {
+   "id": "query_shape",
+   "type": "text",
+   "text": "## Query = envelope + body (d1–4)\n- khora's own logical model; engine plans only below the planner.\n- Data, not a text language: storable, versioned, defines computed entities.\n```\nQuery { body: Operator,\n  time: { asOf, validAt? },\n  annotations, semantics: set|multiset,\n  return, order, page }\nOperator = Scan | Filter | Propagate\n  | Aggregate | Not | Search | Spatial | …\n```\n- Path modes from ISO GQL; walk is default.",
+   "x": 1270,
+   "y": 946,
+   "width": 470,
+   "height": 412
+  },
+  {
+   "id": "propagate",
+   "type": "text",
+   "text": "## Propagate: the general operator (d5)\n```\nPropagate { seed, over, algebra,\n  update?: Expression | Process,\n  until: steps(n) | hops{min,max}\n       | fixpoint | converged(ε),\n  emit: final | per-step | paths }\n```\n- Join = steps(1); blast radius, rollups, reachability = fixpoint; PageRank-like = converged.\n- Updates: declarative algebra, rule-guarded, or opaque process (must be pure: 0YA d7).\n- Presets: PageRank, BFS, shortest paths, components, label and belief propagation.\n- Library outside it: Louvain/Leiden, embeddings, max flow, matching.",
+   "x": 1780,
+   "y": 946,
+   "width": 470,
+   "height": 464
+  },
+  {
+   "id": "algebras",
+   "type": "text",
+   "text": "## Algebras (d6)\n| (⊕, ⊗) | computes |\n|---|---|\n| (or, and) | reachability |\n| (min, +) | shortest path |\n| (max, ×) | most probable path |\n| (max, min) | bottleneck |\n| (+, ×) | counts, weighted sums |\n| (min, id) | components |\n| provenance polynomials | lineage |\n- Algebras declare properties; optimizations apply only when declared.\n- 0YB d11 adds: each algebra declares how it is maintained incrementally.",
+   "x": 1270,
+   "y": 1450,
+   "width": 470,
+   "height": 412
+  },
+  {
+   "id": "metadata",
+   "type": "text",
+   "text": "## Metadata at three levels (d7)\n- **Query:** snapshot, deadline, required completeness, annotations, budget.\n- **Result:** complete / partial (reason) / unknown; applied position; cursor; cost; steps and residual.\n- **Value annotations:** confidence, age, provenance, combined by the algebra.\n- Confidence and age carried by default, kept cheap (constant 1 folds away).\n- Caveats: termination only for well-behaved algebras; probabilities assume independence; generic execution is slow until patterns are recognized.",
+   "x": 1780,
+   "y": 1450,
+   "width": 470,
+   "height": 386
+  },
+  {
+   "id": "log_core",
+   "type": "text",
+   "text": "## The log is the source of truth (d1–4)\n- Internal entities live in the log; everything else is a **projection** of it.\n- Action = intent + outcome + effects:\n```\nAction { id: hash, log, pos, causes,\n  invocation: { actor, on_behalf_of,\n    grant, operation, args },\n  process?, trace,\n  outcome: applied|rejected|pending,\n  effects: [Delta] }\nDelta = Attr | Rel | Member  (invertible)\n```\n- Rejected attempts are logged too.\n- Actions form a causal hash graph; frontiers must be causally closed.\n- A log is the unit of total order and replication; at least one per deployment.",
+   "x": 50,
+   "y": 2514,
+   "width": 470,
+   "height": 516
+  },
+  {
+   "id": "projections",
+   "type": "text",
+   "text": "## Projections\n- Datastores, indexes, access labels, lenses, views and process state are folds of the log.\n- Each reports the frontier it has applied.\n- Materialized where reads must be fast; computed on demand otherwise.\n- A snapshot is a projection checkpointed at a frontier.\n- Projections advance in dependency order; a stream delivers an action only after access labels reach that frontier (d13).\n- External content stays outside the log; sync and write-back (outbox) are actions about it (d5).",
+   "x": 560,
+   "y": 2514,
+   "width": 470,
+   "height": 386
+  },
+  {
+   "id": "processes",
+   "type": "text",
+   "text": "## Processes: durable execution (d6–9)\n- A process instance's state is a fold over its own actions.\n- Each step logs start (inputs), then completion (outputs, effects) or failure; effects commit atomically.\n- Replay: deterministic steps may re-run; nondeterministic ones (agents, external calls, clocks) return recorded outputs.\n- Waiting is an action, not a thread: timers, approvals, human steps hold no resources.\n- Instances stay pinned to their definition's version; failure across steps uses sagas.",
+   "x": 50,
+   "y": 3070,
+   "width": 470,
+   "height": 386
+  },
+  {
+   "id": "subscriptions",
+   "type": "text",
+   "text": "## Reactivity (d10–13)\n- **Subscription** = Query + cursor; the cursor is an entity, so it survives restarts.\n- At-least-once delivery; handlers idempotent by action id.\n- Controllers and triggers are built on subscriptions.\n- Views for people are subscriptions by default (P0 \"data is alive\").\n- Live views maintained incrementally as far as the algebra allows (rings fully; semirings by counting or re-derivation; non-monotone by stratum).\n- Time-driven change is lazy: decay computed at read time; thresholds schedule a timer action.",
+   "x": 560,
+   "y": 3070,
+   "width": 470,
+   "height": 412
+  },
+  {
+   "id": "retention",
+   "type": "text",
+   "text": "## Retention (d14)\n- Actions are never deleted; content is shredded.\n- Payloads encrypted per entity or holder; deleting the key deletes the content.\n- The skeleton (id, causes, actor) survives for causality and audit.\n- Decay is staged: archive, then shred.\n- Open: log store (Redpanda/Kafka, NATS JetStream, embedded on object storage), partitioning, key granularity.",
+   "x": 50,
+   "y": 3522,
+   "width": 470,
+   "height": 308
+  },
+  {
+   "id": "behavior",
+   "type": "text",
+   "text": "## Logic as data (d1–3)\n- Behavior is a facet, not a kind: any entity can have behaviors.\n- A behavior is an entity, bound to a kind or a single entity, identified by content hash, versioned by log position.\n- Each declares a contract: trigger (call, event, schedule), reads and writes as scopes, effect class, reversibility, determinism.\n- Undeclared = opaque: impact is \"unknown\", never \"unaffected\".\n- Declared writes are enforced; violations stop and roll back.",
+   "x": 1270,
+   "y": 2514,
+   "width": 470,
+   "height": 386
+  },
+  {
+   "id": "pure",
+   "type": "text",
+   "text": "## Pure behaviors (d4, d7)\n- Run in the kernel: computed attributes, rule checks and invariants, kind-specific collapsed representations, Propagate updates.\n- A computed entity is the output of a pure behavior.\n- Queries call only pure behaviors.\n- Nondeterministic output is recorded and replayed, or marked non-reproducible.\n- Run under the query's deadline and budget.",
+   "x": 1780,
+   "y": 2514,
+   "width": 470,
+   "height": 308
+  },
+  {
+   "id": "operations",
+   "type": "text",
+   "text": "## Operations (d5, d8–10)\n- Behaviors with effects, declared on a kind, run by a principal through the action layer as **governed actions**.\n- Sources execute the operations they claim via `invoke?`.\n- An action = the invocation + the effects it caused.\n- Effect class (pure / internal / external) drives governance: approval for irreversible, external or high-impact operations; impact preview from declared writes and blast radius; undo for reversible ones.\n- In the MVP, entities do not execute effects themselves.",
+   "x": 1270,
+   "y": 2940,
+   "width": 470,
+   "height": 438
+  },
+  {
+   "id": "controllers",
+   "type": "text",
+   "text": "## Controllers (d6, d13, d15–16)\n- A controller is a principal that subscribes to changes and invokes operations under a standing grant.\n- An entity that \"acts on its own\" is an entity with a controller.\n- Sync of external entities is a controller; so is housekeeping (lenses, access labels, revocation cascades, orphan decay).\n- Stops when its grant chain breaks; one execution home at a time (lease).\n- Every reaction records its cause and frontier; cascades carry budgets (depth, count, cost); cycles detected via cause links.",
+   "x": 1780,
+   "y": 2940,
+   "width": 470,
+   "height": 412
+  },
+  {
+   "id": "staging",
+   "type": "text",
+   "text": "## Staging (d17)\n1. **MVP:** pure behaviors in the kernel; operations executed by principals; controllers.\n2. **Native:** declarative operations run by khora's own runtime, queries first, then writes.\n3. **Self-hosting:** the runtime is modeled data, produced and checked by its previous version (P1 self-containment).\n\nOpen: behavior language (declarative core + sandboxed opaque steps, e.g. WASM).",
+   "x": 1270,
+   "y": 3418,
+   "width": 470,
+   "height": 320
+  },
+  {
+   "id": "scopes_core",
+   "type": "text",
+   "text": "## Scopes (d1–7)\n- A scope is an entity whose content is a meaningful subgraph.\n- Membership comes from any source: declared, defined (a Query), structural, detected (Leiden, Infomap; soft, versioned), or produced by a process.\n- Facets, not kinds: access, navigation, object, component (boundary = interface), context.\n- Scopes overlap and nest: a lattice, not a tree.\n- Relations are induced when both ends are members.\n- Membership is pinned to a frontier; changes are actions.\n- A scope's governance (grants, agreements) is a scope inside it.",
+   "x": 50,
+   "y": 4160,
+   "width": 470,
+   "height": 412
+  },
+  {
+   "id": "views",
+   "type": "text",
+   "text": "## Levels of description (d8–13)\n- An object scope is **collapsed** (one node, aggregated attributes, bundled crossing edges: Aggregate with an algebra) or **expanded**.\n- Kinds may define their own collapsed representation.\n- **Lens:** a hierarchy of scopes (governance, work breakdown, physical structure, detected communities).\n- **View** = lens + cut (which scopes are expanded) + representation (canvas, report, agent context).\n- Networks without obvious scale get lenses from multi-resolution detection; lenses must be stable.\n- Lenses and aggregates are materialized, refined on demand like map tiles.",
+   "x": 560,
+   "y": 4160,
+   "width": 470,
+   "height": 438
+  },
+  {
+   "id": "khoras",
+   "type": "text",
+   "text": "## Khoras (d14–21)\n- A khora is a scope formed around a **center**; its membership is its **field**.\n- The center can be any gathering entity: person, organization, agent, project, building, product, relationship, body of knowledge.\n- Khoras form; they are not set up.\n- Fields overlap and confer **no authority**.\n- Not a deployment unit, not a schema boundary; as cheap as a scope.\n- Seats are scopes in the organization's khora.\n- Open: how a field is defined (lean: personalized-PageRank preset of Propagate).\n- Caveat: a khora may be a pattern, not a kernel concept; interoperability then means federating one entity space.",
+   "x": 50,
+   "y": 4638,
+   "width": 470,
+   "height": 464
+  },
+  {
+   "id": "rights",
+   "type": "text",
+   "text": "## Rights (d22–29)\n- No ownership, no binding to a khora.\n- Rights originate in creation and pass by **grant** (object capabilities); nobody gives more than they have.\n- Bundle: read, use, manage, grant, transfer; plus **invoke** (0YA d11).\n- Every action records actor and on whose behalf, decided by the grant used (PROV-O).\n- Shared rights come from **agreements**, which create a collective principal and its decision rule.\n- Outside authority is a grant from another khora.\n- External entities mirror their source's rights; khora can only narrow them.\n- Copies exist only for differing perspectives.",
+   "x": 1270,
+   "y": 4160,
+   "width": 470,
+   "height": 438
+  },
+  {
+   "id": "access",
+   "type": "text",
+   "text": "## Access (d30–37)\n- Effective access: a chain of grants from a holder to P, over a scope containing e, conditions holding.\n- Private by default; no deny rules in the MVP.\n- Re-delegation needs the grant right.\n- A relation is visible only if both ends are.\n- Detected scopes never carry grants; defined scopes only explicitly.\n- Least privilege: invoker's rights ∩ process's grants (also operations, 0YA d12).\n- Enforced by the planner via materialized labels pushed to sources.\n- Restrictions travel with derived data and with effects (0YA d14); collapsed scopes show partial aggregates.",
+   "x": 1780,
+   "y": 4160,
+   "width": 470,
+   "height": 464
+  },
+  {
+   "id": "orphans",
+   "type": "text",
+   "text": "## Orphans (d42)\n- An entity no live principal holds rights over is an orphan.\n- Unclaimed orphans decay by default (staged: archive, then shred; respect legal retention).\n- An orphan has no controller with a live grant, so it cannot act (0YA d13).\n- Open: prevention (named succession), detection (query over rights), claiming (by pull, contestable).",
+   "x": 1270,
+   "y": 4664,
+   "width": 470,
+   "height": 282
+  },
+  {
+   "id": "frontier",
+   "type": "text",
+   "text": "## Frontiers (0XZ d38)\n- Logs are entities and can be joined; actions in logs that don't know of each other are concurrent.\n- A snapshot is a frontier: one position per log.\n- A result is partial when a log has not arrived.\n- Cross-deployment frontiers lag behind the slowest log they depend on.",
+   "x": 50,
+   "y": 5432,
+   "width": 470,
+   "height": 230
+  },
+  {
+   "id": "federation",
+   "type": "text",
+   "text": "## Federation (d39–41)\n- Identities need no coordination (hashes, issuer ids, DIDs).\n- Deployments publish the claims they choose to; lookups go through a distributed index of pointers.\n- Anything unpublished is found only through a grant.\n- Replicas are one entity; divergence is a perspective or a flagged conflict.\n- Replicate by need, not global consensus.\n- Out of scope so far: the interoperability protocol itself (study Holochain, Solid).",
+   "x": 560,
+   "y": 5432,
+   "width": 470,
+   "height": 360
+  },
+  {
+   "id": "sys_template",
+   "type": "text",
+   "text": "## Specification template\n1. Overview\n2. Context and boundaries\n3. Requirements\n4. Architecture\n5. Constraints, assumptions, risks\n6. Verification\n7. Open questions\n\n[[docs/systems/template|template]]",
+   "x": 50,
+   "y": 6222,
+   "width": 380,
+   "height": 294
+  },
+  {
+   "id": "sys_nutrition",
+   "type": "text",
+   "text": "## Nutrition optimization\n- Meal and activity tracking, recipe index, shopping list.\n- Components: store tracker, activity tracker, meal accessor, meal processor.\n- Entities: Store, Product, Activity, Recipe, Meal.\n- External: store promotions and stock via API or scraping.\n\n[[docs/systems/nutrition-optimization|spec]]",
+   "x": 470,
+   "y": 6222,
+   "width": 420,
+   "height": 320
+  },
+  {
+   "id": "sys_built",
+   "type": "text",
+   "text": "## Built-environment review\n- Federates IFC, DWG, GIS, CityJSON, networks and PDFs as synced proxies in one frame; runs permit and coordination reviews.\n- Components: format connectors, georeferencer, semantic mapper, network model, federated view, rule library, checker, review workflow, works coordinator, cost estimator.\n- Leans on: proxies, valid time, spatial capability, network traversal, rules as data, BCF write-back.\n\n[[docs/systems/built-environment-review|spec]]",
+   "x": 930,
+   "y": 6222,
+   "width": 460,
+   "height": 372
+  },
+  {
+   "id": "sys_learning",
+   "type": "text",
+   "text": "## Lifelong learning\n- A dynamic generative learner model that decides what, how and when to learn.\n- Components: evidence collectors, concept linker, learner model, belief updater, structure learner, planner (expected free energy), path builder, representation library, value governor, open learner view, context service.\n- Leans on: shared concept space, beliefs with uncertainty and decay, structure changes as versioned actions, private-by-default rights.\n\n[[docs/systems/lifelong-learning|spec]]",
+   "x": 1430,
+   "y": 6222,
+   "width": 460,
+   "height": 372
+  },
+  {
+   "id": "sys_brain",
+   "type": "text",
+   "text": "## Company brain\n- ERP and CRM in the khora format: an organization's work, knowledge, relations and resources as one living model.\n- Components: org khora, seats, collectives, source connectors, extractor, organization model, work / process / knowledge / network models, org views, context service, action layer.\n- Leans on: proxies, extraction, claims and beliefs, governed actions with write-back, propagation of core ontology.\n- ⚠ Still uses placement and ownership language that ADR-0XZ replaces.\n\n[[docs/systems/company-brain|spec]]",
+   "x": 50,
+   "y": 6634,
+   "width": 460,
+   "height": 424
+  },
+  {
+   "id": "sys_appdev",
+   "type": "text",
+   "text": "## Application development\n- Holds an application as a model and develops it through agents, verified on evidence.\n- Components: application model, context tools, work manager, run supervisor, verifier, impact analyzer, representation engine, version manager, test manager, interface workshop.\n- Leans on: blast radius (Propagate to fixpoint), checkpoints (frontiers), governed actions, process runtime.\n- Long-term target: developing khora itself.\n\n[[docs/systems/application-development|spec]]",
+   "x": 550,
+   "y": 6634,
+   "width": 460,
+   "height": 372
+  },
+  {
+   "id": "sys_furniture",
+   "type": "text",
+   "text": "## Furniture workshop\n- Furniture design projects (Kroika first) as proxies with child proxies; search, reuse, quoting, catalog, many plants.\n- Components: source connectors, project mapper, compute step, search, project assembler, catalog, plant model, router and demand planner, conflict detector, company links.\n- Leans on: child proxies, compute step in the process runtime, write-back as governed actions, drift, Company brain for customers, orders, invoices.\n\n[[docs/systems/furniture-workshop|spec]]",
+   "x": 1050,
+   "y": 6634,
+   "width": 460,
+   "height": 372
+  },
+  {
+   "id": "open_amend",
+   "type": "text",
+   "text": "## Pending amendments\n- 0XZ d38 → 0XY: `asOf` is a frontier.\n- 0YA d7 → 0XX: Propagate updates must be pure.\n- 0YA d8–9 → 0XY: `invoke`, shape of actions.\n- 0YA d11–14 → 0XZ: invoke right, authority, effect restrictions.\n- 0YB → 0XY d7 (projections report frontiers) and 0XX d6 (incremental maintenance per algebra).\n- None of the amended ADRs reflect these yet.",
+   "x": 2610,
+   "y": 946,
+   "width": 460,
+   "height": 282
+  },
+  {
+   "id": "open_followups",
+   "type": "text",
+   "text": "## Follow-ups\n- Rewrite the company brain spec: seats as scopes, rights instead of ownership and placement, close \"what defines a khora\".\n- Assign ADR numbers (placeholders 0XX–0YB; ADR-014 \"views\" is referenced but not in the repo).\n- PRD #TODO sections: security, technical spec, UX, timeline.",
+   "x": 2610,
+   "y": 1268,
+   "width": 460,
+   "height": 256
+  },
+  {
+   "id": "open_questions",
+   "type": "text",
+   "text": "## Biggest open questions\n- Implementation language → federation engine (DataFusion / Calcite / custom).\n- Shape and store of the action log (0YB provisional; measure first).\n- Base contract of a source: scans over entity and relation tables?\n- Upper ontology choice; mixins.\n- How a khora's field is defined.\n- Lineage for derived restrictions: per entity or per scope?\n- Process engine and its language.\n- Interoperability protocol (all **interop: review** points).\n- Existence leaks of hidden entities.",
+   "x": 2610,
+   "y": 1564,
+   "width": 460,
+   "height": 438
+  }
+ ],
+ "edges": [
+  {
+   "id": "e1",
+   "fromNode": "prd_p0",
+   "toNode": "g_scope",
+   "toEnd": "arrow",
+   "fromSide": "bottom",
+   "toSide": "top",
+   "label": "Scoping"
+  },
+  {
+   "id": "e2",
+   "fromNode": "prd_p0",
+   "toNode": "g_log",
+   "toEnd": "arrow",
+   "fromSide": "bottom",
+   "toSide": "top",
+   "label": "Provenance; data is alive"
+  },
+  {
+   "id": "e3",
+   "fromNode": "prd_p0",
+   "toNode": "g_query",
+   "toEnd": "arrow",
+   "fromSide": "bottom",
+   "toSide": "top",
+   "label": "Computations"
+  },
+  {
+   "id": "e4",
+   "fromNode": "prd_p0",
+   "toNode": "g_schema",
+   "toEnd": "arrow",
+   "fromSide": "bottom",
+   "toSide": "top",
+   "label": "Modeling: kernel schema"
+  },
+  {
+   "id": "e5",
+   "fromNode": "prd_p1",
+   "toNode": "staging",
+   "toEnd": "arrow",
+   "fromSide": "bottom",
+   "toSide": "top",
+   "label": "Self-containment"
+  },
+  {
+   "id": "e6",
+   "fromNode": "prd_p1",
+   "toNode": "g_dist",
+   "toEnd": "arrow",
+   "fromSide": "left",
+   "toSide": "left",
+   "label": "Collaboration and interoperability"
+  },
+  {
+   "id": "e7",
+   "fromNode": "query_shape",
+   "toNode": "planner",
+   "toEnd": "arrow",
+   "fromSide": "left",
+   "toSide": "right",
+   "label": "Query{envelope, body}"
+  },
+  {
+   "id": "e8",
+   "fromNode": "planner",
+   "toNode": "schema_store",
+   "toEnd": "arrow",
+   "fromSide": "top",
+   "toSide": "bottom",
+   "label": "kinds and claims @ frontier"
+  },
+  {
+   "id": "e9",
+   "fromNode": "planner",
+   "toNode": "source_contract",
+   "toEnd": "arrow",
+   "fromEnd": "arrow",
+   "fromSide": "right",
+   "toSide": "bottom",
+   "label": "fragments ⇄ batches + ResultMeta"
+  },
+  {
+   "id": "e10",
+   "fromNode": "source_contract",
+   "toNode": "entities",
+   "toEnd": "arrow",
+   "fromSide": "top",
+   "toSide": "bottom",
+   "label": "hold / produce"
+  },
+  {
+   "id": "e11",
+   "fromNode": "entities",
+   "toNode": "firmware",
+   "toEnd": "arrow",
+   "fromSide": "top",
+   "toSide": "bottom",
+   "label": "kinds defined in"
+  },
+  {
+   "id": "e12",
+   "fromNode": "planner",
+   "toNode": "time",
+   "toEnd": "arrow",
+   "fromSide": "right",
+   "toSide": "left",
+   "label": "pins every read"
+  },
+  {
+   "id": "e13",
+   "fromNode": "propagate",
+   "toNode": "algebras",
+   "toEnd": "arrow",
+   "fromSide": "bottom",
+   "toSide": "top",
+   "label": "meaning set by"
+  },
+  {
+   "id": "e14",
+   "fromNode": "query_shape",
+   "toNode": "propagate",
+   "toEnd": "arrow",
+   "fromSide": "right",
+   "toSide": "left",
+   "label": "patterns expand into"
+  },
+  {
+   "id": "e15",
+   "fromNode": "planner",
+   "toNode": "metadata",
+   "toEnd": "arrow",
+   "fromSide": "right",
+   "toSide": "left",
+   "label": "returns"
+  },
+  {
+   "id": "e16",
+   "fromNode": "log_core",
+   "toNode": "projections",
+   "toEnd": "arrow",
+   "fromSide": "right",
+   "toSide": "left",
+   "label": "folded into"
+  },
+  {
+   "id": "e17",
+   "fromNode": "projections",
+   "toNode": "source_contract",
+   "toEnd": "arrow",
+   "fromSide": "top",
+   "toSide": "left",
+   "label": "datastores and indexes are projections"
+  },
+  {
+   "id": "e18",
+   "fromNode": "projections",
+   "toNode": "time",
+   "toEnd": "arrow",
+   "fromSide": "top",
+   "toSide": "bottom",
+   "label": "report applied frontier"
+  },
+  {
+   "id": "e19",
+   "fromNode": "processes",
+   "toNode": "log_core",
+   "toEnd": "arrow",
+   "fromSide": "top",
+   "toSide": "bottom",
+   "label": "state = fold of own actions"
+  },
+  {
+   "id": "e20",
+   "fromNode": "subscriptions",
+   "toNode": "query_shape",
+   "toEnd": "arrow",
+   "fromSide": "right",
+   "toSide": "bottom",
+   "label": "Query + cursor"
+  },
+  {
+   "id": "e21",
+   "fromNode": "projections",
+   "toNode": "access",
+   "toEnd": "arrow",
+   "fromSide": "bottom",
+   "toSide": "top",
+   "label": "access labels are a projection"
+  },
+  {
+   "id": "e22",
+   "fromNode": "operations",
+   "toNode": "log_core",
+   "toEnd": "arrow",
+   "fromSide": "left",
+   "toSide": "right",
+   "label": "invocation + effects = action"
+  },
+  {
+   "id": "e23",
+   "fromNode": "source_contract",
+   "toNode": "operations",
+   "toEnd": "arrow",
+   "fromSide": "bottom",
+   "toSide": "top",
+   "label": "invoke?() executes claimed operations"
+  },
+  {
+   "id": "e24",
+   "fromNode": "controllers",
+   "toNode": "subscriptions",
+   "toEnd": "arrow",
+   "fromSide": "left",
+   "toSide": "right",
+   "label": "built on"
+  },
+  {
+   "id": "e25",
+   "fromNode": "controllers",
+   "toNode": "operations",
+   "toEnd": "arrow",
+   "fromSide": "left",
+   "toSide": "right",
+   "label": "invoke under standing grant"
+  },
+  {
+   "id": "e26",
+   "fromNode": "pure",
+   "toNode": "propagate",
+   "toEnd": "arrow",
+   "fromSide": "top",
+   "toSide": "bottom",
+   "label": "Propagate updates must be pure"
+  },
+  {
+   "id": "e27",
+   "fromNode": "controllers",
+   "toNode": "entities",
+   "toEnd": "arrow",
+   "fromSide": "top",
+   "toSide": "right",
+   "label": "sync of external entities"
+  },
+  {
+   "id": "e28",
+   "fromNode": "behavior",
+   "toNode": "entities",
+   "toEnd": "arrow",
+   "fromSide": "left",
+   "toSide": "right",
+   "label": "behavior is an entity"
+  },
+  {
+   "id": "e29",
+   "fromNode": "scopes_core",
+   "toNode": "query_shape",
+   "toEnd": "arrow",
+   "fromSide": "top",
+   "toSide": "left",
+   "label": "defined membership is a Query"
+  },
+  {
+   "id": "e30",
+   "fromNode": "views",
+   "toNode": "algebras",
+   "toEnd": "arrow",
+   "fromSide": "top",
+   "toSide": "bottom",
+   "label": "collapse = Aggregate with an algebra"
+  },
+  {
+   "id": "e31",
+   "fromNode": "khoras",
+   "toNode": "scopes_core",
+   "toEnd": "arrow",
+   "fromSide": "top",
+   "toSide": "bottom",
+   "label": "a khora is a scope with a center"
+  },
+  {
+   "id": "e32",
+   "fromNode": "khoras",
+   "toNode": "propagate",
+   "toEnd": "arrow",
+   "fromSide": "right",
+   "toSide": "bottom",
+   "label": "field (lean): personalized PageRank"
+  },
+  {
+   "id": "e33",
+   "fromNode": "rights",
+   "toNode": "scopes_core",
+   "toEnd": "arrow",
+   "fromSide": "left",
+   "toSide": "right",
+   "label": "grants target scopes (access facet)"
+  },
+  {
+   "id": "e34",
+   "fromNode": "rights",
+   "toNode": "access",
+   "toEnd": "arrow",
+   "fromSide": "bottom",
+   "toSide": "top",
+   "label": "effective access = grant chain"
+  },
+  {
+   "id": "e35",
+   "fromNode": "access",
+   "toNode": "planner",
+   "toEnd": "arrow",
+   "fromSide": "top",
+   "toSide": "bottom",
+   "label": "labels pushed down as filters"
+  },
+  {
+   "id": "e36",
+   "fromNode": "operations",
+   "toNode": "access",
+   "toEnd": "arrow",
+   "fromSide": "bottom",
+   "toSide": "top",
+   "label": "least privilege; effects carry read restrictions"
+  },
+  {
+   "id": "e37",
+   "fromNode": "orphans",
+   "toNode": "rights",
+   "toEnd": "arrow",
+   "fromSide": "top",
+   "toSide": "bottom",
+   "label": "no live holder"
+  },
+  {
+   "id": "e38",
+   "fromNode": "retention",
+   "toNode": "orphans",
+   "toEnd": "arrow",
+   "fromSide": "right",
+   "toSide": "left",
+   "label": "decay = archive, then shred"
+  },
+  {
+   "id": "e39",
+   "fromNode": "frontier",
+   "toNode": "log_core",
+   "toEnd": "arrow",
+   "fromSide": "top",
+   "toSide": "bottom",
+   "label": "snapshot = frontier over logs"
+  },
+  {
+   "id": "e40",
+   "fromNode": "federation",
+   "toNode": "entities",
+   "toEnd": "arrow",
+   "fromSide": "top",
+   "toSide": "bottom",
+   "label": "global identity"
+  },
+  {
+   "id": "e41",
+   "fromNode": "federation",
+   "toNode": "schema_store",
+   "toEnd": "arrow",
+   "fromSide": "top",
+   "toSide": "bottom",
+   "label": "selective claim publication"
+  },
+  {
+   "id": "e42",
+   "fromNode": "g_sys",
+   "toNode": "g_scope",
+   "toEnd": "arrow",
+   "fromSide": "top",
+   "toSide": "bottom",
+   "label": "installed as kinds + operations (0YA)"
+  },
+  {
+   "id": "e43",
+   "fromNode": "sys_brain",
+   "toNode": "sys_furniture",
+   "toEnd": "arrow",
+   "fromSide": "right",
+   "toSide": "left",
+   "label": "customers, orders, invoices"
+  },
+  {
+   "id": "e44",
+   "fromNode": "open_followups",
+   "toNode": "sys_brain",
+   "toEnd": "arrow",
+   "fromSide": "bottom",
+   "toSide": "right",
+   "label": "rewrite pending",
+   "color": "1"
+  },
+  {
+   "id": "e45",
+   "fromNode": "open_amend",
+   "toNode": "g_schema",
+   "toEnd": "arrow",
+   "fromSide": "left",
+   "toSide": "top",
+   "label": "amendments pending",
+   "color": "1"
+  }
+ ]
+}
