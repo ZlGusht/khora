@@ -11,6 +11,7 @@ There is no implementation code yet. The design lives in [`docs/`](docs/):
   - [Entity sources, time and schema](docs/adr/entity-sources-time-and-schema.md) (ADR-0XY)
   - [Scopes, khoras and rights](docs/adr/scopes-khoras-and-rights.md) (ADR-0XZ)
   - [Entity behavior and effects](docs/adr/entity-behavior-and-effects.md) (ADR-0YA)
+  - [Action log, processes and reactivity](docs/adr/action-log-processes-and-reactivity.md) (ADR-0YB, provisional)
 - [`docs/systems/`](docs/systems/): sample domain system specs, written with the [specification template](docs/systems/template.md).
   - [Nutrition optimization](docs/systems/nutrition-optimization.md)
   - [Built-environment review](docs/systems/built-environment-review.md)
