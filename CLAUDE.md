@@ -18,7 +18,7 @@ There is no implementation code yet.
 **ADRs** use this shape:
 - Header block: Status, Date (DD.MM.YYYY), Issue, Related, Number.
 - Sections: Context, Terms (table), Decisions (numbered, bold lead sentence), Caveats, Consequences (positive, negative), Alternatives considered, Open questions (table with a "Lean" column), Out of scope (TODO), Done when.
-- ADRs are referred to by placeholder ids (ADR-0XX, ADR-0XY, ADR-0XZ, ADR-0YA) until numbers are assigned. Cite decisions as "ADR-0XY decision 10".
+- ADRs are referred to by placeholder ids (ADR-0XX, ADR-0XY, ADR-0XZ, ADR-0YA, ADR-0YB) until numbers are assigned. Cite decisions as "ADR-0XY decision 10".
 - When an ADR amends another, it says so in the decision and lists the amendment under "Done when".
 
 **Markers:**
@@ -32,3 +32,4 @@ There is no implementation code yet.
 
 - ADR-0XZ makes the company brain spec's placement rule, ownership language, participant khoras and scope-to-khora promotion obsolete. `docs/systems/company-brain.md` still needs the rewrite: seats as scopes, rights instead of ownership and placement.
 - ADR-0XZ and ADR-0YA amend ADR-0XX and ADR-0XY (frontiers, pure updates, `invoke`, the shape of actions). The amended ADRs do not yet reflect this in their own text.
+- ADR-0YB (action log, processes and reactivity) is provisional. It amends ADR-0XY decision 7 and ADR-0XX decision 6; neither reflects this yet.
