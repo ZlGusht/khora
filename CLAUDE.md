@@ -7,7 +7,7 @@ This repository is the single source of truth for khora's design. Read and edit 
 - `docs/PRD.md`: product requirements (draft). Sections marked `#TODO` are still template placeholders.
 - `docs/adr/`: architecture decision records, one file per decision area.
 - `docs/systems/`: sample domain system specs, plus `template.md`.
-- `docs/architecture.canvas`: an Obsidian canvas summarizing the PRD, ADRs and specs, with decision numbers. It is a map, not a source of truth: when an ADR or spec changes, update the matching canvas node.
+- `docs/architecture.canvas`: an Obsidian canvas of the projected runtime architecture (components and flows), derived from the ADRs. It is not a source of truth: when an ADR adds or changes a component or flow, update the canvas.
 - The GitHub wiki and the claude.ai Project only point here. Do not add documents to either.
 
 There is no implementation code yet.
