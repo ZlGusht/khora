@@ -17,9 +17,13 @@ There is no implementation code yet.
 
 **ADRs** use this shape:
 - Header block: Status, Date (DD.MM.YYYY), Issue, Related, Number.
-- Sections: Context, Terms (table), Decisions (numbered, bold lead sentence), Caveats, Consequences (positive, negative), Alternatives considered, Open questions (table with a "Lean" column), Out of scope (TODO), Done when.
-- ADRs are referred to by placeholder ids (ADR-0XX, ADR-0XY, ADR-0XZ, ADR-0YA, ADR-0YB) until numbers are assigned. Cite decisions as "ADR-0XY decision 10".
-- When an ADR amends another, it says so in the decision and lists the amendment under "Done when".
+- Sections: Context, Terms (table), Decisions (numbered, bold lead sentence), Costs and risks, Alternatives considered, Open questions (table with a "Lean" column), MVP, Done when.
+- Every sentence must decide something, define a term the decisions use, or name a cost or risk that could change a decision. No positive consequences (they restate decisions), no lists of where something is "already implicit", no cross-references that are not needed to read the decision.
+- Alternatives: only ones a reader would actually propose, one line each.
+- MVP: which decisions are in the MVP and which come later.
+- Done when: only where an issue or tests exist.
+- ADRs are referred to by placeholder ids until numbers are assigned: ADR-0YA (the model; read first), ADR-0YB, ADR-0XY, ADR-0XX, ADR-0XZ, ADR-0YC, ADR-0YD, ADR-0YE. Cite decisions as "ADR-0XY decision 10".
+- When an ADR changes another, update both in the same change.
 
 **Markers:**
 - `(interop: review)`: depends on interoperability across deployments; revisit when that is designed.
@@ -30,6 +34,6 @@ There is no implementation code yet.
 
 ## Known follow-ups
 
-- ADR-0XZ makes the company brain spec's placement rule, ownership language, participant khoras and scope-to-khora promotion obsolete. `docs/systems/company-brain.md` still needs the rewrite: seats as scopes, rights instead of ownership and placement.
-- ADR-0XZ and ADR-0YA amend ADR-0XX and ADR-0XY (frontiers, pure updates, `invoke`, the shape of actions). The amended ADRs do not yet reflect this in their own text.
-- ADR-0YB (action log, processes and reactivity) is provisional. It amends ADR-0XY decision 7 and ADR-0XX decision 6; neither reflects this yet.
+- The system specs predate the current model and use older terms (proxies, governed actions, action layer, controllers, projections). Update a spec's wording when it is next touched.
+- `docs/systems/company-brain.md` still relies on seats, agreements, ownership, placement and participant khoras, none of which ADR-0XZ keeps. It needs a rewrite.
+- ADR-0YE (security model) is a stub.
