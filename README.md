@@ -5,6 +5,7 @@ khora is a unification layer for prototyping, developing, scaling and integratin
 There is no implementation code yet. The design lives in [`docs/`](docs/):
 
 - [`docs/PRD.md`](docs/PRD.md): product requirements (draft).
+- [`docs/implementation-plan.md`](docs/implementation-plan.md): implementation plan (draft): components, milestones, workstreams and tasks.
 - [`docs/adr/`](docs/adr/): architecture decision records (proposed). Read ADR-0YA first.
   - [Origins, behaviors, surfaces and executors](docs/adr/origins-behaviors-surfaces-executors.md) (ADR-0YA): the model
   - [The khora log](docs/adr/khora-log.md) (ADR-0YB)
