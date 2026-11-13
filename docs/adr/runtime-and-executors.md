@@ -1,24 +1,27 @@
 # ADR-0YC: Runtime and executors
 
 > **Status:** Proposed
-> **Date:** 12.11.2026
+> **Date:** 13.11.2026
 > **Issue:** #9 Narrow the kernel
-> **Related:** ADR-0YA (executors); ADR-0XX (declarative logic); ADR-0YD (behaviors and processes)
+> **Related:** ADR-0YA (events and executors); ADR-0XX (declarative logic); ADR-0YD (behaviors and processes)
 > **Number:** to be assigned when added to the repository
 
 ## Context
 
-All logic runs in one runtime, and executors bring initiative (ADR-0YA decisions 7–8). This ADR fixes how the runtime runs logic and how executors, including hubs, behave.
+All logic runs in one runtime, and executors bring initiative (ADR-0YA decisions 11–12). This ADR fixes how the runtime runs logic, how executors, including hubs, behave, and what the kernel is.
 
 ## Terms
 
 | Term | Meaning |
 | --- | --- |
 | **Runtime** | Where all logic runs. |
-| **Trigger** | What starts an executor: a call, a change, a time, or the executor itself. |
+| **Trigger** | What starts an executor: a call, an event, a time, or the executor itself. |
 | **Standing executor** | An executor defined as data that acts until stopped: a reaction, schedule or resident agent. |
 | **Budget** | Limits on depth, count and cost, inherited along causes. |
 | **Hub** | A live shared instance of a surface. |
+| **Kernel** | The code that implements this model: the log, the surface contract, the runtime, and access enforcement. |
+| **Base system** | A system that ships with the kernel. |
+| **Domain system** | A system built on top of the kernel and its base systems. |
 
 ## Decisions
 
@@ -46,6 +49,7 @@ Slow work never delays the first two.
 **6. People and outside agents connect through the API and hubs. Code executors run in the runtime.**
 
 **7. A standing executor acts for whoever granted it and stops when that grant is revoked.**
+- When it acts, it issues an action under that grant (ADR-0YA decision 5).
 - It runs in one place at a time, held as a lease.
 - Triggers are delivered at least once and keyed by trigger and time, so handling one twice changes nothing.
 
@@ -60,12 +64,23 @@ Slow work never delays the first two.
 - It stays on the surface definition it opened with.
 - Its state can be rebuilt from origins.
 
+### Kernel
+
+**11. The kernel is the code in the repository, and is distributed as code.**
+- Definitions (kinds, behaviors, surface definitions) are declared in their own files, apart from engine code.
+- Later the kernel becomes a firmware plus data: definitions move into the log, and the firmware boots from them (PRD P1 Self-containment).
+
+**12. Base systems ship with the kernel; domain systems are built on top,** as an operating system ships with a shell and a file browser.
+- Base systems: principals and grants, scopes, a history view of the log, and a generic entity view.
+- Domain systems live in their own packages and reach data only through surfaces.
+
 ## Costs and risks
 
 - The sandbox is on the hot path. Each call between sandboxed layers adds overhead; inlining declarative logic keeps most of it out.
 - One runtime is one blast radius: a sandbox escape exposes everything.
 - At-least-once delivery makes every handler responsible for idempotence.
 - Hubs on popular surfaces become hotspots and may need to be split.
+- While definitions are code, changing one is a release, and the log does not version them (ADR-0XY).
 
 ## Alternatives considered
 
@@ -83,7 +98,7 @@ Slow work never delays the first two.
 
 ## MVP
 
-Declarative logic only, without the sandbox. Reactions and schedules written in code. Hubs as simple shared rooms. Agents through the API; the agent runner comes later.
+The kernel as code (11) with the base systems (12). Declarative logic only, without the sandbox. Reactions and schedules written in code. Hubs as simple shared rooms. Agents through the API; the agent runner comes later.
 
 ## Done when (issue #9)
 

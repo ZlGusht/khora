@@ -35,6 +35,6 @@ There is no implementation code yet.
 
 ## Known follow-ups
 
-- The system specs predate the current model and use older terms (proxies, governed actions, action layer, controllers, projections). Update a spec's wording when it is next touched.
+- The system specs predate the current model and use older terms (proxies, governed actions, action layer, action log, controllers, projections). Update a spec's wording when it is next touched.
 - `docs/systems/company-brain.md` still relies on seats, agreements, ownership, placement and participant khoras, none of which ADR-0XZ keeps. It needs a rewrite.
 - ADR-0YE (security model) is a stub.

@@ -1,14 +1,14 @@
 # ADR-0XY: Surfaces
 
 > **Status:** Proposed
-> **Date:** 12.11.2026
+> **Date:** 13.11.2026
 > **Issue:** #1 DataStore: base and advanced capabilities
 > **Related:** ADR-0YA (surfaces are the only way to reach data); ADR-0XX (the logic surfaces run); ADR-0YB (the log surfaces build on)
 > **Number:** to be assigned when added to the repository
 
 ## Context
 
-Surfaces are the only way to reach data (ADR-0YA decision 6). This ADR fixes the contract every surface implements, what surfaces declare, how reads are pinned in time, and how writes meet.
+Surfaces are the only way to reach data (ADR-0YA decision 10). This ADR fixes the contract every surface implements, what surfaces declare, how reads are pinned in time, and how writes meet.
 
 ## Terms
 
@@ -37,7 +37,7 @@ ctx = { principal, grant, budget, cause }
 
 - The request states the time it reads at (ADR-0XX decision 2).
 - A result carries its completeness, the frontier it saw, and its annotations.
-- Reads and writes go through the same contract and context, so both are always attributable.
+- Reads and writes go through the same contract and context, so both are always attributable. Each call is one action (ADR-0YA decision 2).
 
 **2. Surfaces declare their capabilities:**
 - authoritative or not;
@@ -62,7 +62,7 @@ Results carry what those declarations imply, such as "as observed at 10:42" or "
 
 **6. Effects keep the vocabulary version they were written in.** A definition that changes meaning provides an upcaster from its earlier versions. An effect with no upcaster path is read as it was and marked.
 
-**7. Every write is conditional on what it read.** If the condition fails, the write is rejected and recorded (ADR-0YB), unless the attribute declares a merge rule.
+**7. Every write is conditional on what it read.** If the condition fails, the action gets a rejected outcome (ADR-0YB decision 3), unless the attribute declares a merge rule.
 
 **8. Surfaces apply writes locally and commit asynchronously.**
 - Unconfirmed writes are a short-lived branch (ADR-0YB decision 8).
@@ -70,8 +70,8 @@ Results carry what those declarations imply, such as "as observed at 10:42" or "
 - Work that needs confirmation waits for it.
 
 **9. External systems are connected through adapters.**
-- An adapter turns the system's changes into native or observed effects, and turns writes into the system's own operations.
-- A write to an external origin stays pending until it is observed there.
+- An adapter records the system's changes as observations, with the effects they cause, and turns writes into the system's own operations.
+- A write to an external origin is unconfirmed until an observation shows it there.
 - Two origins asserting different values for the same thing are both kept, with a contradiction flag.
 
 **10. Materializing a surface changes speed, never results.**
@@ -81,6 +81,7 @@ Results carry what those declarations imply, such as "as observed at 10:42" or "
 ## Costs and risks
 
 - Upcasters accumulate: every change in meaning adds one, permanently.
+- Until definitions live in the log, they are versioned by the repository. A past read then sees old data and old kinds, but current definitions (ADR-0YC decision 11).
 - Asynchronous commits widen the conflict window. Without merge rules, people see more rejections.
 - Pushdown fallbacks are correct but can be far slower than native execution.
 
@@ -96,11 +97,12 @@ Results carry what those declarations imply, such as "as observed at 10:42" or "
 | Question | Lean |
 | --- | --- |
 | Conflict resolution beyond merge rules | Later; needs its own design |
+| Does the first version commit synchronously, so that branches for unconfirmed writes can wait? | Open. The write call answers "unconfirmed" either way, so callers do not change later |
 | Result batch format | Arrow record batches |
 
 ## MVP
 
-Decisions 1–8 and 10, with two or three datastores. Adapters (9) start with the first external system a domain needs.
+Decisions 1–8 and 10, with two or three datastores. Old definitions in past reads (5) wait until definitions live in the log. Adapters (9) start with the first external system a domain needs.
 
 ## Done when (issue #1)
 
