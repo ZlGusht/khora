@@ -8,6 +8,7 @@ This repository is the single source of truth for khora's design. Read and edit 
 - `docs/adr/`: architecture decision records, one file per decision area.
 - `docs/implementation-plan.md`: implementation plan (draft). Built from the ADRs; when an ADR's decisions or MVP change, update the plan in the same change.
 - `docs/systems/`: sample domain system specs, plus `template.md`.
+- `docs/visuals/`: the images shown in the README, exported from the "khora visuals" design canvas. When the model changes, update the canvas and export again; do not edit the images.
 - The GitHub wiki and the claude.ai Project only point here. Do not add documents to either.
 
 There is no implementation code yet.
