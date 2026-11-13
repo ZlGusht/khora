@@ -5,11 +5,16 @@ khora is a unification layer for prototyping, developing, scaling and integratin
 There is no implementation code yet. The design lives in [`docs/`](docs/):
 
 - [`docs/PRD.md`](docs/PRD.md): product requirements (draft).
-- [`docs/adr/`](docs/adr/): architecture decision records (proposed).
-  - [Query model and propagation](docs/adr/query-model-and-propagation.md) (ADR-0XX)
-  - [Entity sources, time and schema](docs/adr/entity-sources-time-and-schema.md) (ADR-0XY)
+- [`docs/implementation-plan.md`](docs/implementation-plan.md): implementation plan (draft): components, milestones, workstreams and tasks.
+- [`docs/adr/`](docs/adr/): architecture decision records (proposed). Read ADR-0YA first.
+  - [Origins, behaviors, surfaces and executors](docs/adr/origins-behaviors-surfaces-executors.md) (ADR-0YA): the model
+  - [The khora log](docs/adr/khora-log.md) (ADR-0YB)
+  - [Surfaces](docs/adr/surfaces.md) (ADR-0XY)
+  - [Surface logic](docs/adr/surface-logic.md) (ADR-0XX)
   - [Scopes, khoras and rights](docs/adr/scopes-khoras-and-rights.md) (ADR-0XZ)
-  - [Entity behavior and effects](docs/adr/entity-behavior-and-effects.md) (ADR-0YA)
+  - [Runtime and executors](docs/adr/runtime-and-executors.md) (ADR-0YC)
+  - [Behaviors and processes](docs/adr/behaviors-and-processes.md) (ADR-0YD)
+  - [Security model](docs/adr/security-model.md) (ADR-0YE, stub)
 - [`docs/systems/`](docs/systems/): sample domain system specs, written with the [specification template](docs/systems/template.md).
   - [Nutrition optimization](docs/systems/nutrition-optimization.md)
   - [Built-environment review](docs/systems/built-environment-review.md)
