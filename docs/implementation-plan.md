@@ -1,27 +1,24 @@
 # khora: implementation plan
 
 > **Status:** Draft for the team session
-> **Date:** 12.11.2026
-> **Built from:** the decision records in `docs/adr/` as of commit `fff8c6a`
+> **Date:** 13.11.2026
+> **Built from:** the decision records in `docs/adr/`, including the event model of 13.11.2026
 
 ## Purpose
 
-This plan turns the eight decision records on the `adr-rewrite` branch into seven workstreams and 51 tasks the team can take. khora has no implementation code yet, seven records are still marked Proposed, and the security record is a stub.
+The goal is a working kernel with a few base systems, on which domain systems are built, as on an operating system's kernel. The plan has four stages. The kernel core is built together; from stage 2 on, each person builds the system they need and pulls kernel capabilities with it.
 
-Three kinds of statement appear below, and they carry different weight:
+Three kinds of statement appear below:
 
 - **Decided:** taken from a decision record, cited as "0YB d3" (record ADR-0YB, decision 3).
-- **MVP cut:** what each record's own MVP section keeps in and leaves for later.
-- ***Suggestion*:** proposed in this plan, not decided in any record. The workstream split, the task list, the milestones and the first system are all suggestions for the team to change.
+- **MVP cut:** what a record's own MVP section keeps in and leaves for later.
+- ***Suggestion*:** proposed in this plan, not decided in any record.
 
-Two things the team should know before reading on:
-
-- The PRD sets the launch target at Q4 2026. That is the current quarter, so the target needs a new date (see Open decisions).
-- The sample system specs still use the older terms (proxies, governed actions, action layer, projections). This plan uses the current ones.
+There is no implementation code yet. Seven records are marked Proposed, and the security record is a stub.
 
 ## The model
 
-khora has three layers: origins hold the truth, surfaces give it shape, and executors act on it. ADR-0YA defines this and every other record builds on it.
+khora has three layers: origins hold the truth, surfaces give it shape, and executors act on it (ADR-0YA).
 
 ```mermaid
 flowchart TB
@@ -34,73 +31,84 @@ flowchart TB
   end
   subgraph OR["Origins: authoritative sources of effects"]
     direction LR
-    LOG["<b>khora log</b><br/>Append-only actions.<br/>Everything khora owns."]
+    LOG["<b>khora log</b><br/>Append-only events.<br/>Everything khora owns."]
     EXT["<b>External systems</b><br/>Connected by adapters.<br/>They keep their own truth."]
   end
-  EX -- "reads and writes carry principal, grant, budget, cause" --> SU
+  EX -- "actions: reads and writes, with principal, grant, budget, cause" --> SU
   SU -- "changes" --> EX
-  SU -- "writes become effects inside actions" --> OR
+  SU -- "actions, then outcomes and effects" --> OR
   OR -- "effects and observations" --> SU
 ```
 
-One runtime runs all logic: surface logic, behaviors and code executors.
+Everything in the log is an event (0YA d1–5):
 
-Read it top down for a write and bottom up for a read. The khora log is the only place khora stores what it owns.
+```mermaid
+flowchart LR
+  E["Executor"] -- requests --> A["<b>Action</b><br/>the request.<br/>Authority is checked here."]
+  A -- decided --> O["<b>Outcome</b><br/>accepted or rejected"]
+  O -- "if accepted" --> F["<b>Effects</b><br/>the result.<br/>Each changes one entity."]
+  X["External system"] -- "seen by an adapter" --> B["<b>Observation</b><br/>carries its source,<br/>not authority"]
+  B -- causes --> F
+```
 
-Six rules from ADR-0YA constrain every component:
+The rules every component holds:
 
-1. State changes only through effects. An entity has no storage of its own (d1).
-2. Everything khora owns lives in its log. Every other origin is an external system (d3).
-3. Surfaces are the only way to reach data, for reads and for writes (d6).
-4. Rules about data are behaviors, never surface logic, so a rule holds through every surface (d5).
-5. Executors keep no state. Whatever must survive is written through a surface (d8).
-6. Anything a write depends on is reproducible or recorded (d9).
+1. Everything that happens is an event. A log holds only events, linked by cause (0YA d1).
+2. A request, its acceptance and its result are separate events: action, outcome, effects (0YA d3).
+3. A read is an action with no effects (0YA d3, 0YB d11).
+4. State changes only through effects. Every effect is caused by an accepted action or by an observation (0YA d4).
+5. Only actions need authority (0YA d5).
+6. Everything khora owns lives in its log (0YA d7).
+7. Surfaces are the only way to reach data (0YA d10).
+8. Rules about data are behaviors, so a rule holds through every surface (0YA d9).
+9. Executors keep no state (0YA d12).
+10. Anything a write depends on is reproducible or recorded (0YA d13).
 
-One write travels this path, and each step belongs to a different workstream:
+One write travels this path:
 
-1. An executor calls a surface's `write` with an operation, a condition and a context (0XY d1).
+1. An executor calls a surface's `write` with an operation, a condition and a context. The call is one action (0XY d1).
 2. Stacked surfaces translate the operation downward until it is effects (0XX d8).
 3. Rules are checked at commit, whichever surface the write came through (0YD d4).
-4. The action is appended to the log as applied or rejected. Both are recorded (0YB d3).
+4. The action's outcome and effects are appended together. A rejected action leaves its action and a rejected outcome (0YB d3, d6).
 5. Surfaces advance in dependency order, access labels first (0YC d4).
-6. Confirmation or rejection reaches the caller through the surface's changes (0XY d8).
+6. The outcome reaches the caller through the surface's changes (0XY d8).
 
-## What we build
+## Kernel and systems
 
-The decision records describe eight components. Each row gives what the component does, what its record keeps in the MVP, and what waits.
+| Layer | What it is | Examples |
+| --- | --- | --- |
+| **Kernel** | The code in the repository, distributed as code (0YC d11) | Log, surface contract, query evaluation, rule check at commit, access enforcement, API |
+| **Base systems** | Ship with the kernel (0YC d12) | Principals and grants, scopes, history view of the log, generic entity view |
+| **Domain systems** | Built on top, in their own packages | Furniture workshop, company brain, nutrition, application development |
 
-| Component | What it does | In the MVP | Later | Record, issue |
-| --- | --- | --- | --- | --- |
-| **Log** | Append-only, totally ordered actions in a causal hash graph. Two times per action. Payloads stored once by hash and encrypted per key. | Decisions 1–7 and 10. Branches for unconfirmed writes only. | Plans, offline edits and agent branches. Snapshots of external content. | 0YB, #4 |
-| **Surface contract** | One contract for every surface: `declares`, `read`, `write`, `changes`. Reads at a frontier, conditional writes, upcasters, materialization. | Decisions 1–8 and 10, with two or three datastores. | Conflict resolution beyond merge rules. | 0XY, #1 |
-| **Adapters** | Connect an external system as an origin: its changes become effects, writes become its own operations. | The first external system a domain needs. | More systems. | 0XY d9 |
-| **Surface logic** | `Query` as data: an envelope and a tree of operators, with `Propagate` as the general one. Named algebras, merge rules, annotations. | Decisions 1–5 and 7–9. Incremental upkeep for rings only. | Other algebras kept live. The algorithm library. Text syntax. | 0XX, #1 |
-| **Runtime** | Runs all logic. Compiles declarative logic and pushes it into datastores. Scheduling classes, dependency-order advance, lazy time. | Declarative logic only. | The sandbox for opaque code (lean: WASM). | 0YC d1–5, #9 |
-| **Executors and hubs** | API for people and outside agents. Standing executors with leases, at-least-once triggers and budgets. Hubs as live shared surfaces. | Reactions and schedules written in code. Hubs as simple shared rooms. Agents through the API. | The agent runner. | 0YC d6–10, #9 |
-| **Behaviors and processes** | Logic bound to a kind or an entity, defined as data. Rules checked at commit. Processes as composed behaviors whose instances are entities. | Derived and invoked behaviors, rules, processes with internal and external actions, child processes and waits. | Agent parts. Parallel composition. | 0YD, #2 and #7 |
-| **Scopes, rights and access** | Scopes as membership surfaces. Rights by grant, no owners. Access labels enforced by the runtime and explainable. | Decisions 1–20, with declared, defined and structural membership. | Detected membership. Identity and distribution across deployments (d21–22). | 0XZ, #6 |
+Two habits keep the later move to firmware plus data cheap (PRD P1 Self-containment):
 
-The security record (0YE) is a stub. It lists what the others already commit to and leaves authentication, secrets, trust boundaries, abuse limits and the threat model to design.
+- Kinds, behaviors and surface definitions are declared in their own files, apart from engine code.
+- Domain systems reach data only through surfaces.
+
+Until definitions live in the log, the repository versions them. A past read then sees old data with current definitions (0XY).
 
 ## Shared contracts
 
-Three shapes are shared by every workstream, so they are fixed first and changed only together. They are copied from the records.
+Three shapes are shared by everyone, so they are fixed in stage 1 and changed only together.
 
-**The action** (0YB d3) is what the log stores and what every surface is built from:
+**The event** (0YB d3):
 
 ```
-Action { id: hash, log, causes: [ActionId],
-         occurred, recorded, vocabulary,
-         actor, on_behalf_of, grant, via,
-         outcome: applied | rejected(reason) | pending,
-         effects: [Effect] }
-Effect = Attr   { entity, attribute, old, new }
-       | Rel    { relation, from, to, +/- }
-       | Member { scope, entity, +/- }
-       | Kind   { entity, old, new }
+Event { id: hash, log, causes: [EventId],
+        occurred, recorded, vocabulary,
+        body: Action | Outcome | Effect | Observation }
+
+Action      { actor, on_behalf_of, grant, via, operation }
+Outcome     { accepted | rejected(reason) }
+Effect      = Attr   { entity, attribute, old, new }
+            | Rel    { relation, from, to, +/- }
+            | Member { scope, entity, +/- }
+            | Kind   { entity, old, new }
+Observation { origin, position, content }
 ```
 
-**The surface contract** (0XY d1) is how anything reaches data:
+**The surface contract** (0XY d1):
 
 ```
 Surface {
@@ -112,7 +120,7 @@ Surface {
 ctx = { principal, grant, budget, cause }
 ```
 
-**The query** (0XX d2 and d4) is the declarative logic surfaces and behaviors carry:
+**The query** (0XX d2 and d4):
 
 ```
 Query { body: Operator,
@@ -123,178 +131,190 @@ Propagate { seed, over, algebra, update?,
             emit:  final | per-step | paths }
 ```
 
-Every component also holds these rules, whichever workstream builds it:
+Rules that hold whoever builds a component:
 
-- **Every call is attributable.** Reads and writes carry the same context (0XY d1).
 - **Every read happens at a frontier,** and its result states completeness, the frontier seen and its annotations (0XY d1, d4).
-- **Every write is conditional on what it read.** A failed condition is rejected and recorded, unless a merge rule applies (0XY d7).
-- **Effects are invertible,** so undo, incremental upkeep and conflict detection share one format (0YB d4).
+- **Every write is conditional on what it read.** A failed condition gives a rejected outcome, unless a merge rule applies (0XY d7).
+- **Effects are invertible** (0YB d4).
 - **Nothing is delivered before access labels reach its frontier** (0YC d4).
-- **A write runs with the caller's rights intersected with the surface's grants,** never the surface's alone (0XZ d16).
+- **A write runs with the caller's rights intersected with the surface's grants** (0XZ d16).
 - **Restrictions travel.** A derived value is readable only by those who may read all its inputs (0XZ d17).
-- **A datastore never silently drops part of a request.** It answers exact, inexact or unsupported (0XY d3).
-- **Nondeterministic output is recorded before a write uses it** (0YA d9).
+- **A datastore never silently drops part of a request** (0XY d3).
 
-## Milestones
+## Testing
 
-*Suggestion.* Four milestones, each ending in something that runs. None has a date, because the team's capacity is not stated anywhere in the repo.
+*Suggestion.* One format for every test, chosen in stage 0: a recorded sequence of events in, expected reads at a frontier out. The log makes this deterministic.
 
-| Milestone | What runs at the end | PRD P0 it covers | Gate to pass |
+- **Kernel:** contract tests any surface can run, and property tests of the invariants. Examples: a rebuild from the log equals the materialized state; an inverse effect undoes its effect; no effect exists without an accepted action or an observation as its cause.
+- **Systems:** every requirement in a system spec has a Verification. Each becomes a scenario in the same format. A system ships with its required behavior and is run against it whenever it or the kernel changes.
+- **Later, as data:** required behavior becomes rules declared on the system's scope. Not built now.
+
+## Stages
+
+*Suggestion.* The team is two technical people and a designer. A fourth person may join for application development. No stage has a date, because the team's weekly capacity is not stated.
+
+| Stage | Technical A | Technical B | Designer |
 | --- | --- | --- | --- |
-| **M0 Foundations** | The shared contracts as types in the chosen language. A log prototype with measurements. | None yet | Language chosen. Log store chosen from the issue #4 measurements. |
-| **M1 Walking skeleton** | A write through the API becomes an action in the log. A state surface answers reads at a frontier, one entity's history, and who did what. A write is undone by its inverse. | Provenance, Computations | The issue #4 queries pass. Surface contract tests pass for one datastore. |
-| **M2 Structure and rules** | Scopes, grants and access labels. Kinds, rules at commit, derived and invoked behaviors. Queries with `Propagate` across two datastores. | Scoping, Modeling (in part) | The issue #6 access tests pass. A rule holds through two different surfaces. |
-| **M3 First system** | One sample system end to end: an adapter syncs an external source, queries answer real questions, a process with a wait and an approval writes back. | Interoperability | The system's own query suite and log replay pass. |
+| **0. Decide** | Language, log store, test format | Same, together | How people see and work with a khora |
+| **1. Kernel core** | Kernel, together | Kernel, together | Generic entity view and history view |
+| **2. Two systems in parallel** | Furniture workshop, slice 1 | Company brain slice | Both interfaces |
+| **3. In parallel** | Furniture workshop, slice 2 | Nutrition, or application development if a fourth person joins | Remaining interfaces |
 
-*Suggestion:* use the **furniture workshop** as the first system. Three reasons:
+| Gate | Passed when |
+| --- | --- |
+| 0 → 1 | The stage 0 decisions are made and the records are accepted |
+| 1 → 2 | An action through the API yields an outcome and effects. State is read at a frontier. The history view shows who did what. The contract tests pass. |
+| 2 → 3 | The furniture slice answers its query suite on real Kroika projects. The company brain slice passes the access tests on the team's own work. |
+| 3 done | A furniture project is linked to a company brain order. An assembled project opens in Kroika. |
 
-- The records already test against it: the log's done-when includes its 100 000-project import (R19), and the process example is `QuoteFromHistory`.
-- It has a real first source (Kroika project files) and a named pilot path: the Kroika author's projects, then one workshop.
-- It exercises the adapter, the mapping into child entities, scoped access per plant, and write-back with approval.
+From stage 2 on, whoever's system needs a kernel capability first builds it against the contract tests, and the other technical person reviews it.
 
-Nutrition optimization is the smaller alternative. It needs no multi-party access, so it would leave the rights work untested.
+## Tasks
 
-**PRD P0 Interaction has no decision record.** It asks for representations people use instead of raw entities, and data that feels alive. Hubs cover the live part. Nothing in the records covers what a person sees, so no milestone above delivers it.
+"Done when" comes from a record's own done-when list where one exists. The Owner column is empty for the team to fill.
 
-## Workstreams and tasks
+### Stage 0: decide
 
-*Suggestion.* Seven workstreams, A to G, one per component group plus the first system. "Done when" comes from each record's own done-when list where one exists. "Needs" lists the tasks that must land first. The Owner column is empty for the team to fill.
+| ID | Decision | Lean in the records | Owner |
+| --- | --- | --- | --- |
+| D1 | Implementation language | None. The planner lean depends on it: DataFusion if Rust, Calcite if JVM (0YC) | |
+| D2 | Log store | Measure Redpanda or Kafka, NATS JetStream, an embedded log on object storage (0YB) | |
+| D3 | Accept the records, with the event model | All Proposed | |
+| D4 | Test format | *Suggestion* above | |
+| D5 | Does the first version commit synchronously? | Open (0XY). If yes, branches wait | |
+| D6 | How people see and work with a khora | No record. PRD P0 Interaction | |
+| D7 | License | Open source intended; license not chosen | |
 
-### A. Log (0YB, issue #4)
+### Stage 1: kernel core
 
-| ID | Task | Done when | Needs | Milestone | Owner |
-| --- | --- | --- | --- | --- | --- |
-| A1 | Action and effect types, content-hash ids over causes, hybrid logical clock | An action round-trips. A frontier that includes an action without its causes is refused. |  | M0 |  |
-| A2 | Log store prototype on the three candidates: Redpanda or Kafka, NATS JetStream, an embedded log on object storage | The five issue #4 measurements exist for each candidate | A1 | M0 |  |
-| A3 | Append path with total order and the three outcomes: applied, rejected, pending | A rejected attempt appears in the log as an action | A2 | M1 |  |
-| A4 | Payload store: content by hash, encrypted per key, shredded by deleting the key | Deleting a key removes the content. Id, causes and actor remain. | A1 | M1 |  |
-| A5 | Bulk write as one action with one payload | A 100 000-project import is one action, and its entities are addressable inside the batch | A3, A4 | M1 |  |
-| A6 | Branches for unconfirmed writes | A read on a branch sees its base up to the fork plus its own actions. A merge appends conditional actions. | A3 | M2 |  |
-
-### B. Surfaces and datastores (0XY, issue #1)
-
-| ID | Task | Done when | Needs | Milestone | Owner |
-| --- | --- | --- | --- | --- | --- |
-| B1 | Surface contract, declaration and context as types | A stub surface implements them |  | M0 |  |
-| B2 | Contract test suite any surface can run | It covers the base contract, each declared capability, conditional writes, upcasting and past reads | B1 | M1 |  |
-| B3 | State datastore: entities and relations materialized from the log | It passes B2. A rebuild from a snapshot equals a rebuild from the start of the log. | A3, B1 | M1 |  |
-| B4 | Frontiers and past reads, by recorded or occurred time | A read at a later frontier waits or returns partial. A past read sees old data, definitions and kinds. | B3 | M1 |  |
-| B5 | Conditional writes with asynchronous commit | A failed condition is rejected and recorded. Confirmation arrives through `changes`. | A6, B3 | M2 |  |
-| B6 | Vocabulary versions and upcasters | An old effect reads both as it was and with today's meaning. An effect with no upcaster path is marked. | B4 | M2 |  |
-| B7 | A second datastore with a declared capability, such as search or time series | It answers exact, inexact or unsupported per operation | B1, B2 | M2 |  |
-| B8 | Adapter framework | External changes become observed effects. A write stays pending until observed. Contradicting values are both kept and flagged. | B5 | M3 |  |
-
-### C. Surface logic and planner (0XX, 0YC d1)
-
-| ID | Task | Done when | Needs | Milestone | Owner |
-| --- | --- | --- | --- | --- | --- |
-| C1 | `Query` as a data structure, with validation | A query is stored and versioned. A malformed one is refused. |  | M0 |  |
-| C2 | `Scan`, `Filter`, `Aggregate` and `Not` on the state datastore | Reads in the M1 demo run as queries | B3, C1 | M1 |  |
-| C3 | `Propagate` with all four stop conditions, in a generic loop | A join runs as `steps(1)`. Reachability runs to `fixpoint`. | C2 | M2 |  |
-| C4 | The seven named algebras, each declaring its properties | An optimization applies only when the algebra declares the property it needs | C3 | M2 |  |
-| C5 | Merge rules as algebras on concurrent writes | Counters add and sets unite. An attribute without a rule conflicts. | C4, B5 | M2 |  |
-| C6 | Annotations as columns: confidence and age by default | A constant confidence of 1 drops out of the plan | C3 | M2 |  |
-| C7 | Planner and pushdown across two datastores | Each pushdown fallback returns the same result as native execution | B7, C3 | M2 |  |
-| C8 | Incremental upkeep for ring algebras. Evaluate DBSP/Feldera and Differential Dataflow first. | A materialized surface equals a recompute after inserts and deletes | C4, B3 | M2 |  |
-
-### D. Scopes, rights and access (0XZ, issue #6; 0YE)
-
-| ID | Task | Done when | Needs | Milestone | Owner |
-| --- | --- | --- | --- | --- | --- |
-| D1 | Principals, the rights bundle, and grants as entities | A creator holds all rights. Nobody can grant more than they hold. | A1 | M2 |  |
-| D2 | Scopes with declared, defined and structural membership, nesting and overlapping | A relation belongs to a scope when both its ends do | B3, C2 | M2 |  |
-| D3 | Access labels as a kernel surface, pushed down as filters | Everything is private by default. A relation is visible only if both ends are. | D1, D2 | M2 |  |
-| D4 | Revocation, cascading through delegated grants | A revocation reaches the labels before any later read is served | D3 | M2 |  |
-| D5 | Write authority as an intersection, with `on_behalf_of` taken from the grant used | A write through a surface never exceeds the caller's own rights | D1, B5 | M2 |  |
-| D6 | Restrictions on derived values, and partial aggregates | A derived value is hidden from anyone who cannot read all its inputs. An aggregate over hidden members is marked partial. | D3, C3 | M2 |  |
-| D7 | Approval for irreversible, external and untrusted-caused writes, and recorded reads | Such a write waits for a holder's approval. A read in a recording scope is in the log. | D5 | M3 |  |
-| D8 | Explain access | For any principal and right, the grant chain is shown, or the reason none exists | D3 | M2 |  |
-| D9 | Authentication at the API and hub boundary. Not designed yet: 0YE is a stub. | A short design is agreed, then implemented |  | M1 |  |
-
-### E. Behaviors and processes (0YD, issues #2 and #7)
-
-| ID | Task | Done when | Needs | Milestone | Owner |
-| --- | --- | --- | --- | --- | --- |
-| E1 | Kinds, and behaviors bound to a kind or to one entity, stored as data | An entity-bound behavior overrides its kind's | A1, F3 | M2 |  |
-| E2 | Derived and invoked behaviors inside surfaces, each with its declaration | An undeclared behavior reports impact as unknown, never as unaffected | E1, C2 | M2 |  |
-| E3 | Rules checked at commit | A rule holds whichever surface a write comes through | E1, B5 | M2 |  |
-| E4 | Behavior versions | A new rule flags violating entities without rewriting them. A read at an earlier frontier uses the earlier version. | E3, B4 | M2 |  |
-| E5 | Process composition: sequence, choice, wait and child process, with internal and external actions | A pure process runs inside surface logic | E2 | M3 |  |
-| E6 | Process instances as entities built from their actions | An instance resumes after a restart without repeating work. A wait holds no resources. It stops when its starter's authority ends. | E5, D4 | M3 |  |
-| E7 | Compensation from invertible effects | A failure across two origins is compensated | E6, B8 | M3 |  |
-
-### F. Runtime, executors and API (0YC, issue #9)
-
-| ID | Task | Done when | Needs | Milestone | Owner |
-| --- | --- | --- | --- | --- | --- |
-| F1 | Runtime skeleton: three scheduling classes, surfaces advancing in dependency order | Slow executor work does not delay label upkeep | B3 | M1 |  |
-| F2 | API for people and outside agents: read, write and changes | The M1 demo runs through it | B1, D9 | M1 |  |
-| F3 | Definitions catalog and boot. Open question in 0YA. | khora starts from vocabulary, behavior and surface definitions held in its own log | A3, B3 | M2 |  |
-| F4 | Standing executors: reactions and schedules in code, each held as a lease | A trigger delivered twice changes nothing. Revoking the grant stops the executor. | F1, D4 | M3 |  |
-| F5 | Budgets along chains of causes | A chain that exhausts its budget stops and is flagged | F4 | M3 |  |
-| F6 | Lazy time: decay and staleness computed on read, with threshold timers | Nothing ticks per entity | F1, C6 | M3 |  |
-| F7 | Hubs as simple shared rooms | Each participant receives only what they may read | F2, D3 | M3 |  |
-
-### G. First system: furniture workshop slice
-
-| ID | Task | Done when | Needs | Milestone | Owner |
-| --- | --- | --- | --- | --- | --- |
-| G1 | Update the spec to the current terms. Listed as a follow-up in `CLAUDE.md`. | No proxies, governed actions or action layer remain in the spec |  | M0 |  |
-| G2 | Vocabulary: kinds for project, piece, panel, material and plant | The kinds load through the catalog | E1 | M3 |  |
-| G3 | Kroika adapter for project files, and the mapper into child entities | Spec R1 and R4 tests pass | B8, G2 | M3 |  |
-| G4 | Query suite and first-sync load test on a generated corpus | Spec R7 passes. R19 is measured. | G3, C7 | M3 |  |
-| G5 | Plants as scopes | Spec R14 and R21 access tests pass | G3, D3 | M3 |  |
-| G6 | `QuoteFromHistory` without its agent part, and assembling a new project with approval and write-back | Spec R9 passes. The new project opens in Kroika. | E6, D7 | M3 |  |
-
-## Sequencing
-
-The log and the state datastore gate almost everything, so they get people first. Ten tasks form the longest chain, and it ends at the quote process.
-
-| Workstream | M0 Foundations | M1 Walking skeleton | M2 Structure and rules | M3 First system |
+| ID | Task | Done when | Needs | Owner |
 | --- | --- | --- | --- | --- |
-| A. Log | **A1, A2** | **A3**, A4, A5 | A6 | |
-| B. Surfaces and datastores | B1 | B2, **B3**, B4 | B5, B6, B7 | B8 |
-| C. Surface logic and planner | C1 | C2 | C3 to C8 | |
-| D. Scopes, rights and access | | D9 | D1 to D6, D8 | D7 |
-| E. Behaviors and processes | | | **E1, E2**, E3, E4 | **E5, E6**, E7 |
-| F. Runtime, executors and API | | F1, F2 | **F3** | F4 to F7 |
-| G. First system | G1 | | | G2 to G5, **G6** |
+| K1 | Event types: action, outcome, effect, observation. Content-hash ids over causes. Hybrid logical clock. | An event round-trips. A frontier that lacks an event's cause is refused. An effect whose cause is neither an accepted outcome nor an observation is refused. | D1 | |
+| K2 | Log store prototype on the candidates | The issue #4 measurements exist for each candidate | K1 | |
+| K3 | Append path: an action, then its outcome and effects together or not at all | A rejected action leaves its action and a rejected outcome, and no effects | K2 | |
+| K4 | Surface contract, declaration and context as types. Each call is one action. | A stub surface implements them | D1 | |
+| K5 | Contract test suite, in the chosen test format | It covers the base contract, each declared capability, conditional writes and past reads | K4, D4 | |
+| K6 | State datastore: entities and relations materialized from effects | It passes K5. A rebuild from a snapshot equals a rebuild from the start of the log. | K3, K4 | |
+| K7 | Frontiers and past reads, by recorded or occurred time | A read at a later frontier waits or returns partial. A past read sees old data and old kinds. | K6 | |
+| K8 | `Query` as a data structure, with `Scan`, `Filter`, `Aggregate` and `Not` | A query is stored and validated. Reads in the stage 1 demo run as queries. | K6 | |
+| K9 | Conditional writes | A failed condition gives a rejected outcome. The call answers "unconfirmed" and the outcome arrives through `changes`. | K6, D5 | |
+| K10 | Reads as actions | An accepted read has an action and an outcome, and no effects | K3, K4 | |
+| K11 | Authentication at the API boundary. Not designed: 0YE is a stub. | A short design is agreed, then implemented | | |
+| K12 | API for people and outside agents: read, write, changes | The stage 1 demo runs through it | K4, K11 | |
+| K13 | Definitions in their own files: kinds, behaviors, surface definitions | No definition is written inside engine code | K6 | |
+| B1 | Base system: history view of the log | One entity's history, recent events in a scope, and the action behind any effect | K7, K8 | |
+| B2 | Base system: generic entity view | A person can create, change and view entities without a domain system | K12, D6 | |
 
-Tasks in bold are on the longest chain.
+*Suggestion:* use a minimal nutrition model as the stage 1 test content: a few kinds, entered by hand, no store adapter. It gives the core a real use before any system starts.
 
-Each row is a workstream and each column a milestone. Cells in the same column can run in parallel once their "Needs" are met.
+### Stage 2: two systems in parallel
 
-- **Day one, in parallel:** A1, B1, C1, G1, and the design for D9. None of them needs another task.
-- **The longest chain:** A1 → A2 → A3 → B3 → F3 → E1 → E2 → E5 → E6 → G6. A delay on any of these delays M3.
-- **The widest fan-out:** B3, the state datastore. Seven tasks across four workstreams need it directly.
-- **The quiet blocker:** F3, the definitions catalog. Behaviors cannot be stored as data until it exists, and 0YA leaves its design open.
-- **M2 is the heaviest milestone,** with 22 of the 51 tasks. Logic (C) and rights (D) can go to different people: rights needs logic only for D2 and D6.
+**Furniture workshop, slice 1 (Technical A):** one workshop, read-only.
+
+| ID | Task | Done when | Pulls from the kernel | Owner |
+| --- | --- | --- | --- | --- |
+| F1 | Update the spec to the current terms | No proxies, governed actions or action log remain | | |
+| F2 | Kinds: project, piece, panel, material | The kinds load from their files | K13 | |
+| F3 | Kroika adapter for project files | Spec R1: added, changed, moved and deleted projects are followed | P1 | |
+| F4 | Mapper from a project into child entities | Spec R4: an edited piece changes only its own entity | P1 | |
+| F5 | Structured queries with ranges and facets | Spec R7 on a reference corpus | P2 | |
+
+**Company brain slice (Technical B):** work management, on the team's own khora work.
+
+| ID | Task | Done when | Pulls from the kernel | Owner |
+| --- | --- | --- | --- | --- |
+| C1 | Rewrite the spec onto scopes and rights. It still relies on seats and ownership. | The spec uses only what ADR-0XZ keeps | | |
+| C2 | Kinds for work: goal, requirement, work item, definition of done | The team's tasks from this plan are entities | K13 | |
+| C3 | Customer, order and invoice kinds, agreed with the furniture system | Both systems use the same entities | | |
+| C4 | Team members as principals, work scoped per person and per project | The issue #6 access tests pass on the team's work | P3, P4, P5 | |
+| C5 | Rules on work items, and derived values such as progress | A rule holds whichever surface a write comes through | P6 | |
+
+**Kernel capabilities pulled in stage 2:**
+
+| ID | Capability | Done when | Pulled by | Owner |
+| --- | --- | --- | --- | --- |
+| P1 | Adapter framework, read-only | External changes become observations and the effects they cause (0XY d9) | F3 | |
+| P2 | A second datastore with search, and pushdown from the planner | It answers exact, inexact or unsupported per operation. A fallback returns the same result as native execution. | F5 | |
+| P3 | Base system: principals and grants | A creator holds all rights. Nobody can grant more than they hold. | C4 | |
+| P4 | Base system: scopes with declared, defined and structural membership. `Propagate` with reachability and counts. | A relation belongs to a scope when both its ends do | C4 | |
+| P5 | Access labels, enforcement, revocation and explanation | Private by default. A revocation reaches the labels before any later read. The grant chain can be shown. | P3, P4 | |
+| P6 | Behaviors: derived, invoked, and rules at commit | An undeclared behavior reports impact as unknown | C5 | |
+
+### Stage 3: in parallel
+
+**Furniture workshop, slice 2 (Technical A):** several plants, and writing back.
+
+| ID | Task | Done when | Pulls from the kernel | Owner |
+| --- | --- | --- | --- | --- |
+| F6 | Plants as scopes | Spec R14 and R21 access tests pass | P5 | |
+| F7 | Link projects to company brain customers and orders | Spec R12. Two systems share entities on one khora (PRD P0 Interoperability). | C3 | |
+| F8 | Assemble a new project, with approval and write-back | Spec R9. The new project opens in Kroika. | P7, P8 | |
+| F9 | `QuoteFromHistory`, without its agent part | The instance resumes after a restart without repeating work | P9 | |
+| F10 | First sync of a large corpus. To be confirmed. | Spec R19 is measured | P10 | |
+
+**Nutrition (Technical B),** or application development if a fourth person joins.
+
+| ID | Task | Done when | Pulls from the kernel | Owner |
+| --- | --- | --- | --- | --- |
+| N1 | Extend the spec. It has two requirements. | Requirements with verifications exist | | |
+| N2 | One store source for prices and stock | Prices are observations with their source and time | P1 | |
+| N3 | Demand derived from activity | The demand changes when the activity does | P6 | |
+| N4 | A plan computed outside khora, through the API | The plan is written back as an action by the optimizer (PRD P0 Computations) | K12 | |
+| N5 | A weekly schedule | A trigger delivered twice changes nothing | P11 | |
+| A1 | Application development overlay: import this repository's requirements, decisions and tasks as entities. The repository stays the system of record. | The impact of changing a decision is a `Propagate` query | P1, P4 | |
+
+**Kernel capabilities pulled in stage 3:**
+
+| ID | Capability | Done when | Pulled by | Owner |
+| --- | --- | --- | --- | --- |
+| P7 | Approval for irreversible, external and untrusted-caused writes (0XZ d18) | Such a write waits for a holder's approval | F8 | |
+| P8 | Writes to an external origin | The write is confirmed by the observation that shows it there | F8 | |
+| P9 | Processes: sequence, choice, wait, child process. Instances as entities built from their events. | A wait holds no resources. An instance stops when its starter's authority ends. | F9 | |
+| P10 | Bulk write as one action with one payload. To be confirmed. | A 100 000-project import is one action | F10 | |
+| P11 | Standing executors: reactions and schedules, each held as a lease, with budgets | Revoking the grant stops the executor. A chain that exhausts its budget stops. | N5 | |
+
+### Not staged: built when a system needs it
+
+- Branches for unconfirmed writes, and asynchronous commit (0YB d8, 0XY d8).
+- The other five algebras, merge rules, and incremental upkeep (0XX d5–7).
+- Vocabulary versions and upcasters (0XY d6).
+- Payload encryption per key, and shredding (0YB d10). Decide key granularity before the first personal data that must be deletable.
+- A policy for which reads are kept (0YB open question).
+- Hubs, lazy time, compensation, detected scopes.
+- Definitions in the log, and the firmware that boots from them (PRD P1).
+- The sandbox and the agent runner.
+- Identity and distribution across deployments (0XZ d21–22). **(interop: review)**
+
+## PRD coverage
+
+| PRD P0 requirement | First delivered by |
+| --- | --- |
+| Provenance | Stage 1: the history view (B1) |
+| Computations | Stage 1: the API (K12); proven by N4 |
+| Interaction | Stage 1: the generic entity view (B2), after D6. No record covers it yet. |
+| Scoping | Stage 2: P4, P5 |
+| Modeling | Stage 2 in part: kinds and behaviors. No record covers the upper ontology. |
+| Interoperability | Stage 3: F7 |
+
+Materialization and versioning recur in every component. The records give each one mechanism: a version is a frontier in the log, and a materialized surface changes speed, never results (0XY d10). For now there are two modes only: kept live, and computed on request. *Suggestion.*
 
 ## Open decisions
 
-Thirteen decisions are open. The first four block M0 and belong in the team session.
+Beyond stage 0:
 
-| Decision | Lean in the records | Blocks | Needed by |
-| --- | --- | --- | --- |
-| **Implementation language** | None stated. The planner lean depends on it: DataFusion if Rust, Calcite if JVM (0YC). | Every task | M0 |
-| **Log store** | Measure Redpanda or Kafka, NATS JetStream, and an embedded log on object storage (0YB) | A2, A3 | M0 |
-| **Accept the records** | All seven are Proposed and unnumbered. The model record says every other builds on it. | Shared contracts | M0 |
-| **First system** | None stated. *Suggestion:* furniture workshop. | Workstream G | M0 |
-| **Which two or three datastores** | Not named. 0XY lists the capabilities: traversal, search, spatial, time series, valid time. | B3, B7 | M1 |
-| **Authentication** | To design (0YE stub) | D9, F2 | M1 |
-| **Definitions catalog and boot** | Open: a named catalog surface, or ordinary surfaces over definition effects (0YA) | F3, E1 | M2 |
-| **Incremental engine** | Adopt rather than build: DBSP/Feldera or Differential Dataflow (0XX) | C8 | M2 |
-| **Key granularity for encryption** | Per entity, or per holder and scope. Decide with security (0YB). | A4 | M1 |
-| **Upper ontology** | No record covers it. PRD P0 Modeling asks for a complete structural ontology kernel. | G2, and Modeling in full | M2 |
-| **Interaction layer** | No record covers it. PRD P0 Interaction. | What people see at M3 | M3 |
-| **Launch target** | The PRD says Q4 2026, with no code written yet | Planning | M0 |
-| **License** | Open source is intended. The license is not chosen. | First public commit of code | M0 |
-
-These are open in the records but do not block the MVP: the sandbox (lean: WASM), rebasing long-lived branches, conflict resolution beyond merge rules, how a khora's field is defined, whether the existence of hidden entities is protected, the process definition syntax, and everything marked **(interop: review)**.
+| Decision | Lean in the records | Blocks |
+| --- | --- | --- |
+| Which datastores | Not named. 0XY lists capabilities: traversal, search, spatial, time series, valid time | K6, P2 |
+| Do events carry domain kinds? | The action's operation carries the meaning; open (0YA) | K1 |
+| Which reads are kept, and for how long | *Suggestion* in 0YB | Read volume |
+| Key granularity for encryption | Per entity, or per holder and scope (0YB) | Shredding |
+| Upper ontology | No record | PRD P0 Modeling in full |
+| Incremental engine | Adopt: DBSP/Feldera or Differential Dataflow (0XX) | Incremental upkeep |
+| Launch target | The PRD says Q4 2026, with no code written yet | Planning |
 
 ## Sources
 
-Everything above marked as decided comes from this repository at commit `fff8c6a` (branch `adr-rewrite`), read on 12 November 2026. Issue numbers are as cited inside the records; the issues themselves were not read.
+Issue numbers are as cited inside the records; the issues themselves were not read.
 
 | Record | File |
 | --- | --- |
@@ -303,9 +323,9 @@ Everything above marked as decided comes from this repository at commit `fff8c6a
 | ADR-0XY, surfaces | [surfaces.md](adr/surfaces.md) |
 | ADR-0XX, surface logic | [surface-logic.md](adr/surface-logic.md) |
 | ADR-0XZ, scopes, khoras and rights | [scopes-khoras-and-rights.md](adr/scopes-khoras-and-rights.md) |
-| ADR-0YC, runtime and executors | [runtime-and-executors.md](adr/runtime-and-executors.md) |
+| ADR-0YC, runtime, executors and kernel | [runtime-and-executors.md](adr/runtime-and-executors.md) |
 | ADR-0YD, behaviors and processes | [behaviors-and-processes.md](adr/behaviors-and-processes.md) |
 | ADR-0YE, security model (stub) | [security-model.md](adr/security-model.md) |
 | Product requirements | [PRD.md](PRD.md) |
-| Furniture workshop spec | [furniture-workshop.md](systems/furniture-workshop.md) |
+| System specs | [systems/](systems/) |
 | Conventions and follow-ups | [CLAUDE.md](../CLAUDE.md) |

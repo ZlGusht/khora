@@ -1,14 +1,14 @@
 # ADR-0YD: Behaviors and processes
 
 > **Status:** Proposed
-> **Date:** 12.11.2026
+> **Date:** 13.11.2026
 > **Issue:** #2 Make process execution core capability; #7 Process model
 > **Related:** ADR-0YA (behaviors are the logic of entities); ADR-0XX (operations); ADR-0YC (the runtime that runs them)
 > **Number:** to be assigned when added to the repository
 
 ## Context
 
-Entities can have their own logic and cause effects (ADR-0YA decision 4). Processes are that logic composed over time. This ADR fixes how behaviors are bound, declared, enforced and versioned, and how processes compose them.
+Entities can have their own logic and cause effects (ADR-0YA decision 8). Processes are that logic composed over time. This ADR fixes how behaviors are bound, declared, enforced and versioned, and how processes compose them.
 
 ## Terms
 
@@ -16,7 +16,7 @@ Entities can have their own logic and cause effects (ADR-0YA decision 4). Proces
 | --- | --- |
 | **Rule** | A behavior that constrains what an entity may be. |
 | **Process** | A behavior composed of actions and other processes. |
-| **Instance** | A running process: an entity whose state is built from its actions. |
+| **Instance** | A running process: an entity whose state is built from its events. |
 
 ## Decisions
 
@@ -30,7 +30,7 @@ Entities can have their own logic and cause effects (ADR-0YA decision 4). Proces
 - reactive: runs when something changes;
 - autonomous: acts on its own initiative.
 
-Derived and invoked behaviors run inside surfaces; reactive and autonomous ones run as executors (ADR-0YA decision 7).
+Derived and invoked behaviors run inside surfaces; reactive and autonomous ones run as executors (ADR-0YA decision 11).
 
 **3. Every behavior declares** its trigger, what it reads and writes (as scopes), its effect class (pure, internal, external), its reversibility and its determinism. An undeclared behavior is opaque: impact on it is "unknown", never "unaffected".
 
@@ -40,13 +40,13 @@ Derived and invoked behaviors run inside surfaces; reactive and autonomous ones 
 
 ### Processes
 
-**6. A process is a behavior composed of actions and other processes,** in sequence, in parallel, by choice, or waiting for an action. Parts with overlapping writes do not run in parallel.
+**6. A process is a behavior composed of actions and other processes,** in sequence, in parallel, by choice, or waiting for an event. Parts with overlapping writes do not run in parallel.
 
 **7. A process with no effects and no nondeterminism is pure** and can be used in surface logic, including as a `Propagate` update.
 
-**8. A process instance is an entity** whose state is built from its actions in the log.
+**8. A process instance is an entity** whose state is built from its events in the log.
 - It stays on the version it started with until it is migrated explicitly.
-- A wait holds no resources; the matching action resumes the instance.
+- A wait holds no resources; the matching event resumes the instance.
 
 **9. An instance acts for its starter and stops when the starter's authority ends.** Reversible work in progress completes; irreversible work is aborted. Each part gets a share of the instance's budget.
 

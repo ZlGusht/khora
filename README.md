@@ -2,6 +2,44 @@
 
 khora is a unification layer for prototyping, developing, scaling and integrating systems. Everything is data, the system grows out instead of being built, scale compounds value instead of adding cost, and meaning is stored and manipulated at its core.
 
+## What khora is for
+
+Each thing exists once, and every tool, view and agent reads that one entity.
+
+![Today each tool keeps its own copy; with khora each thing exists once](docs/visuals/one-model-instead-of-copies.png)
+
+The four uses from the product requirements, as steps you take and steps khora takes.
+
+![Four ways to use khora](docs/visuals/four-ways-to-use-khora.png)
+
+Six sample systems are specified in this repository. None is built yet.
+
+![Six sample systems on one khora](docs/visuals/sample-systems.png)
+
+One of them, the furniture workshop, from sync to write-back.
+
+![A quote from past work, in six steps](docs/visuals/quote-from-past-work.png)
+
+## How it works
+
+Executors act, surfaces give shape, and origins hold the truth.
+
+![khora architecture: executors, surfaces, origins and the runtime](docs/visuals/architecture.png)
+
+Everything in the log is an event. A request, its acceptance and its result are separate events.
+
+![Action, outcome, effects and observation as events](docs/visuals/everything-is-an-event.png)
+
+One write, from the request to its confirmed result.
+
+![One write, end to end, in seven steps](docs/visuals/one-write-end-to-end.png)
+
+Access follows grants and scopes. No entity has an owner.
+
+![Grant chains and scopes feed access labels, which filter every read](docs/visuals/access.png)
+
+## Documents
+
 There is no implementation code yet. The design lives in [`docs/`](docs/):
 
 - [`docs/PRD.md`](docs/PRD.md): product requirements (draft).
@@ -15,6 +53,7 @@ There is no implementation code yet. The design lives in [`docs/`](docs/):
   - [Runtime and executors](docs/adr/runtime-and-executors.md) (ADR-0YC)
   - [Behaviors and processes](docs/adr/behaviors-and-processes.md) (ADR-0YD)
   - [Security model](docs/adr/security-model.md) (ADR-0YE, stub)
+- [`docs/visuals/`](docs/visuals/): the images above.
 - [`docs/systems/`](docs/systems/): sample domain system specs, written with the [specification template](docs/systems/template.md).
   - [Nutrition optimization](docs/systems/nutrition-optimization.md)
   - [Built-environment review](docs/systems/built-environment-review.md)

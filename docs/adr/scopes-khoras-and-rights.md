@@ -1,7 +1,7 @@
 # ADR-0XZ: Scopes, khoras and rights
 
 > **Status:** Proposed
-> **Date:** 12.11.2026
+> **Date:** 13.11.2026
 > **Issue:** #6 Scopes
 > **Related:** ADR-0YA (the model); ADR-0XY (surfaces); ADR-0YE (security model)
 > **Number:** to be assigned when added to the repository
@@ -81,6 +81,7 @@ Adopting a detected scope pins it as declared or defined.
 - Access needs a chain of grants from a holder, over a scope that contains the entity.
 - Re-granting needs the grant right.
 - There are no deny rules in the MVP.
+- Authority is checked on actions only. Outcomes, effects and observations are valid by their cause (ADR-0YA decisions 4–5).
 
 **14. A relation is visible only if both its ends are visible.**
 
@@ -95,7 +96,7 @@ Adopting a detected scope pins it as declared or defined.
 
 **18. Holders of a scope set which writes need approval.** By default these are irreversible writes, external writes, and writes whose cause includes content from an untrusted origin.
 
-**19. Holders of a scope can require reads in it to be recorded.**
+**19. Holders of a scope can require reads in it to be kept.** Every read is an action (ADR-0YB decision 11); this sets which ones are kept durably.
 
 **20. Access is enforced by the runtime and is explainable.**
 - Read access is materialized as labels, a kernel surface, and pushed down as filters.
