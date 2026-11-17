@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Prints the Obsidian app's temp folder — the root of the khora plugin's queue dirs —
+# as a path usable from bash. Never use the agent's own $TMPDIR / /tmp: the plugin can't see it.
+case "$(uname -s)" in
+  Darwin)               getconf DARWIN_USER_TEMP_DIR | sed 's:/*$::' ;;
+  MINGW*|MSYS*|CYGWIN*) cygpath -u "${LOCALAPPDATA}\Temp" ;;   # Git Bash's own $TEMP is /tmp — wrong dir
+  *)                    printf '%s\n' "${TMPDIR:-/tmp}" | sed 's:/*$::' ;;
+esac

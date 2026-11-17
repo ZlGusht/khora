@@ -1,3 +1,8 @@
+---
+areas:
+  - "[[Product]]"
+---
+
 ## 1. Overview
  
 - **System name:** Lifelong learning

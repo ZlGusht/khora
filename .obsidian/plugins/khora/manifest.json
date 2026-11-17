@@ -1,0 +1,9 @@
+{
+	"id": "khora",
+	"name": "Khora",
+	"version": "0.1.0",
+	"minAppVersion": "1.12.0",
+	"description": "Khora agent-layer plugin. Exposes capabilities not in the Obsidian CLI as palette commands with file-based I/O, so external scripts can compose them without using obsidian eval.",
+	"author": "Khora",
+	"isDesktopOnly": true
+}

@@ -1,3 +1,8 @@
+---
+areas:
+  - "[[Product]]"
+---
+
 > **Status:** Draft. Points marked **(interop: review)** depend on interoperability between khoras and are to be reviewed once that functionality is designed. The definition of a khora, as opposed to a scope, is #TODO.
  
 ## 1. Overview

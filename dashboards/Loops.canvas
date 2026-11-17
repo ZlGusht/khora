@@ -1,0 +1,92 @@
+{
+	"nodes": [
+		{
+			"id": "g-23cae583fd75c7",
+			"x": 720,
+			"y": 0,
+			"width": 1200,
+			"height": 189,
+			"type": "text",
+			"text": "# Loops\nThe team's open loops: the current weekly and every run in progress.\n\nColours: red = needs a person now · orange = header and Reading · yellow = live · purple = Spec, kinds and processes.\n\nRendered 2026-11-17 by agent:claude-opus-5-5",
+			"color": "2"
+		},
+		{
+			"id": "g-510675bd9c99f9",
+			"x": 720,
+			"y": 309,
+			"width": 760,
+			"height": 136,
+			"type": "text",
+			"text": "## Reading · 2026-11-17\n- No loop runs exist yet: no Team Weekly has been opened and no Loop run started.\n- **Needs a person:** open the first Team Weekly to start the rhythm.",
+			"color": "2"
+		},
+		{
+			"id": "g-4131cd90ec4ced",
+			"type": "group",
+			"label": "Open loops",
+			"x": 720,
+			"y": 565,
+			"width": 840,
+			"height": 410
+		},
+		{
+			"id": "g-172c286006a28e",
+			"x": 760,
+			"y": 635,
+			"width": 760,
+			"height": 300,
+			"type": "text",
+			"text": "```dataviewjs\nawait dv.view(\"dashboards/views/open-loops\", {})\n```",
+			"color": "3"
+		},
+		{
+			"id": "g-a714f9d37266b7",
+			"type": "group",
+			"label": "Closed in the last 90 days",
+			"x": 1680,
+			"y": 565,
+			"width": 440,
+			"height": 410
+		},
+		{
+			"id": "g-a9d933be9f9867",
+			"x": 1720,
+			"y": 635,
+			"width": 360,
+			"height": 300,
+			"type": "text",
+			"text": "```dataviewjs\nawait dv.view(\"dashboards/views/closed-loops\", {})\n```",
+			"color": "3"
+		},
+		{
+			"id": "g-234201d88bfaa6",
+			"type": "group",
+			"label": "Calls, last 30 days",
+			"x": 2240,
+			"y": 565,
+			"width": 440,
+			"height": 410
+		},
+		{
+			"id": "g-722e082131d080",
+			"x": 2280,
+			"y": 635,
+			"width": 360,
+			"height": 300,
+			"type": "text",
+			"text": "```dataviewjs\nawait dv.view(\"dashboards/views/calls\", {\"days\": 30, \"limit\": 8})\n```",
+			"color": "3"
+		},
+		{
+			"id": "spec",
+			"type": "text",
+			"x": 0,
+			"y": 0,
+			"width": 560,
+			"height": 698,
+			"color": "6",
+			"text": "## Spec · Loops\n*Edit this card to change what the canvas shows. Agents re-render everything else from it via [[Render Canvas v1.0.0]].*\n\n**Purpose.** A working map of the team's open loops: the current Team Weekly, and every Loop run in progress.\n\n**Top:** the open `Team Weekly v1.0.0` run as a hub: centre the live loop-card; top a Reading card (phase against evidence, Reservoir state as in [[Loop v2.0.0]], what changed, what needs a person); left its active Decisions; right the issues the team means to close this week; bottom the Calls of the week.\n\n**Below, one hub per other open loop run**, sub-loops in the row below their parent: centre loop-card; left active Decisions originating in it; right its open issues; bottom its unresolved Letters summarised.\n\n**Always:** a live `open-loops` table and a live `closed-loops` card for the last 90 days.\n\n**Live vs agent:** lists are live views from dashboards/views/; agent cards carry judgement. Each list sits in a labelled group.\n\n**Edges:** none.\n\n**Triggers:** when a loop opens, closes or changes phase; at each Team Weekly's Laydown and Observe; on request.\n\nKinds: Loop v2.0.0, Team Weekly v1.0.0, Letter v1.0.0, Call v1.0.0\n"
+		}
+	],
+	"edges": []
+}

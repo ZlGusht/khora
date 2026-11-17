@@ -1,0 +1,5 @@
+.obsidian/workspace*.json
+.smart-env/
+dashboards/stale.md
+__pycache__/
+.superpowers/

@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Runs khora-validate-entity.py with whichever Python 3 on this machine has PyYAML.
+# macOS usually has `python3`; Windows usually has `python` (python3 may be a Store stub).
+here="$(cd "$(dirname "$0")" && pwd)"
+for py in python3 python; do
+  if "$py" -c "import sys, yaml; sys.exit(sys.version_info < (3, 8))" >/dev/null 2>&1; then
+    exec "$py" "$here/khora-validate-entity.py" "$@"
+  fi
+done
+echo "khora-validate: no Python 3 with PyYAML found — install Python 3, then: <python> -m pip install --user pyyaml" >&2
+exit 2

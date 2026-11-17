@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Prints a fresh lowercase UUID v4 (for identity__uuid and plugin queue ids).
+if command -v uuidgen >/dev/null 2>&1; then
+  uuidgen | tr 'A-Z' 'a-z'
+else
+  powershell.exe -NoProfile -Command "[guid]::NewGuid().ToString()" | tr -d '\r'
+fi

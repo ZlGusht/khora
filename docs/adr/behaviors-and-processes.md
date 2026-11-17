@@ -1,3 +1,8 @@
+---
+areas:
+  - "[[Behaviors]]"
+---
+
 # ADR-0YD: Behaviors and processes
 
 > **Status:** Proposed
