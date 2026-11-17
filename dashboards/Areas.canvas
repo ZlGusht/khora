@@ -1,0 +1,505 @@
+{
+	"nodes": [
+		{
+			"id": "g-23cae583fd75c7",
+			"x": 720,
+			"y": 0,
+			"width": 1200,
+			"height": 189,
+			"type": "text",
+			"text": "# Areas\nThe state of each area of khora's design: decided, open, and where it is written.\n\nColours: red = needs a person now · orange = header and Reading · yellow = live · purple = Spec, kinds and processes.\n\nRendered 2026-11-17 by agent:claude-opus-5-5",
+			"color": "2"
+		},
+		{
+			"id": "g-510675bd9c99f9",
+			"x": 720,
+			"y": 309,
+			"width": 760,
+			"height": 208,
+			"type": "text",
+			"text": "## Reading · 2026-11-17\n- First render. The vault has no Decisions or Questions yet, so every Area is empty.\n- Eight transcripts are waiting for Call Ingestion (see the Stale canvas). Until they are ingested, no document can be traced.\n- **Needs a person:** decide how transcripts are shared, now that they stay out of git, before the first ingestion.",
+			"color": "2"
+		},
+		{
+			"id": "g-4b3b152b205845",
+			"type": "group",
+			"label": "Design",
+			"x": 720,
+			"y": 637,
+			"width": 440,
+			"height": 1074
+		},
+		{
+			"id": "g-4a90f3010a3897",
+			"x": 760,
+			"y": 707,
+			"width": 360,
+			"height": 300,
+			"type": "text",
+			"text": "```dataviewjs\nawait dv.view(\"dashboards/views/decisions\", {\"area\": \"Design\", \"limit\": 8})\n```",
+			"color": "3"
+		},
+		{
+			"id": "g-54ad55f21aafaf",
+			"x": 760,
+			"y": 1047,
+			"width": 360,
+			"height": 300,
+			"type": "text",
+			"text": "```dataviewjs\nawait dv.view(\"dashboards/views/questions\", {\"area\": \"Design\", \"limit\": 6})\n```",
+			"color": "3"
+		},
+		{
+			"id": "g-68469fe39526a9",
+			"x": 760,
+			"y": 1387,
+			"width": 360,
+			"height": 146,
+			"type": "text",
+			"text": "**Documents**\n- [[docs/adr/origins-behaviors-surfaces-executors|origins-behaviors-surfaces-executors.md]]"
+		},
+		{
+			"id": "g-b626c0c62a8738",
+			"x": 760,
+			"y": 1573,
+			"width": 360,
+			"height": 98,
+			"type": "text",
+			"text": "**Open issues**\n*None link this Area's Decisions yet.*"
+		},
+		{
+			"id": "g-64128480a6eccc",
+			"type": "group",
+			"label": "Log",
+			"x": 1280,
+			"y": 637,
+			"width": 440,
+			"height": 1026
+		},
+		{
+			"id": "g-6a7c5d7270f970",
+			"x": 1320,
+			"y": 707,
+			"width": 360,
+			"height": 300,
+			"type": "text",
+			"text": "```dataviewjs\nawait dv.view(\"dashboards/views/decisions\", {\"area\": \"Log\", \"limit\": 8})\n```",
+			"color": "3"
+		},
+		{
+			"id": "g-2b9950ad272d0f",
+			"x": 1320,
+			"y": 1047,
+			"width": 360,
+			"height": 300,
+			"type": "text",
+			"text": "```dataviewjs\nawait dv.view(\"dashboards/views/questions\", {\"area\": \"Log\", \"limit\": 6})\n```",
+			"color": "3"
+		},
+		{
+			"id": "g-6d348e9d71c7cb",
+			"x": 1320,
+			"y": 1387,
+			"width": 360,
+			"height": 98,
+			"type": "text",
+			"text": "**Documents**\n- [[docs/adr/khora-log|khora-log.md]]"
+		},
+		{
+			"id": "g-fadf0086beb2ee",
+			"x": 1320,
+			"y": 1525,
+			"width": 360,
+			"height": 98,
+			"type": "text",
+			"text": "**Open issues**\n*None link this Area's Decisions yet.*"
+		},
+		{
+			"id": "g-a13923e580190f",
+			"type": "group",
+			"label": "Surfaces",
+			"x": 1840,
+			"y": 637,
+			"width": 440,
+			"height": 1026
+		},
+		{
+			"id": "g-4207adb3ca9c87",
+			"x": 1880,
+			"y": 707,
+			"width": 360,
+			"height": 300,
+			"type": "text",
+			"text": "```dataviewjs\nawait dv.view(\"dashboards/views/decisions\", {\"area\": \"Surfaces\", \"limit\": 8})\n```",
+			"color": "3"
+		},
+		{
+			"id": "g-eae31a2d44cce4",
+			"x": 1880,
+			"y": 1047,
+			"width": 360,
+			"height": 300,
+			"type": "text",
+			"text": "```dataviewjs\nawait dv.view(\"dashboards/views/questions\", {\"area\": \"Surfaces\", \"limit\": 6})\n```",
+			"color": "3"
+		},
+		{
+			"id": "g-986c1025539e6e",
+			"x": 1880,
+			"y": 1387,
+			"width": 360,
+			"height": 98,
+			"type": "text",
+			"text": "**Documents**\n- [[docs/adr/surfaces|surfaces.md]]"
+		},
+		{
+			"id": "g-66443e39996a54",
+			"x": 1880,
+			"y": 1525,
+			"width": 360,
+			"height": 98,
+			"type": "text",
+			"text": "**Open issues**\n*None link this Area's Decisions yet.*"
+		},
+		{
+			"id": "g-9e09047ddfa38c",
+			"type": "group",
+			"label": "Surface logic",
+			"x": 2400,
+			"y": 637,
+			"width": 440,
+			"height": 1050
+		},
+		{
+			"id": "g-cc4239a946088a",
+			"x": 2440,
+			"y": 707,
+			"width": 360,
+			"height": 300,
+			"type": "text",
+			"text": "```dataviewjs\nawait dv.view(\"dashboards/views/decisions\", {\"area\": \"Surface logic\", \"limit\": 8})\n```",
+			"color": "3"
+		},
+		{
+			"id": "g-a4d6cf6cec71ca",
+			"x": 2440,
+			"y": 1047,
+			"width": 360,
+			"height": 300,
+			"type": "text",
+			"text": "```dataviewjs\nawait dv.view(\"dashboards/views/questions\", {\"area\": \"Surface logic\", \"limit\": 6})\n```",
+			"color": "3"
+		},
+		{
+			"id": "g-8c3d4f05de401d",
+			"x": 2440,
+			"y": 1387,
+			"width": 360,
+			"height": 122,
+			"type": "text",
+			"text": "**Documents**\n- [[docs/adr/surface-logic|surface-logic.md]]"
+		},
+		{
+			"id": "g-c0958e58733f6a",
+			"x": 2440,
+			"y": 1549,
+			"width": 360,
+			"height": 98,
+			"type": "text",
+			"text": "**Open issues**\n*None link this Area's Decisions yet.*"
+		},
+		{
+			"id": "g-c58dd452447740",
+			"type": "group",
+			"label": "Scopes",
+			"x": 2960,
+			"y": 637,
+			"width": 440,
+			"height": 1050
+		},
+		{
+			"id": "g-d0b7255a96936c",
+			"x": 3000,
+			"y": 707,
+			"width": 360,
+			"height": 300,
+			"type": "text",
+			"text": "```dataviewjs\nawait dv.view(\"dashboards/views/decisions\", {\"area\": \"Scopes\", \"limit\": 8})\n```",
+			"color": "3"
+		},
+		{
+			"id": "g-00a7554b9ae4f4",
+			"x": 3000,
+			"y": 1047,
+			"width": 360,
+			"height": 300,
+			"type": "text",
+			"text": "```dataviewjs\nawait dv.view(\"dashboards/views/questions\", {\"area\": \"Scopes\", \"limit\": 6})\n```",
+			"color": "3"
+		},
+		{
+			"id": "g-5ad2cc1973e92c",
+			"x": 3000,
+			"y": 1387,
+			"width": 360,
+			"height": 122,
+			"type": "text",
+			"text": "**Documents**\n- [[docs/adr/scopes-khoras-and-rights|scopes-khoras-and-rights.md]]"
+		},
+		{
+			"id": "g-5c7f529c6595a5",
+			"x": 3000,
+			"y": 1549,
+			"width": 360,
+			"height": 98,
+			"type": "text",
+			"text": "**Open issues**\n*None link this Area's Decisions yet.*"
+		},
+		{
+			"id": "g-d1f2d8c722b47d",
+			"type": "group",
+			"label": "Runtime",
+			"x": 720,
+			"y": 1831,
+			"width": 440,
+			"height": 1050
+		},
+		{
+			"id": "g-f7f1289fffc91f",
+			"x": 760,
+			"y": 1901,
+			"width": 360,
+			"height": 300,
+			"type": "text",
+			"text": "```dataviewjs\nawait dv.view(\"dashboards/views/decisions\", {\"area\": \"Runtime\", \"limit\": 8})\n```",
+			"color": "3"
+		},
+		{
+			"id": "g-3e8bdbd10b5a06",
+			"x": 760,
+			"y": 2241,
+			"width": 360,
+			"height": 300,
+			"type": "text",
+			"text": "```dataviewjs\nawait dv.view(\"dashboards/views/questions\", {\"area\": \"Runtime\", \"limit\": 6})\n```",
+			"color": "3"
+		},
+		{
+			"id": "g-52f9bd9216ffa4",
+			"x": 760,
+			"y": 2581,
+			"width": 360,
+			"height": 122,
+			"type": "text",
+			"text": "**Documents**\n- [[docs/adr/runtime-and-executors|runtime-and-executors.md]]"
+		},
+		{
+			"id": "g-14ca361ef104f0",
+			"x": 760,
+			"y": 2743,
+			"width": 360,
+			"height": 98,
+			"type": "text",
+			"text": "**Open issues**\n*None link this Area's Decisions yet.*"
+		},
+		{
+			"id": "g-efa95cd5246126",
+			"type": "group",
+			"label": "Behaviors",
+			"x": 1280,
+			"y": 1831,
+			"width": 440,
+			"height": 1050
+		},
+		{
+			"id": "g-ba06b631c7bf9e",
+			"x": 1320,
+			"y": 1901,
+			"width": 360,
+			"height": 300,
+			"type": "text",
+			"text": "```dataviewjs\nawait dv.view(\"dashboards/views/decisions\", {\"area\": \"Behaviors\", \"limit\": 8})\n```",
+			"color": "3"
+		},
+		{
+			"id": "g-3e33b234fec07d",
+			"x": 1320,
+			"y": 2241,
+			"width": 360,
+			"height": 300,
+			"type": "text",
+			"text": "```dataviewjs\nawait dv.view(\"dashboards/views/questions\", {\"area\": \"Behaviors\", \"limit\": 6})\n```",
+			"color": "3"
+		},
+		{
+			"id": "g-b35f43a49b8d6a",
+			"x": 1320,
+			"y": 2581,
+			"width": 360,
+			"height": 122,
+			"type": "text",
+			"text": "**Documents**\n- [[docs/adr/behaviors-and-processes|behaviors-and-processes.md]]"
+		},
+		{
+			"id": "g-de04ec14060a6e",
+			"x": 1320,
+			"y": 2743,
+			"width": 360,
+			"height": 98,
+			"type": "text",
+			"text": "**Open issues**\n*None link this Area's Decisions yet.*"
+		},
+		{
+			"id": "g-a15cfd482f659c",
+			"type": "group",
+			"label": "Security",
+			"x": 1840,
+			"y": 1831,
+			"width": 440,
+			"height": 1050
+		},
+		{
+			"id": "g-c9e4931ad51e8e",
+			"x": 1880,
+			"y": 1901,
+			"width": 360,
+			"height": 300,
+			"type": "text",
+			"text": "```dataviewjs\nawait dv.view(\"dashboards/views/decisions\", {\"area\": \"Security\", \"limit\": 8})\n```",
+			"color": "3"
+		},
+		{
+			"id": "g-fd19cb23322118",
+			"x": 1880,
+			"y": 2241,
+			"width": 360,
+			"height": 300,
+			"type": "text",
+			"text": "```dataviewjs\nawait dv.view(\"dashboards/views/questions\", {\"area\": \"Security\", \"limit\": 6})\n```",
+			"color": "3"
+		},
+		{
+			"id": "g-bd39d6b50d34bb",
+			"x": 1880,
+			"y": 2581,
+			"width": 360,
+			"height": 122,
+			"type": "text",
+			"text": "**Documents**\n- [[docs/adr/security-model|security-model.md]]"
+		},
+		{
+			"id": "g-424de0903ca3d9",
+			"x": 1880,
+			"y": 2743,
+			"width": 360,
+			"height": 98,
+			"type": "text",
+			"text": "**Open issues**\n*None link this Area's Decisions yet.*"
+		},
+		{
+			"id": "g-8343dceec10332",
+			"type": "group",
+			"label": "Product",
+			"x": 2400,
+			"y": 1831,
+			"width": 440,
+			"height": 1386
+		},
+		{
+			"id": "g-d92b270e6f882f",
+			"x": 2440,
+			"y": 1901,
+			"width": 360,
+			"height": 300,
+			"type": "text",
+			"text": "```dataviewjs\nawait dv.view(\"dashboards/views/decisions\", {\"area\": \"Product\", \"limit\": 8})\n```",
+			"color": "3"
+		},
+		{
+			"id": "g-e41f9aa9467210",
+			"x": 2440,
+			"y": 2241,
+			"width": 360,
+			"height": 300,
+			"type": "text",
+			"text": "```dataviewjs\nawait dv.view(\"dashboards/views/questions\", {\"area\": \"Product\", \"limit\": 6})\n```",
+			"color": "3"
+		},
+		{
+			"id": "g-47a2180a7a92bc",
+			"x": 2440,
+			"y": 2581,
+			"width": 360,
+			"height": 458,
+			"type": "text",
+			"text": "**Documents**\n- [[docs/PRD|PRD.md]]\n- [[docs/implementation-plan|implementation-plan.md]]\n- [[docs/systems/application-development|application-development.md]]\n- [[docs/systems/built-environment-review|built-environment-review.md]]\n- [[docs/systems/company-brain|company-brain.md]]\n- [[docs/systems/furniture-workshop|furniture-workshop.md]]\n- [[docs/systems/lifelong-learning|lifelong-learning.md]]\n- [[docs/systems/nutrition-optimization|nutrition-optimization.md]]\n- [[docs/systems/template|template.md]]"
+		},
+		{
+			"id": "g-4e0a730400340f",
+			"x": 2440,
+			"y": 3079,
+			"width": 360,
+			"height": 98,
+			"type": "text",
+			"text": "**Open issues**\n*None link this Area's Decisions yet.*"
+		},
+		{
+			"id": "g-e9692f06380b0e",
+			"type": "group",
+			"label": "Kit",
+			"x": 2960,
+			"y": 1831,
+			"width": 440,
+			"height": 1122
+		},
+		{
+			"id": "g-fa072e7416b9e4",
+			"x": 3000,
+			"y": 1901,
+			"width": 360,
+			"height": 300,
+			"type": "text",
+			"text": "```dataviewjs\nawait dv.view(\"dashboards/views/decisions\", {\"area\": \"Kit\", \"limit\": 8})\n```",
+			"color": "3"
+		},
+		{
+			"id": "g-34e74eb5572171",
+			"x": 3000,
+			"y": 2241,
+			"width": 360,
+			"height": 300,
+			"type": "text",
+			"text": "```dataviewjs\nawait dv.view(\"dashboards/views/questions\", {\"area\": \"Kit\", \"limit\": 6})\n```",
+			"color": "3"
+		},
+		{
+			"id": "g-d2d57f34070c29",
+			"x": 3000,
+			"y": 2581,
+			"width": 360,
+			"height": 194,
+			"type": "text",
+			"text": "**Documents**\n- [[docs/khora-kit-plan|khora-kit-plan.md]]\n- [[docs/khora-kit|khora-kit.md]]\n- [[docs/systems/application-development|application-development.md]]\n- [[CLAUDE|CLAUDE.md]]"
+		},
+		{
+			"id": "g-747b376d7c1a78",
+			"x": 3000,
+			"y": 2815,
+			"width": 360,
+			"height": 98,
+			"type": "text",
+			"text": "**Open issues**\n*None link this Area's Decisions yet.*"
+		},
+		{
+			"id": "spec",
+			"type": "text",
+			"x": 0,
+			"y": 0,
+			"width": 560,
+			"height": 755,
+			"color": "6",
+			"text": "## Spec · Areas\n*Edit this card to change what the canvas shows. Agents re-render everything else from it via [[Render Canvas v1.0.0]].*\n\n**Purpose.** One place to see the state of each area of khora's design: what is decided, what is open, and which documents carry it.\n\n**For each Area**, one labelled group, in the order Design, Log, Surfaces, Surface logic, Scopes, Runtime, Behaviors, Security, Product, Kit:\n- live `decisions` card for the Area (active Decisions, newest first, max 8);\n- live `questions` card for the Area (open Questions with their lean);\n- a card listing the documents whose `areas` frontmatter names the Area, as links;\n- a card listing open issues that link the Area's Decisions (`gh issue list`), or saying there are none.\n\n**Reading card** at the top: which Areas moved since the last render, which have Decisions no document carries yet (from the stale report), and the one thing that most needs a person.\n\n**Edges:** none.\n\n**Context:** `khora-canvas graph`; `areas` frontmatter in docs/ and CLAUDE.md; `bash .claude/scripts/khora-stale --stdout`; `gh issue list --state open`.\n\n**Triggers:** after each ingestion pull request is merged; after Update View; at the weekly's Observe; on request.\n\nKinds: Area v1.0.0, Decision v1.0.0, Question v1.0.0\n"
+		}
+	],
+	"edges": []
+}
