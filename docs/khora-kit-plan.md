@@ -119,13 +119,15 @@
 **Files:**
 - Create in `blob/`: `Area v1.0.0`, `Question v1.0.0`, `Update View v1.0.0`, `Team Weekly v1.0.0`
 - Create in `blob/`, each `is_a [[Area v1.0.0]]`: `Log`, `Surfaces`, `Surface logic`, `Scopes`, `Runtime`, `Behaviors`, `Security`, `Product`, `Design`, `Kit`
+- Modify: frontmatter of `docs/adr/*.md`, `docs/PRD.md`, `docs/implementation-plan.md`, `docs/khora-kit.md`, `docs/khora-kit-plan.md`, `CLAUDE.md`
 
 **Interfaces:**
 - Produces:
-  - `Area v1.0.0` with property `documents` (list<text>, optional): repository paths of the documents that are this Area's views. *Builder's call: needed by `khora-stale` and the Areas dashboard to map documents to Areas.*
+  - `Area v1.0.0` with no fields of its own.
+  - Documents name their Areas: each document in `docs/` (and `CLAUDE.md`) starts with frontmatter `areas: ["[[<Area>]]", …]`. That is the only frontmatter key a document carries.
   - `Question v1.0.0`: `originates_in` (connection, optional), `lean` (text).
   - Trace markers, defined in `Update View v1.0.0`: `<!-- d:<decision uuid> -->` after a sentence that decides; `<!-- q:<question uuid> -->` in an open-question row.
-- Area `documents` values: Log → `docs/adr/khora-log.md`; Surfaces → `docs/adr/surfaces.md`; Surface logic → `docs/adr/surface-logic.md`; Scopes → `docs/adr/scopes-khoras-and-rights.md`; Runtime → `docs/adr/runtime-and-executors.md`; Behaviors → `docs/adr/behaviors-and-processes.md`; Security → `docs/adr/security-model.md`; Product → `docs/PRD.md`, `docs/implementation-plan.md`; Design → `docs/adr/origins-behaviors-surfaces-executors.md`; Kit → `docs/khora-kit.md`, `docs/khora-kit-plan.md`, `CLAUDE.md`.
+- Document `areas` values: Log → `docs/adr/khora-log.md`; Surfaces → `docs/adr/surfaces.md`; Surface logic → `docs/adr/surface-logic.md`; Scopes → `docs/adr/scopes-khoras-and-rights.md`; Runtime → `docs/adr/runtime-and-executors.md`; Behaviors → `docs/adr/behaviors-and-processes.md`; Security → `docs/adr/security-model.md`; Product → `docs/PRD.md`, `docs/implementation-plan.md`; Design → `docs/adr/origins-behaviors-surfaces-executors.md`; Kit → `docs/khora-kit.md`, `docs/khora-kit-plan.md`, `CLAUDE.md`.
 
 - [ ] **Step 1: Write `Area v1.0.0` and `Question v1.0.0`.**
 - [ ] **Step 2: Write `Update View v1.0.0`** (`is_a [[Process(n) v1.0.0]]`). Its steps:
@@ -139,7 +141,7 @@
   - Observe, before the interview: read `dashboards/stale.md`; list open `ingestion` pull requests; compute the acceptance rate since the last weekly (Decisions merged active ÷ Decisions proposed); sample three active Decisions and ask whether each still holds.
   - Process(v): close `ingestion` pull requests older than this weekly's start, and deposit a Letter on each Call they carried (kit d11).
   - The execution log is the week's Calls, merged pull requests and closed issues, not Daily Loops.
-- [ ] **Step 4: Write the 10 Areas** with their `documents`.
+- [ ] **Step 4: Write the 10 Areas, and add `areas` frontmatter to each document** listed above.
 - [ ] **Step 5: Validate all 14.** Same loop as Task 3. Expected: every new entity `Result: PASS`.
 - [ ] **Step 6: Commit.** `git commit -m "Add Areas, Questions, Update View and Team Weekly"`
 
@@ -170,7 +172,7 @@
 - Produces:
   - `@dataclass Finding(kind: str, subject: str, reason: str)`. `kind` is one of `sentence`, `document`, `transcript`, `dashboard`, `issue`, `question`, `proposal`, `skipped`.
   - `find_stale(snapshot: Snapshot, today: date) -> list[Finding]`: pure.
-  - `@dataclass Snapshot(entities: list[dict], documents: dict[str, Doc], transcripts: list[str], dashboards: dict[str, Dash], issues: list[dict] | None, proposals: list[dict] | None, changed: dict[str, date])`. `Doc(text: str, committed: date)`; `Dash(rendered: date | None, spec: str)`. `None` for issues or proposals means `gh` was unavailable.
+  - `@dataclass Snapshot(entities: list[dict], documents: dict[str, Doc], transcripts: list[str], dashboards: dict[str, Dash], issues: list[dict] | None, proposals: list[dict] | None, changed: dict[str, date])`. `Doc(text: str, committed: date, areas: list[str])`; `Dash(rendered: date | None, spec: str)`. `None` for issues or proposals means `gh` was unavailable.
   - `collect() -> Snapshot`: all I/O (graph via `khora-canvas graph`, documents and dates via git, `gh issue list --state open --json number,title,body`, `gh pr list --state open --label ingestion --json number,title,createdAt`).
   - `render_report(findings: list[Finding], today: date) -> str`: Markdown, grouped by `kind`, titled `# Stale · YYYY-MM-DD`.
   - CLI: `bash .claude/scripts/khora-stale` writes `dashboards/stale.md` and prints the count; `--stdout` prints the report instead.
@@ -180,7 +182,7 @@ Rules, from kit d17:
 | kind | Stale when |
 | --- | --- |
 | sentence | a `d:` marker names a Decision whose status is superseded or reversed, or no Decision has that id ("unknown decision") |
-| document | an Area lists it in `documents`, has active Decisions with `decided_on` after the document's last commit, and none of them is traced in it |
+| document | its `areas` frontmatter names an Area that has active Decisions with `decided_on` after the document's last commit, and none of them is traced in it |
 | transcript | no Call's `transcript` link names its file |
 | dashboard | `rendered` is older than the newest `changed` date among entities whose kind appears on the Spec card's `Kinds:` line (all entities if the line is absent), or `rendered` is missing |
 | issue | open, and its body names a Decision file that is superseded or reversed |
@@ -213,7 +215,7 @@ Rules, from kit d17:
 - Consumes: `khora-canvas render`, the views from Task 5, `dashboards/stale.md` from Task 6.
 
 - [ ] **Step 1: Write each dashboard's Spec card** (node id `spec`, colour 6), in the shape of Unity's Loops Spec: Purpose, what to show, context, live vs agent, edges (none), triggers, and a `Kinds:` line.
-  - Areas: one labelled group per Area: live `decisions` card, live `questions` card, its documents as file cards, and an agent card listing open issues that link the Area's Decisions. `Kinds: Area v1.0.0, Decision v1.0.0, Question v1.0.0`.
+  - Areas: one labelled group per Area: live `decisions` card, live `questions` card, the documents whose `areas` name it, as file cards, and an agent card listing open issues that link the Area's Decisions. `Kinds: Area v1.0.0, Decision v1.0.0, Question v1.0.0`.
   - Loops: Unity's Loops Spec, without contacts and Tasks; issues in place of Tasks; `Team Weekly v1.0.0` runs as the top loop. `Kinds: Loop v2.0.0, Team Weekly v1.0.0, Letter v1.0.0, Call v1.0.0`.
   - Stale: a header card and one file card embedding `dashboards/stale.md`, with the rule table from Task 6 as a legend. `Kinds:` absent.
 - [ ] **Step 2: Render each** by executing `Render Canvas v1.0.0` through `Execute Process v1.0.0`.
