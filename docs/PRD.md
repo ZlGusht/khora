@@ -1,3 +1,8 @@
+---
+areas:
+  - "[[Product]]"
+---
+
 # Product Requirements Document (PRD)
 
 > **Document Status:** Draft

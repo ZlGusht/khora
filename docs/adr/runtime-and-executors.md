@@ -1,3 +1,8 @@
+---
+areas:
+  - "[[Runtime]]"
+---
+
 # ADR-0YC: Runtime and executors
 
 > **Status:** Proposed

@@ -1,3 +1,8 @@
+---
+areas:
+  - "[[Product]]"
+---
+
 # System Specification Template
 
 ## 1. Overview

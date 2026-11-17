@@ -1,3 +1,9 @@
+---
+areas:
+  - "[[Product]]"
+  - "[[Kit]]"
+---
+
 > **Status:** Sample spec. It shows the main functionalities such a system needs; it is not complete. Points marked **(interop: review)** depend on interoperability between khoras. Points marked *Suggestion* are proposals that have not been decided.
  
 ## 1. Overview

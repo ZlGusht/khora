@@ -1,3 +1,8 @@
+---
+areas:
+  - "[[Kit]]"
+---
+
 # The khora kit
 
 > **Status:** Approved

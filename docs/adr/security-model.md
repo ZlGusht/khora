@@ -1,3 +1,8 @@
+---
+areas:
+  - "[[Security]]"
+---
+
 # ADR-0YE: Security model
 
 > **Status:** Stub

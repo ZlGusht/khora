@@ -1,3 +1,8 @@
+---
+areas:
+  - "[[Kit]]"
+---
+
 # Working on khora
 
 ## Where things live

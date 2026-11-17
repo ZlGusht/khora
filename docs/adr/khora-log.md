@@ -1,3 +1,8 @@
+---
+areas:
+  - "[[Log]]"
+---
+
 # ADR-0YB: The khora log
 
 > **Status:** Proposed

@@ -1,3 +1,8 @@
+---
+areas:
+  - "[[Scopes]]"
+---
+
 # ADR-0XZ: Scopes, khoras and rights
 
 > **Status:** Proposed
