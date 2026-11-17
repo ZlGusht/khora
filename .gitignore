@@ -3,3 +3,5 @@
 dashboards/stale.md
 __pycache__/
 .superpowers/
+transcripts/*
+!transcripts/.gitkeep
