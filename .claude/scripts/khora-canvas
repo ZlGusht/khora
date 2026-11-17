@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Lays out the dashboard canvases under dashboards/ (see khora-canvas.py).
+# Usage: bash .claude/scripts/khora-canvas [loops|ontology|all]
+here="$(cd "$(dirname "$0")" && pwd)"
+for py in python3 python; do
+  if "$py" -c "import sys, yaml; sys.exit(sys.version_info < (3, 8))" >/dev/null 2>&1; then
+    exec "$py" "$here/khora-canvas.py" "$@"
+  fi
+done
+echo "khora-canvas: no Python 3 found" >&2
+exit 2
