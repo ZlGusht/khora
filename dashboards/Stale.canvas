@@ -1,61 +1,11 @@
 {
-	"nodes": [
-		{
-			"id": "g-23cae583fd75c7",
-			"x": 720,
-			"y": 0,
-			"width": 1200,
-			"height": 189,
-			"type": "text",
-			"text": "# Stale\nWhat no longer matches the graph. Run `bash .claude/scripts/khora-stale`, then read below.\n\nColours: red = needs a person now · orange = header and Reading · yellow = live · purple = Spec, kinds and processes.\n\nRendered 2026-11-17 by agent:claude-opus-5-5",
-			"color": "2"
-		},
-		{
-			"id": "g-52053c78937204",
-			"type": "group",
-			"label": "Report",
-			"x": 720,
-			"y": 309,
-			"width": 840,
-			"height": 1010
-		},
-		{
-			"id": "g-04b592729cffdd",
-			"x": 760,
-			"y": 379,
-			"width": 760,
-			"height": 900,
-			"type": "file",
-			"file": "dashboards/stale.md"
-		},
-		{
-			"id": "g-f54f024589d569",
-			"type": "group",
-			"label": "Rules",
-			"x": 1680,
-			"y": 309,
-			"width": 600,
-			"height": 486
-		},
-		{
-			"id": "g-858c92e0665b7d",
-			"x": 1720,
-			"y": 379,
-			"width": 520,
-			"height": 376,
-			"type": "text",
-			"text": "**Stale when**\n- **Sentence:** its `d:` marker names a Decision that is superseded, reversed or unknown.\n- **Document:** an Area it names has active Decisions newer than the document, none of them traced in it.\n- **Transcript:** no Call links it.\n- **Dashboard:** rendered before the newest change to a kind its Spec lists.\n- **Issue:** open, and names a superseded or reversed Decision.\n- **Question:** a `q:` row whose Question an active Decision answers.\n- **Proposal:** an `ingestion` pull request opened before the latest Team Weekly.\n"
-		},
-		{
-			"id": "spec",
-			"type": "text",
-			"x": 0,
-			"y": 0,
-			"width": 560,
-			"height": 448,
-			"color": "6",
-			"text": "## Spec · Stale\n*Edit this card to change what the canvas shows. Agents re-render everything else from it via [[Render Canvas v1.0.0]].*\n\n**Purpose.** What in the vault no longer matches the graph it depends on (kit d17), computed by `bash .claude/scripts/khora-stale`, never judged.\n\n**Show:** the report `dashboards/stale.md` as a file card, so it is current whenever the script was last run; and a legend of the rules. No Reading card: the report speaks for itself.\n\n**Note:** `dashboards/stale.md` is not in git. Each person runs the script on their own machine before reading this canvas.\n\n**Triggers:** the script runs at every Team Weekly's Observe and after each merge. This canvas only needs re-rendering when its Spec changes.\n"
-		}
+	"nodes":[
+		{"id":"g-23cae583fd75c7","x":720,"y":0,"width":1200,"height":189,"type":"text","text":"# Stale\nWhat no longer matches the graph. Run `bash .claude/scripts/khora-stale`, then read below.\n\nColours: red = needs a person now · orange = header and Reading · yellow = live · purple = Spec, kinds and processes.\n\nRendered 2026-11-17 by agent:claude-opus-5-5","color":"2"},
+		{"id":"g-52053c78937204","type":"group","label":"Report","x":720,"y":309,"width":840,"height":1010},
+		{"id":"g-04b592729cffdd","x":760,"y":379,"width":760,"height":900,"type":"file","file":"dashboards/stale.md"},
+		{"id":"g-f54f024589d569","type":"group","label":"Rules","x":1680,"y":309,"width":600,"height":486},
+		{"id":"g-858c92e0665b7d","x":1720,"y":379,"width":520,"height":376,"type":"text","text":"**Stale when**\n- **Sentence:** its `d:` marker names a Decision that is superseded, reversed or unknown.\n- **Document:** an Area it names has active Decisions newer than the document, none of them traced in it.\n- **Transcript:** no Call links it.\n- **Dashboard:** rendered before the newest change to a kind its Spec lists.\n- **Issue:** open, and names a superseded or reversed Decision.\n- **Question:** a `q:` row whose Question an active Decision answers.\n- **Proposal:** an `ingestion` pull request opened before the latest Team Weekly.\n"},
+		{"id":"spec","type":"text","x":0,"y":0,"width":560,"height":448,"color":"6","text":"## Spec · Stale\n*Edit this card to change what the canvas shows. Agents re-render everything else from it via [[Render Canvas v1.0.0]].*\n\n**Purpose.** What in the vault no longer matches the graph it depends on (kit d17), computed by `bash .claude/scripts/khora-stale`, never judged.\n\n**Show:** the report `dashboards/stale.md` as a file card, so it is current whenever the script was last run; and a legend of the rules. No Reading card: the report speaks for itself.\n\n**Note:** `dashboards/stale.md` is not in git. Each person runs the script on their own machine before reading this canvas.\n\n**Triggers:** the script runs at every Team Weekly's Observe and after each merge. This canvas only needs re-rendering when its Spec changes.\n"}
 	],
-	"edges": []
+	"edges":[]
 }
