@@ -154,5 +154,21 @@ class Report(unittest.TestCase):
         self.assertEqual(render_report([], TODAY), "# Stale · 2026-11-17\n\nNothing is stale.\n")
 
 
+class EntityChanges(unittest.TestCase):
+    def test_non_ascii_entity_name_is_tracked(self):
+        import subprocess, tempfile
+        from khora_stale import entity_changes
+        with tempfile.TemporaryDirectory() as tmp:
+            os.makedirs(os.path.join(tmp, "blob"))
+            with open(os.path.join(tmp, "blob", "Run — Решение.md"), "w", encoding="utf-8") as f:
+                f.write("x")
+            git = ["git", "-C", tmp, "-c", "user.email=a@b", "-c", "user.name=a"]
+            subprocess.run(git + ["init", "-q"], check=True)
+            subprocess.run(git + ["add", "-A"], check=True)
+            subprocess.run(git + ["commit", "-q", "-m", "x"], check=True)
+            changes = entity_changes(TODAY, cwd=tmp)
+        self.assertIn("Run — Решение", changes)
+
+
 if __name__ == "__main__":
     unittest.main()

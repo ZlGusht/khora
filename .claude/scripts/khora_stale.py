@@ -200,8 +200,10 @@ def render_report(findings: List[Finding], today: date) -> str:
 
 
 # ------------------------------------------------------------------ reading
-def _git(*args):
-    r = subprocess.run(["git", *args], capture_output=True, text=True, encoding="utf-8", errors="replace")
+def _git(*args, cwd=None):
+    # core.quotepath=off: otherwise git prints non-ASCII paths as quoted octal escapes.
+    r = subprocess.run(["git", "-c", "core.quotepath=off", *args], cwd=cwd,
+                       capture_output=True, text=True, encoding="utf-8", errors="replace")
     return r.stdout if r.returncode == 0 else ""
 
 
@@ -227,6 +229,22 @@ def _areas(text):
     return [_name(a) for a in _list(fm.get("areas"))]
 
 
+def entity_changes(today: date, cwd=None) -> Dict[str, date]:
+    """Entity name -> date of its last commit; today for uncommitted changes."""
+    changed = {}
+    current = None
+    for line in _git("log", "--format=%x00%cs", "--name-only", "--", "blob", cwd=cwd).splitlines():
+        if line.startswith("\x00"):
+            current = _date(line[1:])
+        elif line.startswith("blob/") and line.endswith(".md") and current:
+            changed.setdefault(line[5:-3], current)
+    for line in _git("status", "--porcelain", "--", "blob", cwd=cwd).splitlines():
+        p = line[3:].strip().strip('"')
+        if p.startswith("blob/") and p.endswith(".md"):
+            changed[p[5:-3]] = today
+    return changed
+
+
 def collect(today: date) -> Snapshot:
     here = os.path.dirname(os.path.abspath(__file__))
     r = subprocess.run([sys.executable, os.path.join(here, "khora-canvas.py"), "graph"], capture_output=True,
@@ -245,17 +263,7 @@ def collect(today: date) -> Snapshot:
         committed = _date(_git("log", "-1", "--format=%cs", "--", path).strip()) or today
         documents[path] = Doc(text=text, committed=committed, areas=_areas(text))
 
-    changed = {}
-    current = None
-    for line in _git("log", "--format=%x00%cs", "--name-only", "--", "blob").splitlines():
-        if line.startswith("\x00"):
-            current = _date(line[1:])
-        elif line.startswith("blob/") and line.endswith(".md") and current:
-            changed.setdefault(line[5:-3], current)
-    for line in _git("status", "--porcelain", "--", "blob").splitlines():
-        p = line[3:].strip().strip('"')
-        if p.startswith("blob/") and p.endswith(".md"):
-            changed[p[5:-3]] = today
+    changed = entity_changes(today)
 
     dashboards = {}
     for path in sorted(glob.glob("dashboards/*.canvas")):
