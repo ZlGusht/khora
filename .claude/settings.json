@@ -12,7 +12,15 @@
       "Bash(bash .claude/scripts/khora-canvas *)"
     ],
     "deny": [
-      "Edit(blob/**)"
+      "Edit(blob/**)",
+      "Bash(obsidian eval*)",
+      "Bash(obsidian * eval*)",
+      "Bash(obsidian.exe eval*)",
+      "Bash(obsidian.exe * eval*)"
+    ],
+    "ask": [
+      "Bash(obsidian * delete*)",
+      "Bash(obsidian.exe * delete*)"
     ]
   },
   "enabledPlugins": {

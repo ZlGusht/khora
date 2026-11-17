@@ -5,7 +5,7 @@ const isA = (p, t) => arr(p.relationships__is_a).some(l => nm(l) === t);
 const refs = (p, key, t) => arr(p[key]).some(l => nm(l) === t);
 const all = dv.pages('"blob"');
 const loops = all.where(p => p.identity__type === "particular" && p.properties__status === "open" &&
-  isA(p, "Process Instance v1.0.0") && arr(p.relationships__is_a).some(l => /Loop/.test(nm(l))));
+  isA(p, "Process Instance v1.0.0") && arr(p.relationships__is_a).some(l => /Loop|Weekly/.test(nm(l))));
 dv.table(["Loop", "Phase", "In", "Started", "Reservoir", "Calls"],
   loops.sort(p => p.properties__started_at, "desc").map(p => {
     const ctx = all.where(x => refs(x, "relationships__in_context_of", p.file.name));

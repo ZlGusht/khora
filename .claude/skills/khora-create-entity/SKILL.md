@@ -22,7 +22,7 @@ Optional: `folder` (default `blob/`), `properties`, `relationships`, `body`.
 
 ## Approach
 
-Write the full file content yourself, per the "Creating an entity" pattern in `khora-crud.md` — no templates, no Templater. Generate `identity__uuid` with `bash .claude/scripts/khora-uuid` and `identity__created_at` with `date +%F`. Set `properties__author` (see "Authorship" in `khora-crud.md`). Put the content in a temp file and create it with `obsidian vault=khora create path="blob/<name>.md" content="$(cat <file>)"`. Then read it back and run `khora-validate-entity` on it.
+Write the full file content yourself, per the "Creating an entity" pattern in `khora-crud.md` — no templates, no Templater. Generate `identity__uuid` with `bash .claude/scripts/khora-uuid` and `identity__created_at` with `date +%F`. Set `properties__author` (see "Authorship" in `khora-crud.md`). Put the content in a temp file and create it with `obsidian vault=<vault> create path="blob/<name>.md" content="$(cat <file>)"`. Then read it back and run `khora-validate-entity` on it.
 
 A new **type** (universal) is `identity__type: universal`, named `<Name> v1.0.0`, `is_a [[BaseEntity v1.0.0]]` or another universal, and its TOML body declares a `Description` plus any `[Metadata.Relationships]` / `[Metadata.Properties]` / `[Data]` its instances need. Instances of it are `identity__type: particular`.
 

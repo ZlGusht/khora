@@ -24,6 +24,7 @@ areas:
 
 ## Global Constraints
 
+- Transcripts and exported conversations never enter the repository: it is public. They live in `KHORA_TRANSCRIPTS`, or `khora-transcripts` beside the repository, and are only read.
 - The entity folder is `blob/`, lower case. Every reused file that says `Blob` or `Blob/` is rewritten.
 - The vault name is the name of the repository's root folder (`khora` here). No script hard-codes it. `KHORA_VAULT` overrides it.
 - Every CLI call carries `vault=<name>` before the verb.
@@ -47,7 +48,7 @@ areas:
 ### Task 1: Vault layout and Obsidian config
 
 **Files:**
-- Create: `blob/.gitkeep`, `src/.gitkeep`, `transcripts/.gitkeep`, `canvas/.gitkeep`, `dashboards/views/.gitkeep`
+- Create: `blob/.gitkeep`, `src/.gitkeep`, `canvas/.gitkeep`, `dashboards/views/.gitkeep`. No `transcripts/` folder: transcripts never enter the repository (see Global Constraints).
 - Create: `.gitignore`, `.gitattributes`
 - Create: `.obsidian/app.json`, `.obsidian/community-plugins.json`
 - Create: `.obsidian/plugins/{khora,dataview,smart-connections}/` (copied from the loops starter)
@@ -110,7 +111,7 @@ areas:
 - [ ] **Step 1: Copy the 14 starter entities** unchanged.
 - [ ] **Step 2: Copy Unity's five,** with these changes only:
   - All: the source vault's hub anchors → `[[Kit]]`; `Blob/` → `blob/`; `Dashboards/` → `dashboards/`.
-  - `Call v1.0.0`: transcripts live in `transcripts/` (not `Archive/Transcripts/`).
+  - `Call v1.0.0`: transcripts live outside the repository; a Call names its transcript's file.
   - `Decision v1.0.0`: add `quote = { type="text", description="The transcript line where it was decided, verbatim." }` and `answers = { type="list<connection>", description="Questions this Decision answers.", optional=true }`; add `design` to `kind` values, described as "a choice about khora's model or architecture, the kind ADRs are made of".
   - `Call Ingestion v1.0.0`: Step 6 becomes "List work items as proposed issues in the pull request description: title, assignee, the Call and Decision each one comes from. Do not create Task entities or issues." Add a Step 0: "Work on a branch `ingest/YYYY-MM-DD`." Add a final step: "Open one pull request labelled `ingestion` with every created entity and the proposed issues." Step 5 also writes `quote`. Step 10 re-renders `dashboards/Areas.canvas` and `dashboards/Loops.canvas`.
   - `Render Canvas v1.0.0`: views live in `dashboards/views/`; the canvas list is Areas, Loops and Stale.
@@ -238,25 +239,25 @@ Rules, from kit d17:
 - [ ] **Step 1: Rewrite `CLAUDE.md`** with these sections, in this order:
   1. **What this repository is:** khora's design and code, run as the kit's vault (`docs/khora-kit.md`).
   2. **Layout:** kit d1, one line per folder.
-  3. **How work flows:** recording → `transcripts/` → `Call Ingestion` → pull request → merge accepts → issues created → `Update View` → stale report. One line each, citing kit decisions.
+  3. **How work flows:** recording → transcripts folder outside the repository → `Call Ingestion` → pull request → merge accepts → issues created → `Update View` → stale report. One line each, citing kit decisions.
   4. **Rules for agents:** never write a sentence in `docs/` that no Decision states (kit d13); never edit an accepted Decision except to supersede it, in a pull request (kit d12); never change `canvas/` (kit d14); work items are issues, not entities.
   5. **Design writing conventions:** the current `CLAUDE.md`'s Conventions and Markers sections, unchanged.
   6. **Superpowers:** a run is a Loop instance (kit d18); specs and plans go to `docs/`, not `docs/superpowers/`.
   7. **Entity rules:** five lines, pointing to `.claude/rules/`.
   8. **Known follow-ups:** the current list, unchanged.
-- [ ] **Step 2: Update `khora-setup.md`:** the vault is the cloned repository folder; Git is already present; recordings are Wispr Flow exports saved as `transcripts/YYYY-MM-DD <topic>.md`; `gh auth login` is part of setup.
+- [ ] **Step 2: Update `khora-setup.md`:** the vault is the cloned repository folder; Git is already present; recordings are Wispr Flow exports saved outside the repository, in `KHORA_TRANSCRIPTS` or `../khora-transcripts/`, as `YYYY-MM-DD <topic>.md`; `gh auth login` is part of setup.
 - [ ] **Step 2b: Pin superpowers for the project.** In `.claude/settings.json`, add `"enabledPlugins": {"superpowers@claude-plugins-official": true}`, so every team member's Claude Code offers to install it on first run. The setup check confirms `/plugin` lists superpowers at v7.0.2 or later.
 - [ ] **Step 3: Add a README section** "Working in this repository", three lines: open the folder in Obsidian, run `claude`, read `docs/khora-kit.md`.
-- [ ] **Step 4: Verify.** Start a fresh Claude Code session in the repository and ask "where do decisions come from, and where do I put a recording?" Expected: the answer names `transcripts/`, `Call Ingestion`, and the pull request.
+- [ ] **Step 4: Verify.** Start a fresh Claude Code session in the repository and ask "where do decisions come from, and where do I put a recording?" Expected: the answer names the transcripts folder outside the repository, `Call Ingestion`, and the pull request.
 - [ ] **Step 5: Commit.** `git commit -m "Rewrite CLAUDE.md for the kit"`
 
 ### Task 9: The first Call
 
 **Files:**
-- Create: `transcripts/2026-11-17 Designing the khora kit.md`
+- Create, outside the repository: `../khora-transcripts/2026-11-17 Designing the khora kit.md`. Never inside it: the repository is public.
 - Created by the run: the Call, its Decisions and Questions, a pull request
 
-- [ ] **Step 1: Export the conversation** that produced `docs/khora-kit.md` (Claude Code `/export`) into the transcript file, unedited.
+- [ ] **Step 1: Export the conversation** that produced `docs/khora-kit.md` (Claude Code `/export`) into that file, outside the repository, unedited.
 - [ ] **Step 2: Run `Call Ingestion v1.0.0`** on it through `Execute Process v1.0.0`. Decisions are `in_context_of [[Kit]]`, kind `rule` or `design`.
 - [ ] **Step 3: A team member reviews the pull request** against the quotes, and merges it.
 - [ ] **Step 4: Run `Update View v1.0.0` on `docs/khora-kit.md`** (kit d19). Expected: each decision in the document carries a `d:` marker.

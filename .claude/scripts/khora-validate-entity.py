@@ -106,6 +106,7 @@ def split_frontmatter(content: str):
 
 
 def extract_toml_block(body: str):
+    body = body.replace("\r\n", "\n")  # a CRLF body is still TOML
     m = TOML_FENCE_RE.search(body)
     if not m:
         return None, None

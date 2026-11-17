@@ -37,8 +37,8 @@ The week's work happens in loops, calls and pull requests. The agent does not in
 5. Review the week: the Calls held, the pull requests merged, the issues closed. Then interview as in Weekly Loop: events, insights, overloads.
 
 ### Process(v)
-1. Close every `ingestion` pull request opened before this run's started_at, and deposit a Letter (type signal) on each Call it carried, saying its proposals expired.
-2. Supersede any sampled Decision the team no longer holds, through a pull request.
+1. Close every `ingestion` pull request opened before this run's started_at, and deposit a Letter (type signal, with properties__priority (1 to 5) and properties__resolved (true or false), which Letter v1.0.0 requires) on each Call it carried, saying its proposals expired.
+2. Supersede any sampled Decision the team no longer holds, through a pull request. A Decision made in the weekly originates_in this run and has no quote.
 3. Write ONE key insight and the NextLoopDirective into this run's body.
 """
 

@@ -77,6 +77,18 @@ class Obsidian(unittest.TestCase):
         """)
         self.assertEqual(khora_common.obsidian("read", repo_root=root), "hello\n")
 
+    def test_timeout_holds_even_when_a_child_keeps_the_pipes_open(self):
+        import time
+        khora_common.OBSIDIAN = fake_obsidian(self.tmp.name, """
+            import subprocess, sys, time
+            subprocess.Popen([sys.executable, "-c", "import time; time.sleep(20)"])
+            time.sleep(20)
+        """)
+        start = time.time()
+        with self.assertRaises(khora_common.KitError):
+            khora_common.obsidian("files", timeout=2, repo_root=self.tmp.name)
+        self.assertLess(time.time() - start, 8)
+
 
 if __name__ == "__main__":
     unittest.main()

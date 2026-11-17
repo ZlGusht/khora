@@ -1,0 +1,5 @@
+# Code that runs inside the vault when it is opened in Obsidian: plugin builds,
+# Dataview views and the agent firmware. Changes here need an owner's review.
+/.obsidian/ @ZlGusht
+/dashboards/views/ @ZlGusht
+/.claude/ @ZlGusht

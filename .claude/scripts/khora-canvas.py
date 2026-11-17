@@ -322,6 +322,16 @@ def render(spec, out_path):
 
 
 # ------------------------------------------------------------------ context helper
+def rows_from_envelope(env):
+    """The plugin's answer as {name: frontmatter}. A failed or empty answer is an error, never an empty graph."""
+    if not env.get("success"):
+        raise khora_common.KitError("the khora plugin failed: " + str(env.get("error") or "no reason given"))
+    rows = (env.get("value") or {}).get("values") or []
+    if not rows:
+        raise khora_common.KitError("the graph is empty; Dataview may still be indexing. Wait and retry.")
+    return {r[0]: r[1] for r in rows}
+
+
 def graph_dump():
     def khora_tmp():
         if sys.platform == "darwin":
@@ -344,9 +354,12 @@ def graph_dump():
                 time.sleep(0.2)
                 with open(fout, encoding="utf-8") as f:
                     env = json.load(f)
-                rows = (env.get("value") or {}).get("values", [])
+                try:
+                    graph = rows_from_envelope(env)
+                except khora_common.KitError as e:
+                    sys.exit("graph: " + str(e))
                 sys.stdout.reconfigure(encoding="utf-8")
-                print(json.dumps({r[0]: r[1] for r in rows}, ensure_ascii=False, indent=1))
+                print(json.dumps(graph, ensure_ascii=False, indent=1))
                 return
             time.sleep(0.25)
         sys.exit("graph: no answer from the khora plugin (is Obsidian running?)")

@@ -13,7 +13,8 @@ import os
 import re
 import subprocess
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from urllib.parse import unquote
 from datetime import date
 from typing import Dict, List, Optional
 
@@ -53,6 +54,7 @@ class Snapshot:
     issues: Optional[List[dict]]       # None: gh unavailable
     proposals: Optional[List[dict]]    # None: gh unavailable
     changed: Dict[str, date]           # entity name -> date of its last change
+    accepted: Dict[str, date] = field(default_factory=dict)  # entity name -> date it was first committed
 
 
 # ------------------------------------------------------------------ helpers
@@ -103,10 +105,12 @@ def _documents(snap, decisions):
     for path, d in sorted(snap.documents.items()):
         traced = {u.lower() for u in D_MARKER.findall(d.text)}
         for area in d.areas:
-            newer = [fm for fm in decisions.values()
+            # A Decision counts from the day it reached the repository, not the day it was made:
+            # a backlog call ingested today is new to every document committed before today.
+            newer = [fm for name, fm in decisions.items()
                      if fm.get("properties__status") == "active"
                      and any(_name(l) == area for l in _list(fm.get("relationships__in_context_of")))
-                     and (_date(fm.get("properties__decided_on")) or date.min) > d.committed]
+                     and (snap.accepted.get(name) or _date(fm.get("properties__decided_on")) or date.min) > d.committed]
             if newer and not any(str(fm.get("identity__uuid", "")).lower() in traced for fm in newer):
                 n = len(newer)
                 yield Finding("document", path, f"{n} newer Decision{'s' if n > 1 else ''} in {area} not traced")
@@ -136,7 +140,7 @@ def _dashboards(snap):
 
 def _issues(snap, decisions):
     for issue in sorted(snap.issues or [], key=lambda i: i.get("number", 0)):
-        body = issue.get("body") or ""
+        body = unquote(issue.get("body") or "")  # GitHub links encode spaces as %20
         for name, fm in sorted(decisions.items()):
             status = fm.get("properties__status")
             if status in ("superseded", "reversed") and name in body:
@@ -245,6 +249,22 @@ def entity_changes(today: date, cwd=None) -> Dict[str, date]:
     return changed
 
 
+def entity_added(today: date, cwd=None) -> Dict[str, date]:
+    """Entity name -> date its file was first committed; today for files not committed yet."""
+    added = {}
+    current = None
+    for line in _git("log", "--diff-filter=A", "--format=%x00%cs", "--name-only", "--", "blob", cwd=cwd).splitlines():
+        if line.startswith("\x00"):
+            current = _date(line[1:])
+        elif line.startswith("blob/") and line.endswith(".md") and current:
+            added[line[5:-3]] = current  # log runs newest first, so the last seen is the first add
+    for line in _git("status", "--porcelain", "--", "blob", cwd=cwd).splitlines():
+        p = line[3:].strip().strip('"')
+        if line.startswith("??") and p.startswith("blob/") and p.endswith(".md"):
+            added[p[5:-3]] = today
+    return added
+
+
 def transcripts_dir(root: str) -> str:
     """Transcripts never live in the repository: KHORA_TRANSCRIPTS, or a khora-transcripts folder beside it."""
     return os.environ.get("KHORA_TRANSCRIPTS") or os.path.join(os.path.dirname(os.path.abspath(root)), "khora-transcripts")
@@ -281,7 +301,7 @@ def collect(today: date) -> Snapshot:
     transcripts = sorted(os.path.basename(p) for p in glob.glob(os.path.join(transcripts_dir(os.getcwd()), "*.md")))
     issues = _gh("issue", "list", "--state", "open", "--limit", "500", "--json", "number,title,body")
     proposals = _gh("pr", "list", "--state", "open", "--label", "ingestion", "--json", "number,title,createdAt")
-    return Snapshot(entities, documents, transcripts, dashboards, issues, proposals, changed)
+    return Snapshot(entities, documents, transcripts, dashboards, issues, proposals, changed, entity_added(today))
 
 
 def main(argv):

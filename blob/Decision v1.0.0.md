@@ -30,7 +30,7 @@ answers = { type="list<connection>", description="Questions this Decision answer
 [Metadata.Properties]
 decided_on = { type="date", description="When it was decided." }
 status = { type="text", description="Whether it still holds.", values=["active", "superseded", "reversed"] }
-quote = { type="text", description="The transcript line where it was decided, verbatim, limited to the decision's own words. The repository is public: nothing personal; paraphrase with [paraphrased] when needed." }
+quote = { type="text", description="The transcript line where it was decided, verbatim, limited to the decision's own words. Required when the Decision comes from a Call; a Decision made in a loop run has none. The repository is public: nothing personal; paraphrase with [paraphrased] when needed.", optional=true }
 kind = { type="text", description="thesis = what we believe about the world or market; direction = where the venture is heading; stage = effectuation stage; attention = what we focus on now; rule = a standing way of working; operational = a one-off choice; design = a choice about khora's model or architecture, the kind ADRs are made of.", values=["thesis", "direction", "stage", "attention", "rule", "operational", "design"] }
 
 [Data]

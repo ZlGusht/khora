@@ -27,14 +27,32 @@ def vault_name(cwd=None):
     return os.environ.get("KHORA_VAULT") or os.path.basename(repo_root(cwd))
 
 
+def _kill_tree(proc):
+    # A child that keeps our pipes open would make a plain kill wait for it, so end the whole tree.
+    if os.name == "nt":
+        subprocess.run(["taskkill", "/T", "/F", "/PID", str(proc.pid)], capture_output=True)
+    else:
+        import signal
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+
+
 def _run(args, timeout):
+    group = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt" else {"start_new_session": True}
     try:
-        r = subprocess.run(OBSIDIAN + list(args), capture_output=True, text=True,
-                           encoding="utf-8", errors="replace", timeout=timeout)
-    except (subprocess.TimeoutExpired, FileNotFoundError):
+        proc = subprocess.Popen(OBSIDIAN + list(args), stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                text=True, encoding="utf-8", errors="replace", **group)
+    except FileNotFoundError:
         raise KitError("Obsidian is not running or the CLI is off")
-    out = r.stdout or ""
-    if "Unable to connect" in out or "Unable to connect" in (r.stderr or ""):
+    try:
+        out, err = proc.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        _kill_tree(proc)
+        raise KitError("Obsidian is not running or the CLI is off")
+    out = out or ""
+    if "Unable to connect" in out or "Unable to connect" in (err or ""):
         raise KitError("Obsidian is not running or the CLI is off")
     return out
 

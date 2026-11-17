@@ -4,12 +4,12 @@ The `obsidian` CLI is the only channel for vault I/O (`khora-vault.md` rule 1). 
 
 ## What the CLI directly supports
 
-- **Reading** full content (frontmatter + body): `obsidian vault=khora read path="blob/<name>.md"`. Output starts with a blank line — strip leading whitespace before parsing.
+- **Reading** full content (frontmatter + body): `obsidian vault=<vault> read path="blob/<name>.md"`. Output starts with a blank line — strip leading whitespace before parsing.
 - **Frontmatter properties:** `property:read`, `property:set` (with `type=`), `property:remove`.
 - **Body append / prepend.** No mid-body insertion.
-- **Creating** a file with literal content: `obsidian vault=khora create path="blob/<name>.md" content="…"`. Add `overwrite` to replace an existing file. Never pass `open`.
+- **Creating** a file with literal content: `obsidian vault=<vault> create path="blob/<name>.md" content="…"`. Add `overwrite` to replace an existing file. Never pass `open`.
 - **Deletion.** Backlinks pointing at a deleted entity are not repaired automatically.
-- **Backlinks:** `obsidian vault=khora backlinks path="blob/<name>.md"` — use before deleting or relating.
+- **Backlinks:** `obsidian vault=<vault> backlinks path="blob/<name>.md"` — use before deleting or relating.
 
 ## Creating an entity
 
@@ -63,7 +63,7 @@ The khora plugin (bundled in `.obsidian/plugins/khora/`) exposes Dataview querie
 Steps:
 1. `ID=$(bash .claude/scripts/khora-uuid)`; `TMP=$(bash .claude/scripts/khora-tmp)`; `mkdir -p "$TMP/khora/<cmd>/in" "$TMP/khora/<cmd>/out"`.
 2. Write the request file into `in/`.
-3. `obsidian vault=khora command id="khora:dataview-query"` (or `khora:semantic-search`).
+3. `obsidian vault=<vault> command id="khora:dataview-query"` (or `khora:semantic-search`).
 4. Poll for `out/$ID.json` (sub-second sleeps, ~10 s timeout).
 5. Read the envelope `{ id, success, value?, error? }`.
 6. Delete both files.

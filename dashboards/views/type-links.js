@@ -8,7 +8,7 @@ const kindOf = name => {
   const p = dv.page("blob/" + name + ".md");
   if (!p || p.identity__type !== "particular") return null;
   const ps = arr(p.relationships__is_a).map(nm);
-  if (ps.includes("Process Instance v1.0.0")) return ps.some(x => /Loop/.test(x)) ? "loop run" : "process run";
+  if (ps.includes("Process Instance v1.0.0")) return ps.some(x => /Loop|Weekly/.test(x)) ? "loop run" : "process run";
   return (ps[0] || "").replace(/ v\d.*$/, "");
 };
 const counts = {};

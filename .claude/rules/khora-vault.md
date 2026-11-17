@@ -52,8 +52,9 @@ Don't fill entity bodies with session state ("we just did X", "next step is Y").
 
 ## Pinned operational notes
 
-- **Every CLI call carries `vault=khora` before the verb:** `obsidian vault=khora read path="blob/Letter v1.0.0.md"`. After the verb it is silently ignored.
-- **`khora` is the repository folder's name.** A clone in a folder with another name uses that name instead. Scripts take the name from the folder (or `KHORA_VAULT`) and refuse to run if Obsidian's vault of that name is not this repository: Obsidian matches vault names without regard to case, so another vault called `Khora` would otherwise answer.
+- **Every CLI call carries `vault=<vault>` before the verb:** `obsidian vault=<vault> read path="blob/Letter v1.0.0.md"`. After the verb it is silently ignored.
+- **`<vault>` is this repository's vault name:** `KHORA_VAULT` if set, else the repository folder's name (normally `khora`). Find it with `basename "$(git rev-parse --show-toplevel)"`.
+- **Check the vault before the first hand-made call of a session:** `obsidian vault=<vault> vault` must print this repository's path. Obsidian matches vault names without regard to case, so another vault called `Khora` can answer instead, and writes would land there. If the path is wrong, stop and tell the person (set `KHORA_VAULT`, or rename the other vault's folder). Scripts make this check themselves.
 - **Always address entities by path with explicit `.md`:** `path="blob/<name>.md"`. The bare `name=` form lands new files at the vault root, and the CLI strips a trailing `.0` from versioned names as if it were an extension.
 - **`property:set` takes `type=text|list|number|checkbox|date|datetime`.** `type=list` writes a YAML array and *replaces* the list — to append, read, splice locally, write back.
 - **Process Instances are dual-`is_a`.** A run of process X is `is_a` both `[[Process Instance v1.0.0]]` and `[[X]]`, with `identity__type: particular`. Query runs of X with `is_a contains [[X]] AND identity__type = "particular"`; the definition of X has `identity__type = "universal"`.

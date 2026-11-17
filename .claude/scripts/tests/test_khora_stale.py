@@ -22,7 +22,7 @@ def decision(uuid, status="active", decided_on="2026-11-10", area="Log", answers
 
 
 def snapshot(**kw):
-    base = dict(entities={}, documents={}, transcripts=[], dashboards={}, issues=[], proposals=[], changed={})
+    base = dict(entities={}, documents={}, transcripts=[], dashboards={}, issues=[], proposals=[], changed={}, accepted={})
     base.update(kw)
     return Snapshot(**base)
 
@@ -187,6 +187,22 @@ class TranscriptsDir(unittest.TestCase):
         from khora_stale import transcripts_dir
         os.environ["KHORA_TRANSCRIPTS"] = "/elsewhere/rec"
         self.assertEqual(transcripts_dir("/work/khora"), "/elsewhere/rec")
+
+
+class Review(unittest.TestCase):
+    def test_document_stale_when_decision_accepted_after_commit(self):
+        # Decided 11-05 in a call, merged to main 11-18; the document was last committed 11-17.
+        s = snapshot(entities={"Backlog call": decision(D_ID, decided_on="2026-11-05")},
+                     accepted={"Backlog call": date(2026, 11, 18)},
+                     documents={"docs/adr/khora-log.md": doc("Nothing traced.\n", committed="2026-11-17")})
+        self.assertEqual(find_stale(s, TODAY),
+                         [Finding("document", "docs/adr/khora-log.md", "1 newer Decision in Log not traced")])
+
+    def test_issue_link_with_encoded_spaces(self):
+        s = snapshot(entities={"Use one log": decision(D_ID, status="reversed")},
+                     issues=[{"number": 7, "title": "x",
+                              "body": "https://github.com/ZlGusht/khora/blob/main/blob/Use%20one%20log.md"}])
+        self.assertEqual(find_stale(s, TODAY), [Finding("issue", "#7", "links Use one log, which is reversed")])
 
 
 if __name__ == "__main__":

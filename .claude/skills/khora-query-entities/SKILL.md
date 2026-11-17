@@ -32,7 +32,7 @@ ID=$(bash .claude/scripts/khora-uuid)
 cat > "$TMP/khora/dataview/in/$ID.dql" <<'EOF'
 <the DQL string goes here>
 EOF
-obsidian vault=khora command id="khora:dataview-query"
+obsidian vault="${KHORA_VAULT:-$(basename "$(git rev-parse --show-toplevel)")}" command id="khora:dataview-query"
 # obsidian command blocks until the async callback completes; the polling loop
 # below is a safety net for edge cases, not a hard requirement.
 for i in 1 2 3 4 5 6 7 8 9 10; do

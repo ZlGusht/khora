@@ -39,6 +39,13 @@ khora's design, and later its code, run as the khora kit: a provisional khora bu
 - Set `properties__author` on every entity you write: a team member's name, or `agent:<model>`.
 - Run `bash .claude/scripts/khora-validate "<name>"` after every entity you write.
 
+## Pull requests from outside the team
+
+The vault runs code when Obsidian opens it: the plugin builds in `.obsidian/plugins/` and the Dataview views in `dashboards/views/`. A branch can change both.
+
+- Review a pull request from outside the team in a separate clone that is not open in Obsidian.
+- Check it out in the vault only after its changes to `.obsidian/`, `dashboards/views/` and `.claude/` are reviewed. `.github/CODEOWNERS` requires an owner's review for those paths.
+
 ## Superpowers
 
 - A superpowers run is a Loop instance (kit d18). Brainstorming is the Laydown; the plan and its execution are Operate; verification and review are Observe; the retrospective is Process(v).
@@ -47,7 +54,7 @@ khora's design, and later its code, run as the khora kit: a provisional khora bu
 
 ## Entity rules
 
-- Vault I/O goes through the Obsidian CLI, `obsidian vault=khora …`. Never `eval`; never edit `blob/` files directly.
+- Vault I/O goes through the Obsidian CLI, `obsidian vault=<vault> …`. Never `eval`; never edit `blob/` files directly.
 - Wikilinks are exact and versioned: `[[Decision v1.0.0]]`, not `[[Decision]]`.
 - Only keys declared along an entity's `is_a` chain are allowed. A new key is an ontology change; ask first.
 - Before ontology decisions or new entities, run `khora-assemble-context`.

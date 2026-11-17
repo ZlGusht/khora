@@ -26,7 +26,7 @@ ID=$(bash .claude/scripts/khora-uuid)
 cat > "$TMP/khora/semantic/in/$ID.json" <<EOF
 {"query": "<text>", "limit": 10}
 EOF
-obsidian vault=khora command id="khora:semantic-search"
+obsidian vault="${KHORA_VAULT:-$(basename "$(git rev-parse --show-toplevel)")}" command id="khora:semantic-search"
 # obsidian command blocks until the async callback completes; polling is a safety net.
 for i in 1 2 3 4 5 6 7 8 9 10; do
   [ -f "$TMP/khora/semantic/out/$ID.json" ] && break
