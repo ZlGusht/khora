@@ -26,7 +26,7 @@ The team already runs a vault of this kind for the venture (Unity). The kit star
 | **Entity** | A Markdown file in `blob/` with frontmatter and a body. |
 | **Kind** | What an entity is, declared by `relationships__is_a`. Every kind reaches `BaseEntity v1.0.0`. |
 | **Area** | A hub entity for one design area. Every other entity links to at least one. |
-| **Call** | One recorded discussion. It links its transcript file. |
+| **Call** | One recorded discussion. It names its transcript, which stays outside the repository. |
 | **Decision** | Something the team committed to, quoting the line where it was decided. |
 | **Question** | An open question with its current lean. |
 | **Issue** | A GitHub issue in this repository: the unit of work. |
@@ -81,7 +81,6 @@ The team already runs a vault of this kind for the venture (Unity). The kit star
 - `blob/`: entities.
 - `docs/`: documents, including the existing design documents.
 - `src/`: code.
-- `transcripts/`: Wispr Flow exports, one Markdown file per recording.
 - `canvas/`: canvases the team draws.
 - `dashboards/`: canvases the kit renders, with their live views in `dashboards/views/`.
 
@@ -102,7 +101,7 @@ The team already runs a vault of this kind for the venture (Unity). The kit star
 - The kit's kinds and Unity's may diverge. Nothing keeps them in sync.
 
 **5. `Decision v1.0.0` starts from Unity's Decision, with three additions.**
-- Adds `quote` (text): the transcript line where it was decided.
+- Adds `quote` (text): the transcript line where it was decided, limited to the decision's own words.
 - Adds `answers` (Question, optional).
 - Adds the kind value `design`: a choice about khora's model or architecture, the kind ADRs are made of.
 - The rest is as in Unity: `originates_in`, `decided_by`, `supersedes`, `about`, `decided_on`, `status` (active, superseded, reversed) and the other kind values.
@@ -123,8 +122,9 @@ The team already runs a vault of this kind for the venture (Unity). The kit star
 ### Flow
 
 **8. A recording becomes a transcript file before anything is drawn from it.**
-- A Wispr Flow export goes into `transcripts/`, named `YYYY-MM-DD <topic>.md`, unedited.
-- A transcript is linked from its Call, never copied into it.
+- A Wispr Flow export goes into the transcripts folder outside the repository, named `YYYY-MM-DD <topic>.md`, unedited. The folder is `KHORA_TRANSCRIPTS`, or `khora-transcripts` beside the repository.
+- Transcripts and exported conversations are only read and parsed. The repository is open source, so they never enter it.
+- A Call names its transcript's file. A Decision's `quote` holds only the decision's own words, never anything personal.
 - Wispr Flow does not label speakers reliably. Attribution follows `Call Ingestion`'s rule: unattributed, or marked `[?]`.
 
 **9. Proposals arrive as one pull request per ingestion run.**

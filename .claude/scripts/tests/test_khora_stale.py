@@ -68,7 +68,7 @@ class Transcripts(unittest.TestCase):
         s = snapshot(entities={"Call 2026-11-05 X": call},
                      transcripts=["2026-11-05.md", "2026-11-14.md"])
         self.assertEqual(find_stale(s, TODAY),
-                         [Finding("transcript", "transcripts/2026-11-14.md", "no Call links it")])
+                         [Finding("transcript", "2026-11-14.md", "no Call links it")])
 
 
 class Dashboards(unittest.TestCase):
@@ -124,7 +124,7 @@ class GitHubUnavailable(unittest.TestCase):
     def test_gh_unavailable_skips_only_github_checks(self):
         s = snapshot(issues=None, proposals=None, transcripts=["2026-11-14.md"])
         self.assertEqual(find_stale(s, TODAY), [
-            Finding("transcript", "transcripts/2026-11-14.md", "no Call links it"),
+            Finding("transcript", "2026-11-14.md", "no Call links it"),
             Finding("skipped", "issues", "gh not available"),
             Finding("skipped", "proposals", "gh not available"),
         ])
@@ -168,6 +168,25 @@ class EntityChanges(unittest.TestCase):
             subprocess.run(git + ["commit", "-q", "-m", "x"], check=True)
             changes = entity_changes(TODAY, cwd=tmp)
         self.assertIn("Run — Решение", changes)
+
+
+class TranscriptsDir(unittest.TestCase):
+    def setUp(self):
+        self.saved = os.environ.pop("KHORA_TRANSCRIPTS", None)
+
+    def tearDown(self):
+        os.environ.pop("KHORA_TRANSCRIPTS", None)
+        if self.saved is not None:
+            os.environ["KHORA_TRANSCRIPTS"] = self.saved
+
+    def test_default_is_sibling_of_repository(self):
+        from khora_stale import transcripts_dir
+        self.assertEqual(transcripts_dir("/work/khora"), os.path.abspath("/work/khora-transcripts"))
+
+    def test_env_override(self):
+        from khora_stale import transcripts_dir
+        os.environ["KHORA_TRANSCRIPTS"] = "/elsewhere/rec"
+        self.assertEqual(transcripts_dir("/work/khora"), "/elsewhere/rec")
 
 
 if __name__ == "__main__":

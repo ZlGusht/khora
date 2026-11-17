@@ -36,8 +36,9 @@ Every CLI call: `obsidian vault=khora <verb> …`. Obsidian must be **running** 
 
 ## Recordings
 
-- Record with Wispr Flow. Export each recording as Markdown to `transcripts/YYYY-MM-DD <topic>.md`, unedited.
-- `transcripts/` is not in git: transcripts hold personal information. Never `git add -f` them.
+- Record with Wispr Flow. Export each recording as Markdown, named `YYYY-MM-DD <topic>.md`, unedited, to the transcripts folder outside this repository: `KHORA_TRANSCRIPTS` if set, else a `khora-transcripts` folder beside the repository.
+- Transcripts never enter the repository: it is open source and they hold personal information. The same holds for exported conversations.
+- To share them in the team, sync that folder (e.g. with Syncthing), never through git.
 - Wispr Flow does not label speakers reliably. Ingestion leaves a statement unattributed, or marks it `[?]`, rather than guess.
 
 ## Troubleshooting (symptom → fix)

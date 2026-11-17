@@ -15,13 +15,12 @@ khora's design, and later its code, run as the khora kit: a provisional khora bu
 - `docs/`: documents. `PRD.md`, `adr/`, `implementation-plan.md`, `systems/`, and the kit's own `khora-kit.md` and `khora-kit-plan.md`.
 - `docs/visuals/`: the README images, exported from the "khora visuals" design canvas. Update the canvas and export again; do not edit the images.
 - `src/`: code. There is none yet.
-- `transcripts/`: Wispr Flow exports, one Markdown file per recording. Not in git: they hold personal information.
 - `canvas/`: canvases the team draws.
 - `dashboards/`: canvases the kit renders, and their live views in `dashboards/views/`.
 
 ## How work flows
 
-1. A recording is exported from Wispr Flow to `transcripts/YYYY-MM-DD <topic>.md`, unedited (kit d8).
+1. A recording is exported from Wispr Flow to the transcripts folder outside this repository (`KHORA_TRANSCRIPTS`, by default `../khora-transcripts/`), as `YYYY-MM-DD <topic>.md`, unedited (kit d8). Exported conversations go there too.
 2. `[[Call Ingestion v1.0.0]]` turns it into a Call, Decisions and Questions on a branch, and opens one pull request labelled `ingestion` (kit d9).
 3. A team member checks each Decision against its quote. Merging accepts; `status: reversed` in review rejects (kit d10).
 4. Whoever merges creates the proposed GitHub issues. Work lives in issues, not in entities.
@@ -35,7 +34,8 @@ khora's design, and later its code, run as the khora kit: a provisional khora bu
 - Never edit an accepted Decision, except to supersede it, in a pull request. Only team members fix them.
 - Never change anything in `canvas/`.
 - Never create Task entities. Work items are GitHub issues.
-- Never commit anything from `transcripts/`.
+- Transcripts and exported conversations are only read and parsed. Never copy them into the repository: it is public.
+- A Decision's `quote` holds only the decision's own words. Nothing personal; paraphrase with `[paraphrased]` when needed.
 - Set `properties__author` on every entity you write: a team member's name, or `agent:<model>`.
 - Run `bash .claude/scripts/khora-validate "<name>"` after every entity you write.
 

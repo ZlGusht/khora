@@ -48,7 +48,7 @@ class Dash:
 class Snapshot:
     entities: Dict[str, dict]          # name -> frontmatter, as `khora-canvas graph` prints it
     documents: Dict[str, Doc]          # repository path -> document
-    transcripts: List[str]             # file names in transcripts/
+    transcripts: List[str]             # file names in the transcripts folder, outside the repository
     dashboards: Dict[str, Dash]        # repository path -> dashboard
     issues: Optional[List[dict]]       # None: gh unavailable
     proposals: Optional[List[dict]]    # None: gh unavailable
@@ -117,7 +117,7 @@ def _transcripts(snap):
               for l in _list(fm.get("relationships__transcript"))}
     for f in sorted(snap.transcripts):
         if _name(f) not in linked:
-            yield Finding("transcript", f"transcripts/{f}", "no Call links it")
+            yield Finding("transcript", f, "no Call links it")
 
 
 def _dashboards(snap):
@@ -245,6 +245,11 @@ def entity_changes(today: date, cwd=None) -> Dict[str, date]:
     return changed
 
 
+def transcripts_dir(root: str) -> str:
+    """Transcripts never live in the repository: KHORA_TRANSCRIPTS, or a khora-transcripts folder beside it."""
+    return os.environ.get("KHORA_TRANSCRIPTS") or os.path.join(os.path.dirname(os.path.abspath(root)), "khora-transcripts")
+
+
 def collect(today: date) -> Snapshot:
     here = os.path.dirname(os.path.abspath(__file__))
     r = subprocess.run([sys.executable, os.path.join(here, "khora-canvas.py"), "graph"], capture_output=True,
@@ -273,7 +278,7 @@ def collect(today: date) -> Snapshot:
         stamps = [_date(m) for n in nodes for m in re.findall(r"Rendered (\d{4}-\d{2}-\d{2})", n.get("text", ""))]
         dashboards[path.replace(os.sep, "/")] = Dash(rendered=max([s for s in stamps if s], default=None), spec=spec)
 
-    transcripts = sorted(os.path.basename(p) for p in glob.glob("transcripts/*.md"))
+    transcripts = sorted(os.path.basename(p) for p in glob.glob(os.path.join(transcripts_dir(os.getcwd()), "*.md")))
     issues = _gh("issue", "list", "--state", "open", "--limit", "500", "--json", "number,title,body")
     proposals = _gh("pr", "list", "--state", "open", "--label", "ingestion", "--json", "number,title,createdAt")
     return Snapshot(entities, documents, transcripts, dashboards, issues, proposals, changed)
