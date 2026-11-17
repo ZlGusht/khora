@@ -19,8 +19,8 @@ areas:
 
 | Name | Path |
 | --- | --- |
-| Loops starter | `C:\Users\nam82\Projects\System\export-bundles\khora-startup-loops-2026-11-13\Khora` |
-| Unity | `C:\Users\nam82\Projects\Unity` |
+| Loops starter | The team's loops starter export (2026-11-13), kept outside this repository |
+| Unity | The team's venture vault, kept outside this repository |
 
 ## Global Constraints
 
@@ -31,7 +31,7 @@ areas:
 - `properties__author` is set on every entity written: a team member's name, or `agent:<model>`.
 - Every entity written passes `bash .claude/scripts/khora-validate "<name>"`.
 - Copied kinds keep the copied text, with only the changes a task names.
-- `in_context_of [[Truffle Brain]]` and `[[Truffle]]` in copied entities become `[[Kit]]`.
+- Anchors in copied entities that point at the source vault's own hubs become `[[Kit]]`.
 - Writing in `CLAUDE.md`, rules and process bodies follows the repository's style: plain short sentences, one idea per bullet, no filler.
 
 ## Review Focus
@@ -109,7 +109,7 @@ areas:
 
 - [ ] **Step 1: Copy the 14 starter entities** unchanged.
 - [ ] **Step 2: Copy Unity's five,** with these changes only:
-  - All: `[[Truffle Brain]]` and `[[Truffle]]` → `[[Kit]]`; `Blob/` → `blob/`; `Dashboards/` → `dashboards/`.
+  - All: the source vault's hub anchors → `[[Kit]]`; `Blob/` → `blob/`; `Dashboards/` → `dashboards/`.
   - `Call v1.0.0`: transcripts live in `transcripts/` (not `Archive/Transcripts/`).
   - `Decision v1.0.0`: add `quote = { type="text", description="The transcript line where it was decided, verbatim." }` and `answers = { type="list<connection>", description="Questions this Decision answers.", optional=true }`; add `design` to `kind` values, described as "a choice about khora's model or architecture, the kind ADRs are made of".
   - `Call Ingestion v1.0.0`: Step 6 becomes "List work items as proposed issues in the pull request description: title, assignee, the Call and Decision each one comes from. Do not create Task entities or issues." Add a Step 0: "Work on a branch `ingest/YYYY-MM-DD`." Add a final step: "Open one pull request labelled `ingestion` with every created entity and the proposed issues." Step 5 also writes `quote`. Step 10 re-renders `dashboards/Areas.canvas` and `dashboards/Loops.canvas`.

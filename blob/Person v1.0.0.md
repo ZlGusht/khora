@@ -25,7 +25,7 @@ member_of = { type="list<connection>", description="Organizations this person be
 introduced_by = { type="connection", description="The Person who introduced us to this person.", optional=true }
 
 [Metadata.Properties]
-role = { type="text", description="Their role in plain words, e.g. 'Partner at LAUNCHub', 'Mentor (MTY)', 'Co-founder'.", optional=true }
+role = { type="text", description="Their role in plain words, e.g. 'Investor', 'Mentor', 'Co-founder'.", optional=true }
 link = { type="text", description="One canonical external profile URL, e.g. LinkedIn.", optional=true }
 stage = { type="text", description="Where the relationship stands for the venture (CRM stage), set deliberately. Leave empty for the team and for people we are not pursuing.", values=["identified", "reached_out", "in_conversation", "engaged", "partner", "dormant"], optional=true }
 
