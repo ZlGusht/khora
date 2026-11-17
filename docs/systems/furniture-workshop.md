@@ -1,3 +1,8 @@
+---
+areas:
+  - "[[Product]]"
+---
+
 > **Status:** Draft. A domain system hosted alongside the Company brain system, which holds customers, orders and invoices. Kroika, a separate furniture design app, is the first source. Points marked **(interop: review)** depend on interoperability between khoras; points marked *Suggestion* have not been decided.
 
 ## 1. Overview

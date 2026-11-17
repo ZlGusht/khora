@@ -1,3 +1,8 @@
+---
+areas:
+  - "[[Product]]"
+---
+
 # khora: implementation plan
 
 > **Status:** Draft for the team session

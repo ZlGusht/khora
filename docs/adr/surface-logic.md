@@ -1,3 +1,8 @@
+---
+areas:
+  - "[[Surface logic]]"
+---
+
 # ADR-0XX: Surface logic
 
 > **Status:** Proposed

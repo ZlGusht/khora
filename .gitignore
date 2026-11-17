@@ -1,0 +1,8 @@
+.obsidian/workspace*.json
+.smart-env/
+dashboards/stale.md
+__pycache__/
+.superpowers/
+# Transcripts never belong in this public repository; they live outside it.
+transcripts/
+*.transcript.md

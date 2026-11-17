@@ -1,3 +1,8 @@
+---
+areas:
+  - "[[Design]]"
+---
+
 # ADR-0YA: Origins, behaviors, surfaces and executors
 
 > **Status:** Proposed

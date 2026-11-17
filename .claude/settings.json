@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(obsidian *)",
+      "Bash(obsidian.exe *)",
+      "Bash(which obsidian)",
+      "Bash(bash .claude/scripts/khora-validate *)",
+      "Bash(bash .claude/scripts/khora-uuid)",
+      "Bash(bash .claude/scripts/khora-tmp)",
+      "Bash(date +%F)",
+      "Bash(bash .claude/scripts/khora-stale*)",
+      "Bash(bash .claude/scripts/khora-canvas *)"
+    ],
+    "deny": [
+      "Edit(blob/**)",
+      "Bash(obsidian eval*)",
+      "Bash(obsidian * eval*)",
+      "Bash(obsidian.exe eval*)",
+      "Bash(obsidian.exe * eval*)"
+    ],
+    "ask": [
+      "Bash(obsidian * delete*)",
+      "Bash(obsidian.exe * delete*)"
+    ]
+  },
+  "enabledPlugins": {
+    "superpowers@claude-plugins-official": true
+  }
+}

@@ -1,3 +1,8 @@
+---
+areas:
+  - "[[Surfaces]]"
+---
+
 # ADR-0XY: Surfaces
 
 > **Status:** Proposed
