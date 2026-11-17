@@ -7,11 +7,15 @@
       "Bash(bash .claude/scripts/khora-validate *)",
       "Bash(bash .claude/scripts/khora-uuid)",
       "Bash(bash .claude/scripts/khora-tmp)",
-      "Bash(date +%F)"
+      "Bash(date +%F)",
+      "Bash(bash .claude/scripts/khora-stale*)",
+      "Bash(bash .claude/scripts/khora-canvas *)"
     ],
     "deny": [
-      "Edit(blob/**)",
-      "Write(blob/**)"
+      "Edit(blob/**)"
     ]
+  },
+  "enabledPlugins": {
+    "superpowers@claude-plugins-official": true
   }
 }
