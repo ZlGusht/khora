@@ -15,9 +15,9 @@ properties__author: agent:claude-opus-5-5
 Description = """
 A human the venture interacts with: the team, founders, investors, mentors, advisors, partners, helpers.
 
-One entity per real person, as a particular (identity__type: particular) is_a [[Person v1.0.0]]. The filename is the person's full name as best known; nicknames, initials and transliterations go into `aliases` so search and agents resolve them. Always search for an existing Person under every known name before creating one. A person only mentioned in passing does not get an entity; name them in plain text in the Call body instead. Create the entity when they become someone we act on: contact, decide about, assign, or get introduced to.
+One entity per real person, as a particular (identity__type: particular) is_a [[Person v1.0.0]]. The filename is the person's full name as best known; nicknames, initials and transliterations go into `aliases` so search and agents resolve them. Always search for an existing Person under every known name before creating one. A person only mentioned in passing does not get an entity; name them in plain text in the Conversation body instead. Create the entity when they become someone we act on: contact, decide about, assign, or get introduced to.
 
-History with a person is NOT stored on the Person. It is derived from the graph: the Calls they took part in, the Decisions they made. Their work is in GitHub issues. The body holds only durable facts: who they are, how we know them, what they care about, how they can help.
+History with a person is NOT stored on the Person. It is derived from the graph: the Conversations they took part in, the Decisions they made. Their work is in GitHub issues. The body holds only durable facts: who they are, how we know them, what they care about, how they can help.
 """
 
 [Metadata.Relationships]

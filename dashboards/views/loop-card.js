@@ -24,7 +24,7 @@ const answered = new Set(all.where(x => isA(x, "Decision v1.0.0") && x.propertie
   .flatMap(x => arr(x.relationships__answers).map(nm)).array());
 const open = all.where(x => isA(x, "Question v1.0.0") && x.identity__type === "particular" &&
   refs(x, "relationships__originates_in", loop) && !answered.has(x.file.name));
-const calls = ctx.where(x => isA(x, "Call v1.0.0"));
+const conversations = ctx.where(x => isA(x, "Conversation v1.0.0"));
 const decisions = all.where(x => isA(x, "Decision v1.0.0") && x.properties__status === "active" &&
   (refs(x, "relationships__in_context_of", loop) || refs(x, "relationships__originates_in", loop)));
 const subs = all.where(x => x.identity__type === "particular" && refs(x, "relationships__in_process", loop));
@@ -53,7 +53,7 @@ el.innerHTML = `
   ${stat(unresolved.length + (deposits.length > unresolved.length ? `<span style="font-size:.6em;color:var(--text-muted)">/${deposits.length}</span>` : ""), "reservoir")}
   ${stat(open.length, "open questions")}
   ${stat(decisions.length, "decisions")}
-  ${stat(calls.length, "calls")}
+  ${stat(conversations.length, "conversations")}
   ${stat(subsOpen.length + (subs.length > subsOpen.length ? `<span style="font-size:.6em;color:var(--text-muted)">/${subs.length}</span>` : ""), "sub-loops")}
 </div>
 <div style="font-size:var(--font-ui-smaller);color:var(--text-faint);margin-top:6px">last activity ${fmt(touched)}</div>`;

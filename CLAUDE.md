@@ -11,7 +11,7 @@ khora's design, and later its code, run as the khora kit: a provisional khora bu
 
 ## Layout
 
-- `blob/`: entities: kinds, processes, Areas, Calls, Decisions, Questions, Persons, loop runs.
+- `blob/`: entities: kinds, processes, Areas, Conversations, Decisions, Questions, Persons, loop runs.
 - `docs/`: documents. `PRD.md`, `adr/`, `implementation-plan.md`, `systems/`, and the kit's own `khora-kit.md` and `khora-kit-plan.md`.
 - `docs/visuals/`: the README images, exported from the "khora visuals" design canvas. Update the canvas and export again; do not edit the images.
 - `src/`: code. There is none yet.
@@ -21,7 +21,7 @@ khora's design, and later its code, run as the khora kit: a provisional khora bu
 ## How work flows
 
 1. A recording is exported from Wispr Flow to the transcripts folder outside this repository (`KHORA_TRANSCRIPTS`, by default `../khora-transcripts/`), as `YYYY-MM-DD <topic>.md`, unedited (kit d8). Exported conversations go there too.
-2. `[[Call Ingestion v1.0.0]]` turns it into a Call, Decisions and Questions on a branch, and opens one pull request labelled `ingestion` (kit d9).
+2. `[[Conversation Ingestion v1.0.0]]` turns it into a Conversation, Decisions and Questions on a branch, and opens one pull request labelled `ingestion` (kit d9).
 3. A team member checks each Decision against its quote. Merging accepts; `status: reversed` in review rejects (kit d10).
 4. Whoever merges creates the proposed GitHub issues. Work lives in issues, not in entities.
 5. An ingestion pull request not merged by the next Team Weekly is closed (kit d11).

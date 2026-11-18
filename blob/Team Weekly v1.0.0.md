@@ -27,17 +27,17 @@ The phases are conversational: interview, do not request bullet lists.
 3. Agree a Theme, the loops in focus, and the issues the team means to close.
 
 ### Operate
-The week's work happens in loops, calls and pull requests. The agent does not intrude.
+The week's work happens in loops, conversations and pull requests. The agent does not intrude.
 
 ### Observe
 1. Read `dashboards/stale.md` (run `bash .claude/scripts/khora-stale` first) and go through it with the team.
 2. List open pull requests labelled `ingestion`, with their age.
 3. Compute the acceptance rate since the last run: Decisions merged active, divided by Decisions proposed (merged active plus reversed in review). A rate near 100% with reviews taking almost no time is the fatigue signal; say so.
 4. Sample three active Decisions at random and ask the team whether each still holds.
-5. Review the week: the Calls held, the pull requests merged, the issues closed. Then interview as in Weekly Loop: events, insights, overloads.
+5. Review the week: the Conversations held, the pull requests merged, the issues closed. Then interview as in Weekly Loop: events, insights, overloads.
 
 ### Process(v)
-1. Close every `ingestion` pull request opened before this run's started_at, and deposit a Letter (type signal, with properties__priority (1 to 5) and properties__resolved (true or false), which Letter v1.0.0 requires) on each Call it carried, saying its proposals expired.
+1. Close every `ingestion` pull request opened before this run's started_at, and deposit a Letter (type signal, with properties__priority (1 to 5) and properties__resolved (true or false), which Letter v1.0.0 requires) on each Conversation it carried, saying its proposals expired.
 2. Supersede any sampled Decision the team no longer holds, through a pull request. A Decision made in the weekly originates_in this run and has no quote.
 3. Write ONE key insight and the NextLoopDirective into this run's body.
 """
@@ -45,6 +45,6 @@ The week's work happens in loops, calls and pull requests. The agent does not in
 ContextAssembly = """
 1. The previous run (after_loop) and its NextLoopDirective.
 2. The stale report, open ingestion pull requests (`gh pr list --label ingestion`), issues closed this week (`gh issue list --state closed --search "closed:>=<monday>"`).
-3. Calls and Decisions with dates in this week; open loop runs.
+3. Conversations and Decisions with dates in this week; open loop runs.
 """
 ```
