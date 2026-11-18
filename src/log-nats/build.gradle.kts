@@ -15,6 +15,27 @@ dependencies {
 }
 
 tasks.withType<Test> {
-    systemProperty("khora.nats.conf", rootProject.file("nats/nats-server.conf").absolutePath)
+    systemProperty("khora.nats.conf", rootProject.file("nats/nats-server-always-sync.conf").absolutePath)
     systemProperty("java.util.logging.config.file", file("src/test/resources/logging.properties").absolutePath)
+}
+
+// The benchmark: ./gradlew :log-nats:bench --args='--url nats://localhost:4222 --monitor http://localhost:8222'
+// Not part of `test`. It deletes and recreates the log stream on the server it is given.
+val bench = sourceSets.create("bench") {
+    compileClasspath += sourceSets.main.get().output + sourceSets.main.get().compileClasspath
+    runtimeClasspath += output + compileClasspath + sourceSets.main.get().runtimeClasspath
+}
+
+dependencies {
+    "benchImplementation"(libs.jnats)
+    "benchRuntimeOnly"(libs.slf4j.nop)
+}
+
+tasks.register<JavaExec>("bench") {
+    group = "verification"
+    description = "Measures the NATS log store on the server given by --url."
+    classpath = bench.runtimeClasspath
+    mainClass.set("khora.kernel.log.nats.LogBench")
+    workingDir = rootProject.projectDir
+    maxHeapSize = "2g"
 }

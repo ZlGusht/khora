@@ -148,7 +148,7 @@ public final class NatsTestServer implements AutoCloseable {
 
     private static Path configPath() {
         String configured = System.getProperty("khora.nats.conf");
-        Path path = configured != null ? Paths.get(configured) : Paths.get("../../nats/nats-server.conf");
+        Path path = configured != null ? Paths.get(configured) : Paths.get("../../nats/nats-server-always-sync.conf");
         if (!Files.isRegularFile(path)) {
             throw new IllegalStateException("NATS config not found: " + path.toAbsolutePath());
         }

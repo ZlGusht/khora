@@ -1,3 +1,14 @@
+# The khora log on NATS JetStream.
+#
+# KHORA_NATS_SYNC picks the disk sync of the `nats` service, per deployment:
+#   always  (default) nats/nats-server-always-sync.conf: every write is synced to disk before it
+#                     is acknowledged.
+#   default           nats/nats-server-default-sync.conf: NATS's default, a sync every 2 minutes;
+#                     a host crash can lose recent acknowledged writes.
+# For example: KHORA_NATS_SYNC=default docker compose up -d nats
+#
+# `nats-default-sync` (client port 4223, monitor 8223) runs the default-sync config next to `nats`,
+# with its own volume, so the benchmark (./gradlew :log-nats:bench) can measure both side by side.
 services:
   nats:
     image: nats:2.12-alpine
@@ -6,8 +17,19 @@ services:
       - "4222:4222"
       - "8222:8222"
     volumes:
-      - ./nats/nats-server.conf:/etc/nats/nats-server.conf:ro
+      - ./nats/nats-server-${KHORA_NATS_SYNC:-always}-sync.conf:/etc/nats/nats-server.conf:ro
       - nats-data:/data
+
+  nats-default-sync:
+    image: nats:2.12-alpine
+    command: ["-c", "/etc/nats/nats-server.conf"]
+    ports:
+      - "4223:4222"
+      - "8223:8222"
+    volumes:
+      - ./nats/nats-server-default-sync.conf:/etc/nats/nats-server.conf:ro
+      - nats-default-sync-data:/data
 
 volumes:
   nats-data:
+  nats-default-sync-data:
