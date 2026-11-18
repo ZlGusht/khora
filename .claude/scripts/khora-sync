@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Sync a loop run with GitHub (see khora_sync.py). Usage: bash .claude/scripts/khora-sync open|close|merged|check "<run name>" [--dry-run]
+here="$(cd "$(dirname "$0")" && pwd)"
+for py in python3 python; do
+  if "$py" -c "import sys, yaml, importlib.util as u; sys.exit(sys.version_info < (3, 8) or not (u.find_spec('tomllib') or u.find_spec('tomli')))" >/dev/null 2>&1; then
+    exec "$py" "$here/khora_sync.py" "$@"
+  fi
+done
+echo "khora-sync: no Python 3 with PyYAML and a TOML parser found (pip install pyyaml tomli)" >&2
+exit 2

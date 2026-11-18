@@ -32,6 +32,8 @@ A working session between [[Simeon Petkov]] and a Claude Code agent on how work 
 
 **Conversation, not call.** This session was a chat, not a call. The graph now records conversations: Conversation replaces Call, with a medium property.
 
+**Designing the loops.** The three kinds were designed against what the repository already holds: the implementation plan's stages and the GitHub milestones and issues. Stage 0 is recorded as a closed Milestone run. The plan's Stages section becomes a view of the roadmap. Designer work is issues. An Issue run usually ends in one pull request. What a closed roadmap's Digest resolves into is left open. Simeon approved the design with "go ahead".
+
 ## Decisions
 
 - [[Everyone works on the project inside loop runs]]
@@ -52,6 +54,12 @@ A working session between [[Simeon Petkov]] and a Claude Code agent on how work 
 - [[Cadence loops stay separate from development loops for now]]
 - [[Workflow rules are written first, CI checks later]]
 - [[Conversations replace Calls in the graph]]
+- [[Stage 0 is recorded as a closed Milestone run]]
+- [[The implementation plan's stages are a view of the roadmap]]
+- [[Designer work is tracked as issues]]
+- [[An Issue run usually ends in one pull request]]
+- [[Digests of closed roadmap runs resolve into a level not yet defined]]
+- [[The loops are built as designed on 2026-11-18]]
 
 ## Open questions
 

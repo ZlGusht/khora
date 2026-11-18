@@ -30,6 +30,7 @@ One run of [[Conversation Ingestion v1.0.0]] over one source: the Claude Code co
 10. Not done: dashboards not re-rendered. Obsidian is in Restricted Mode on this machine, so its plugins don't load.
 11. Pull request #33, labelled `ingestion`.
 12. Retyped Call to Conversation in the graph, per [[Conversations replace Calls in the graph]].
+13. The conversation's second part: 6 more Decisions, on the loop design; one answers [[What are the formats of loop runs and digests]].
 
 ## Frictions
 

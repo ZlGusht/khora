@@ -10,5 +10,6 @@ relationships__in_context_of:
 relationships__originates_in:
   - "[[Conversation 2026-11-18 Loop levels for development]]"
 properties__author: agent:claude-opus-5-5
+properties__lean: The Stages section of docs/implementation-plan.md, written from the roadmap run, and a Roadmap canvas [?]
 ---
 The roadmap is to have an artifact in the repository to see and work on. What it is (a canvas, a document, a dashboard) was not discussed.
