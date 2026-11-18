@@ -326,3 +326,6 @@ Task 5, commit `2047c80`. `./gradlew :log-nats:bench` against two local NATS ser
 **How far to trust them.**
 - NATS ran inside Docker Desktop's Linux VM. Its disk sync goes to a virtual disk on APFS, so absolute `sync: always` numbers on a Linux server with a real disk may differ. The comparison between the two settings holds.
 - One machine, one run per scenario.
+- Latency is closed-loop: each appender sends the next append when the last one is confirmed. A stall counts as one slow sample.
+- Throughput and fill times include building the records, so with the NATS default sync they are understated by a few per cent. This does not change the comparison.
+- That the server syncs each message of an atomic batch separately is inferred from the numbers, not confirmed on the server.
