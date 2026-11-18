@@ -97,6 +97,24 @@ public final class NatsTestServer implements AutoCloseable {
         }
     }
 
+    /** Freezes the server process ({@code docker pause}): connections stay open but get no answer. */
+    public void pause() {
+        requireRunning();
+        container.getDockerClient().pauseContainerCmd(container.getContainerId()).exec();
+    }
+
+    /** Resumes a server frozen by {@link #pause()}. */
+    public void unpause() {
+        requireRunning();
+        container.getDockerClient().unpauseContainerCmd(container.getContainerId()).exec();
+    }
+
+    private void requireRunning() {
+        if (container == null) {
+            throw new IllegalStateException("NATS test server is not running");
+        }
+    }
+
     public String url() {
         if (container == null) {
             throw new IllegalStateException("NATS test server is not running");

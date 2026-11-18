@@ -14,10 +14,15 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import khora.kernel.log.LogRecord;
 import khora.kernel.log.LogStore;
 import khora.kernel.log.LogStoreContract;
 import khora.kernel.log.LogStoreException;
+import khora.kernel.log.Subscription;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -182,6 +187,71 @@ class NatsLogStoreTest extends LogStoreContract {
                     () -> unreachable.append(List.of(record("e1", "a", new byte[] {1}))));
             Duration took = Duration.ofNanos(System.nanoTime() - started);
             assertTrue(took.compareTo(Duration.ofSeconds(5)) < 0, "append failed after " + took);
+        }
+    }
+
+    @Test
+    void appendToAPausedServerFailsWithinFiveSeconds() {
+        NatsTestServer server = newServer();
+        try (LogStore paused = NatsLogStore.open(server.url())) {
+            server.pause();
+            try {
+                long started = System.nanoTime();
+                assertThrows(LogStoreException.class,
+                        () -> paused.append(List.of(record("e1", "a", new byte[] {1}))));
+                Duration took = Duration.ofNanos(System.nanoTime() - started);
+                assertTrue(took.compareTo(Duration.ofSeconds(5)) < 0, "append failed after " + took);
+            } finally {
+                server.unpause();
+            }
+        }
+    }
+
+    @Test
+    void undecodableRecordStopsTheSubscriptionVisibly() throws Exception {
+        NatsTestServer server = newServer();
+        List<java.util.logging.LogRecord> logged = new CopyOnWriteArrayList<>();
+        Handler capture = new Handler() {
+            @Override
+            public void publish(java.util.logging.LogRecord record) {
+                logged.add(record);
+            }
+
+            @Override
+            public void flush() {
+            }
+
+            @Override
+            public void close() {
+            }
+        };
+        Logger logger = Logger.getLogger(NatsLogStore.class.getName());
+        logger.addHandler(capture);
+        try (LogStore log = NatsLogStore.open(server.url());
+                Connection raw = Nats.connect(server.url())) {
+            log.append(List.of(record("e1", "a", new byte[] {1})));
+            raw.jetStream().publish("khora.log.action._", new byte[] {2});
+            log.append(List.of(record("e3", "a", new byte[] {3})));
+
+            List<String> received = new CopyOnWriteArrayList<>();
+            try (Subscription subscription = log.subscribe(1, r -> received.add(r.eventId()))) {
+                long deadline = System.nanoTime() + Duration.ofSeconds(5).toNanos();
+                while (logged.stream().noneMatch(r -> r.getLevel().intValue() >= Level.WARNING.intValue())
+                        && System.nanoTime() < deadline) {
+                    Thread.sleep(10);
+                }
+                Thread.sleep(300);
+                assertEquals(List.of("e1"), received);
+            }
+            java.util.logging.LogRecord warning = logged.stream()
+                    .filter(r -> r.getLevel().intValue() >= Level.WARNING.intValue())
+                    .findFirst().orElseThrow(() -> new AssertionError("no warning logged"));
+            assertTrue(warning.getMessage().contains("position 2"), warning.getMessage());
+
+            LogStoreException readFailure = assertThrows(LogStoreException.class, () -> log.read(1, 10));
+            assertTrue(readFailure.getMessage().contains("2"), readFailure.getMessage());
+        } finally {
+            logger.removeHandler(capture);
         }
     }
 }

@@ -16,4 +16,5 @@ dependencies {
 
 tasks.withType<Test> {
     systemProperty("khora.nats.conf", rootProject.file("nats/nats-server.conf").absolutePath)
+    systemProperty("java.util.logging.config.file", file("src/test/resources/logging.properties").absolutePath)
 }

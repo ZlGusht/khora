@@ -24,6 +24,7 @@ import io.nats.client.api.StorageType;
 import io.nats.client.api.StreamConfiguration;
 import io.nats.client.impl.Headers;
 import io.nats.client.impl.NatsJetStreamMetaData;
+import io.nats.client.support.Status;
 import io.synadia.bp.BatchPublishException;
 import io.synadia.bp.BatchPublisher;
 import java.io.IOException;
@@ -128,20 +129,37 @@ public final class NatsLogStore implements LogStore {
                 .connectionTimeout(TIMEOUT)
                 .maxReconnects(-1)
                 .reconnectBufferSize(0)
-                .errorListener(new QuietErrorListener())
+                .errorListener(new LoggingErrorListener())
                 .build();
     }
 
-    /** Sends client errors to the {@code System.Logger} at debug level, instead of to stderr. */
-    private static final class QuietErrorListener implements ErrorListener {
+    /** Sends client errors to the {@code System.Logger} at warning level. */
+    private static final class LoggingErrorListener implements ErrorListener {
         @Override
         public void errorOccurred(Connection conn, String error) {
-            LOG.log(System.Logger.Level.DEBUG, "NATS error: {0}", error);
+            LOG.log(System.Logger.Level.WARNING, "NATS error: " + error);
         }
 
         @Override
         public void exceptionOccurred(Connection conn, Exception exp) {
-            LOG.log(System.Logger.Level.DEBUG, "NATS exception", exp);
+            LOG.log(System.Logger.Level.WARNING, "NATS exception: " + exp, exp);
+        }
+
+        @Override
+        public void slowConsumerDetected(Connection conn, io.nats.client.Consumer consumer) {
+            LOG.log(System.Logger.Level.WARNING, "NATS slow consumer: " + consumer);
+        }
+
+        @Override
+        public void heartbeatAlarm(Connection conn, JetStreamSubscription sub,
+                long lastStreamSequence, long lastConsumerSequence) {
+            LOG.log(System.Logger.Level.WARNING, "NATS heartbeat alarm on " + sub.getSubject()
+                    + " after stream sequence " + lastStreamSequence);
+        }
+
+        @Override
+        public void pullStatusError(Connection conn, JetStreamSubscription sub, Status status) {
+            LOG.log(System.Logger.Level.WARNING, "NATS pull error on " + sub.getSubject() + ": " + status);
         }
     }
 
@@ -448,8 +466,9 @@ public final class NatsLogStore implements LogStore {
      * Delivers with an ordered consumer on the whole log, starting at {@code fromPosition}. The
      * client recreates the consumer from the next expected position if it misses messages, heartbeats
      * or the connection. Messages are handed to {@code handler} on the connection's dispatcher thread,
-     * one at a time. A handler that throws, or a message that cannot be decoded, is logged at debug
-     * level and delivery goes on.
+     * one at a time. A handler that throws is logged at warning level and delivery goes on. A message
+     * that cannot be decoded stops the subscription, logged at error level with its position, since
+     * {@link #read} fails on it too.
      */
     @Override
     public Subscription subscribe(long fromPosition, Consumer<LogRecord> handler) {
@@ -466,6 +485,9 @@ public final class NatsLogStore implements LogStore {
             throw new LogStoreException("subscribing from position " + from + " failed", e);
         }
         subscriptions.add(subscription);
+        if (subscription.closed) {
+            subscription.close(); // a record failed to decode before the consumer was assigned
+        }
         return subscription;
     }
 
@@ -482,12 +504,23 @@ public final class NatsLogStore implements LogStore {
             if (closed) {
                 return;
             }
+            long position = message.metaData().streamSequence();
+            LogRecord record;
             try {
-                NatsJetStreamMetaData meta = message.metaData();
-                handler.accept(decode(meta.streamSequence(), message.getSubject(), message.getHeaders(),
-                        message.getData()));
+                record = decode(position, message.getSubject(), message.getHeaders(), message.getData());
             } catch (RuntimeException e) {
-                LOG.log(System.Logger.Level.DEBUG, "subscription handler failed on " + message.getSubject(), e);
+                LOG.log(System.Logger.Level.ERROR, "subscription stopped: the record at position " + position
+                        + " cannot be decoded: " + e.getMessage(), e);
+                closed = true;
+                // The consumer is closed off the dispatcher thread that is running this method.
+                Thread.ofVirtual().start(this::close);
+                return;
+            }
+            try {
+                handler.accept(record);
+            } catch (RuntimeException e) {
+                LOG.log(System.Logger.Level.WARNING, "subscription handler failed on position " + position
+                        + ", event " + record.eventId() + "; delivery goes on", e);
             }
         }
 
@@ -501,7 +534,7 @@ public final class NatsLogStore implements LogStore {
                 try {
                     c.close();
                 } catch (Exception e) {
-                    LOG.log(System.Logger.Level.DEBUG, "closing a subscription failed", e);
+                    LOG.log(System.Logger.Level.WARNING, "closing a subscription failed", e);
                 }
             }
         }
