@@ -112,7 +112,7 @@ public record LogRecord(
 - One stream, `KHORA_LOG`, file storage, subjects `khora.log.>`.
 - No limits on age, count or size; deletes and purges denied.
 - `allow_atomic` on.
-- The server runs with `sync: always`: an append is confirmed only once it is on disk ([[The log confirms a write only after it is on disk]]). `docker-compose.yml` and the Testcontainers setup both use it.
+- The server runs with `sync: always`: an append is confirmed only once it is on disk ([[The log confirms a write only after it is on disk]]). `docker-compose.yml` and the Testcontainers setup both use it. The setting is selectable per deployment: `docker-compose.yml` picks the server config from `KHORA_NATS_SYNC` (`always`, the default, or `default` for the NATS default sync).
 - Subject per record: `khora.log.<eventType>.<entity>`. The entity id is base64url-encoded without padding, since NATS subject tokens cannot contain dots. A record without an entity uses `_`.
 - The position is the stream sequence.
 - The header `Nats-Msg-Id` carries the event id, so a retried append is deduplicated.

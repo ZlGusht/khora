@@ -18,7 +18,7 @@ properties__author: agent:claude-opus-5-5
 ---
 ## Statement
 
-NATS runs with `sync: always`: an append is confirmed only once it is written to disk.
+By default NATS runs with `sync: always`: an append is confirmed only once it is written to disk. For now the setting is selectable per deployment, so the faster NATS default can be chosen where losing the last seconds of writes on a crash is acceptable.
 
 ## Rationale
 
