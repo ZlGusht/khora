@@ -6,9 +6,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.nats.client.Connection;
 import io.nats.client.Nats;
+import io.nats.client.api.DiscardPolicy;
+import io.nats.client.api.RetentionPolicy;
 import io.nats.client.api.StorageType;
 import io.nats.client.api.StreamConfiguration;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import khora.kernel.log.LogRecord;
@@ -93,16 +96,60 @@ class NatsLogStoreTest extends LogStoreContract {
     }
 
     @Test
-    void openRefusesAnExistingStreamWithOtherSettings() throws Exception {
+    void openRefusesAnExistingStreamWithOtherStorage() throws Exception {
+        assertOpenRefuses(new StreamConfiguration.Builder(NatsLogStore.streamConfiguration())
+                .storageType(StorageType.Memory).build());
+    }
+
+    @Test
+    void openRefusesAnExistingStreamWithOtherRetention() throws Exception {
+        assertOpenRefuses(new StreamConfiguration.Builder(NatsLogStore.streamConfiguration())
+                .retentionPolicy(RetentionPolicy.Interest).build());
+    }
+
+    @Test
+    void openRefusesAnExistingStreamWithOtherDuplicateWindow() throws Exception {
+        assertOpenRefuses(new StreamConfiguration.Builder(NatsLogStore.streamConfiguration())
+                .duplicateWindow(Duration.ofSeconds(10)).build());
+    }
+
+    @Test
+    void openRefusesAnExistingStreamWithOtherDiscardPolicy() throws Exception {
+        assertOpenRefuses(new StreamConfiguration.Builder(NatsLogStore.streamConfiguration())
+                .discardPolicy(DiscardPolicy.New).build());
+    }
+
+    private void assertOpenRefuses(StreamConfiguration existing) throws Exception {
         NatsTestServer server = newServer();
         try (Connection connection = Nats.connect(server.url())) {
-            connection.jetStreamManagement().addStream(StreamConfiguration.builder()
-                    .name("KHORA_LOG")
-                    .subjects("khora.log.>")
-                    .storageType(StorageType.Memory)
-                    .build());
+            connection.jetStreamManagement().addStream(existing);
         }
         assertThrows(LogStoreException.class, () -> NatsLogStore.open(server.url()));
+    }
+
+    @Test
+    void readAndHistoryStreamManyRecords() {
+        int perEntity = 1500;
+        List<LogRecord> batch = new ArrayList<>();
+        for (int i = 0; i < 2 * perEntity; i++) {
+            batch.add(record("e" + i, i % 2 == 0 ? "even" : "odd", new byte[] {(byte) i}));
+            if (batch.size() == LogStore.MAX_APPEND) {
+                store.append(batch);
+                batch.clear();
+            }
+        }
+        store.append(batch);
+        List<LogRecord> even = store.history("even");
+        assertEquals(perEntity, even.size());
+        for (int i = 0; i < perEntity; i++) {
+            assertEquals(2L * i + 1, even.get(i).position());
+            assertEquals("e" + 2 * i, even.get(i).eventId());
+        }
+        List<LogRecord> page = store.read(2001, 1500);
+        assertEquals(1000, page.size());
+        assertEquals(2001L, page.getFirst().position());
+        assertEquals(3000L, page.getLast().position());
+        assertTrue(store.read(3001, 10).isEmpty());
     }
 
     @Test

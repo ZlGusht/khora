@@ -4,13 +4,20 @@ import io.nats.client.Connection;
 import io.nats.client.JetStream;
 import io.nats.client.JetStreamApiException;
 import io.nats.client.JetStreamManagement;
+import io.nats.client.JetStreamSubscription;
+import io.nats.client.Message;
 import io.nats.client.Nats;
 import io.nats.client.PublishOptions;
-import io.nats.client.api.MessageInfo;
+import io.nats.client.PushSubscribeOptions;
+import io.nats.client.api.ConsumerConfiguration;
+import io.nats.client.api.DeliverPolicy;
+import io.nats.client.api.DiscardPolicy;
 import io.nats.client.api.PublishAck;
+import io.nats.client.api.RetentionPolicy;
 import io.nats.client.api.StorageType;
 import io.nats.client.api.StreamConfiguration;
 import io.nats.client.impl.Headers;
+import io.nats.client.impl.NatsJetStreamMetaData;
 import io.synadia.bp.BatchPublishException;
 import io.synadia.bp.BatchPublisher;
 import java.io.IOException;
@@ -49,6 +56,10 @@ public final class NatsLogStore implements LogStore {
     /** Server error: no message found. */
     private static final int NO_MESSAGE_FOUND = 10037;
     private static final int APPEND_ATTEMPTS = 3;
+    /** The window in which the server de-duplicates event ids. */
+    static final Duration DUPLICATE_WINDOW = Duration.ofMinutes(2);
+    /** How long a read waits for the next message it knows is there. */
+    private static final Duration READ_TIMEOUT = Duration.ofSeconds(10);
 
     private final Connection connection;
     private final JetStream jetStream;
@@ -92,6 +103,9 @@ public final class NatsLogStore implements LogStore {
                 .name(STREAM)
                 .subjects(Subjects.ALL)
                 .storageType(StorageType.File)
+                .retentionPolicy(RetentionPolicy.Limits)
+                .discardPolicy(DiscardPolicy.Old)
+                .duplicateWindow(DUPLICATE_WINDOW)
                 .maxAge(Duration.ZERO)
                 .maxMessages(-1)
                 .maxBytes(-1)
@@ -127,6 +141,15 @@ public final class NatsLogStore implements LogStore {
         }
         if (c.getStorageType() != StorageType.File) {
             d.add("storage " + c.getStorageType());
+        }
+        if (c.getRetentionPolicy() != RetentionPolicy.Limits) {
+            d.add("retention " + c.getRetentionPolicy());
+        }
+        if (c.getDiscardPolicy() != DiscardPolicy.Old) {
+            d.add("discard " + c.getDiscardPolicy());
+        }
+        if (!DUPLICATE_WINDOW.equals(c.getDuplicateWindow())) {
+            d.add("duplicate window " + c.getDuplicateWindow());
         }
         if (c.getMaxAge() != null && !c.getMaxAge().isZero()) {
             d.add("max age " + c.getMaxAge());
@@ -292,41 +315,85 @@ public final class NatsLogStore implements LogStore {
         return scan(1, Integer.MAX_VALUE, Subjects.historyFilter(entityId));
     }
 
+    /**
+     * Reads with an ordered consumer on {@code filter} from {@code from}, up to {@code max} records.
+     * It stops at the last sequence matching {@code filter} when the call started, so records
+     * appended during the read are not waited for.
+     */
     private List<LogRecord> scan(long from, int max, String filter) {
-        List<LogRecord> found = new ArrayList<>();
-        long seq = from;
+        if (max <= 0) {
+            return List.of();
+        }
         try {
-            while (found.size() < max) {
-                MessageInfo message;
-                try {
-                    message = management.getNextMessage(STREAM, seq, filter);
-                } catch (JetStreamApiException e) {
-                    if (e.getApiErrorCode() == NO_MESSAGE_FOUND) {
+            long last = lastSequence(filter);
+            if (from > last) {
+                return List.of();
+            }
+            PushSubscribeOptions options = PushSubscribeOptions.builder()
+                    .stream(STREAM)
+                    .ordered(true)
+                    .configuration(ConsumerConfiguration.builder()
+                            .deliverPolicy(DeliverPolicy.ByStartSequence)
+                            .startSequence(from)
+                            .build())
+                    .build();
+            JetStreamSubscription subscription = jetStream.subscribe(filter, options);
+            try {
+                List<LogRecord> found = new ArrayList<>();
+                while (found.size() < max) {
+                    Message message = subscription.nextMessage(READ_TIMEOUT);
+                    if (message == null) {
+                        throw new LogStoreException("reading " + filter + " from position " + from
+                                + " timed out after " + found.size() + " records");
+                    }
+                    NatsJetStreamMetaData meta = message.metaData();
+                    if (meta.streamSequence() > last) {
                         break;
                     }
-                    throw e;
+                    found.add(decode(meta.streamSequence(), message.getSubject(), message.getHeaders(),
+                            message.getData()));
+                    if (meta.streamSequence() == last) {
+                        break;
+                    }
                 }
-                found.add(decode(message));
-                seq = message.getSeq() + 1;
+                return found;
+            } finally {
+                subscription.unsubscribe();
             }
         } catch (IOException | JetStreamApiException e) {
-            throw new LogStoreException("reading " + filter + " from position " + seq + " failed", e);
+            throw new LogStoreException("reading " + filter + " from position " + from + " failed", e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new LogStoreException("interrupted reading " + filter + " from position " + from, e);
         }
-        return found;
     }
 
-    private static LogRecord decode(MessageInfo message) {
-        Headers headers = message.getHeaders();
+    /** The last sequence matching {@code filter} now, or 0 if none does. */
+    private long lastSequence(String filter) throws IOException, JetStreamApiException {
+        if (filter.equals(Subjects.ALL)) {
+            return management.getStreamInfo(STREAM).getStreamState().getLastSequence();
+        }
+        try {
+            return management.getLastMessage(STREAM, filter).getSeq();
+        } catch (JetStreamApiException e) {
+            if (e.getApiErrorCode() == NO_MESSAGE_FOUND) {
+                return 0;
+            }
+            throw e;
+        }
+    }
+
+    private static LogRecord decode(long seq, String subject, Headers headers, byte[] data) {
         String eventId = headers == null ? null : headers.getFirst(MSG_ID);
         if (eventId == null) {
-            throw new LogStoreException("message " + message.getSeq() + " has no " + MSG_ID);
+            throw new LogStoreException("message " + seq + " has no " + MSG_ID);
         }
         String entities = headers.getFirst(ENTITY_IDS);
         List<String> entityIds = entities == null || entities.isEmpty()
                 ? List.of()
                 : Arrays.stream(entities.split(",")).map(Subjects::decode).toList();
-        byte[] body = message.getData() == null ? new byte[0] : message.getData();
-        return new LogRecord(message.getSeq(), eventId, Subjects.eventType(message.getSubject()), entityIds, body);
+        byte[] body = data == null ? new byte[0] : data;
+        return new LogRecord(seq, eventId, Subjects.eventType(subject), entityIds, body);
     }
 
     @Override
