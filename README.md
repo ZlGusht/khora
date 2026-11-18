@@ -40,7 +40,7 @@ Access follows grants and scopes. No entity has an owner.
 
 ## Working in this repository
 
-- Open the repository folder in Obsidian as a vault, and turn community plugins on.
+- Open the repository folder in Obsidian as a vault, and turn community plugins on. On a Linux machine without a screen, Obsidian runs headless instead; `claude` sets it up.
 - Run `claude` in the folder. It walks you through the rest of the setup.
 - Read [`docs/khora-kit.md`](docs/khora-kit.md): how calls become decisions, and decisions become documents.
 

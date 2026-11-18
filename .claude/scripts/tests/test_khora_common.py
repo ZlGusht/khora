@@ -17,6 +17,42 @@ def fake_obsidian(tmp, body):
     return [sys.executable, path]
 
 
+class HeadlessEnv(unittest.TestCase):
+    KEYS = ("KHORA_OBS_HOME", "KHORA_OBS_DISPLAY", "KHORA_OBSIDIAN_TMP")
+
+    def setUp(self):
+        self.saved = {k: os.environ.pop(k, None) for k in self.KEYS}
+
+    def tearDown(self):
+        for k, v in self.saved.items():
+            os.environ.pop(k, None)
+            if v is not None:
+                os.environ[k] = v
+
+    def test_desktop_env_is_unchanged(self):
+        self.assertIsNone(khora_common.obsidian_env())
+
+    def test_headless_env_points_at_the_daemon(self):
+        os.environ["KHORA_OBS_HOME"] = "/srv/obs-home"
+        env = khora_common.obsidian_env()
+        self.assertEqual(env["HOME"], "/srv/obs-home")
+        self.assertEqual(env["DISPLAY"], ":99")
+
+    def test_headless_display_override(self):
+        os.environ["KHORA_OBS_HOME"] = "/srv/obs-home"
+        os.environ["KHORA_OBS_DISPLAY"] = ":77"
+        self.assertEqual(khora_common.obsidian_env()["DISPLAY"], ":77")
+
+    def test_obsidian_tmp_override(self):
+        os.environ["KHORA_OBSIDIAN_TMP"] = "/var/obs-tmp"
+        self.assertEqual(khora_common.obsidian_tmp(), "/var/obs-tmp")
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "Linux default")
+    def test_obsidian_tmp_linux_default_ignores_agent_tmpdir(self):
+        os.environ["TMPDIR"] = "/tmp/claude-1000"
+        self.assertEqual(khora_common.obsidian_tmp(), "/tmp")
+
+
 class VaultName(unittest.TestCase):
     def setUp(self):
         self.saved = os.environ.pop("KHORA_VAULT", None)

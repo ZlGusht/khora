@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# The Obsidian CLI, pointed at the right Obsidian instance.
+# On a desktop this is plain `obsidian`. On a headless Linux instance (KHORA_OBS_HOME set),
+# the CLI only finds the daemon started by obsidian-headless.sh when HOME and DISPLAY match it.
+# Usage: bash .claude/scripts/obs vault=<vault> <verb> ...
+if [ -n "${KHORA_OBS_HOME:-}" ]; then
+  export HOME="$KHORA_OBS_HOME" DISPLAY="${KHORA_OBS_DISPLAY:-:99}"
+fi
+exec obsidian "$@"

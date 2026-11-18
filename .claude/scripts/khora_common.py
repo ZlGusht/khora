@@ -5,6 +5,7 @@ Obsidian resolves vault names without regard to case, so before the first call t
 checks that the named vault's path really is this repository.
 """
 import os
+import sys
 import subprocess
 
 OBSIDIAN = ["obsidian"]
@@ -27,6 +28,30 @@ def vault_name(cwd=None):
     return os.environ.get("KHORA_VAULT") or os.path.basename(repo_root(cwd))
 
 
+def obsidian_env():
+    """The environment for CLI calls. None on a desktop; on a headless Linux instance
+    (KHORA_OBS_HOME set) the CLI only finds the daemon with the daemon's HOME and DISPLAY."""
+    home = os.environ.get("KHORA_OBS_HOME")
+    if not home:
+        return None
+    env = dict(os.environ)
+    env["HOME"] = home
+    env["DISPLAY"] = os.environ.get("KHORA_OBS_DISPLAY") or ":99"
+    return env
+
+
+def obsidian_tmp():
+    """Obsidian's own temp folder, where the khora plugin's queue lives. Never the agent's
+    TMPDIR: an agent sandbox often sets one the Obsidian app can't see."""
+    if os.environ.get("KHORA_OBSIDIAN_TMP"):
+        return os.environ["KHORA_OBSIDIAN_TMP"]
+    if sys.platform == "darwin":
+        return subprocess.run(["getconf", "DARWIN_USER_TEMP_DIR"], capture_output=True, text=True).stdout.strip().rstrip("/")
+    if os.name == "nt":
+        return os.path.join(os.environ["LOCALAPPDATA"], "Temp")
+    return "/tmp"  # obsidian-headless.sh starts Obsidian with TMPDIR=/tmp; desktop Obsidian has no TMPDIR
+
+
 def _kill_tree(proc):
     # A child that keeps our pipes open would make a plain kill wait for it, so end the whole tree.
     if os.name == "nt":
@@ -42,7 +67,7 @@ def _kill_tree(proc):
 def _run(args, timeout):
     group = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt" else {"start_new_session": True}
     try:
-        proc = subprocess.Popen(OBSIDIAN + list(args), stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        proc = subprocess.Popen(OBSIDIAN + list(args), env=obsidian_env(), stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                 text=True, encoding="utf-8", errors="replace", **group)
     except FileNotFoundError:
         raise KitError("Obsidian is not running or the CLI is off")

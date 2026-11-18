@@ -58,6 +58,7 @@ The vault runs code when Obsidian opens it: the plugin builds in `.obsidian/plug
 - Wikilinks are exact and versioned: `[[Decision v1.0.0]]`, not `[[Decision]]`.
 - Only keys declared along an entity's `is_a` chain are allowed. A new key is an ontology change; ask first.
 - Before ontology decisions or new entities, run `khora-assemble-context`.
+- On Linux without a screen, Obsidian runs headless: start it with `.claude/scripts/obsidian-headless.sh` and call the CLI as `bash .claude/scripts/obs`. Setup for macOS, Windows and Linux: `.claude/rules/khora-setup.md`.
 - Details: `.claude/rules/khora-vault.md`, `khora-crud.md`, `khora-setup.md`.
 
 ## Conventions

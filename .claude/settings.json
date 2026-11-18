@@ -9,18 +9,22 @@
       "Bash(bash .claude/scripts/khora-tmp)",
       "Bash(date +%F)",
       "Bash(bash .claude/scripts/khora-stale*)",
-      "Bash(bash .claude/scripts/khora-canvas *)"
+      "Bash(bash .claude/scripts/khora-canvas *)",
+      "Bash(bash .claude/scripts/obs *)",
+      "Bash(bash .claude/scripts/obsidian-headless.sh *)"
     ],
     "deny": [
       "Edit(blob/**)",
       "Bash(obsidian eval*)",
       "Bash(obsidian * eval*)",
       "Bash(obsidian.exe eval*)",
-      "Bash(obsidian.exe * eval*)"
+      "Bash(obsidian.exe * eval*)",
+      "Bash(bash .claude/scripts/obs * eval*)"
     ],
     "ask": [
       "Bash(obsidian * delete*)",
-      "Bash(obsidian.exe * delete*)"
+      "Bash(obsidian.exe * delete*)",
+      "Bash(bash .claude/scripts/obs * delete*)"
     ]
   },
   "enabledPlugins": {
