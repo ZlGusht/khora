@@ -211,12 +211,12 @@ The run switches to approach B if, by the end of step 1, an atomic batch from Ja
 
 **Files:**
 - Create: `src/log-nats/build.gradle.kts` (depends on `:kernel-core`, test fixtures of `:kernel-core` for tests, jnats, batch-publish, Testcontainers); include `:log-nats` in settings
-- Create: `nats/nats-server.conf` (JetStream on, `store_dir: /data`, `sync_interval: always`); `docker-compose.yml` with service `nats` (`nats:2.12-alpine`, `-c /etc/nats/nats-server.conf`, ports 4222 and 8222, a named volume on `/data`)
+- Create: `nats/nats-server-always-sync.conf` (named `nats-server.conf` until Task 5 renamed it; JetStream on, `store_dir: /data`, `sync_interval: always`); `docker-compose.yml` with service `nats` (`nats:2.12-alpine`, `-c` with that config, ports 4222 and 8222, a named volume on `/data`)
 - Create: `src/log-nats/src/test/java/khora/kernel/log/nats/NatsTestServer.java`: a Testcontainers container of the same image and config, with `url()` and `stop()`/`start()` that keep the data directory
 - Test: `src/log-nats/src/test/java/khora/kernel/log/nats/AtomicBatchSpikeTest.java`
 
 **Interfaces:**
-- Produces: `NatsTestServer` (used by Tasks 3 and 4), `nats/nats-server.conf` (used by the benchmark).
+- Produces: `NatsTestServer` (used by Tasks 3 and 4), `nats/nats-server-always-sync.conf` (used by the benchmark).
 
 - [ ] **Step 1: Write the spike tests**, each creating a fresh stream with the Global Constraints settings:
   - `batchOfFourIsStoredTogether`: an atomic batch of 4 messages on two subjects; the stream holds 4 messages with consecutive sequences.
@@ -299,3 +299,30 @@ Task 2, commit `8c8773e`. NATS Server 2.12.15 (`nats:2.12-alpine`), jnats 2.27.0
 Consequences for Task 3:
 - `NatsLogStore.append` removes duplicate event ids inside one batch before publishing, since the server refuses the whole batch otherwise (ledger ruling R1).
 - A server-side refusal is reported as "batch is incomplete"; `LogStoreException` should say which append failed, not why the server refused it.
+
+## Measurements
+
+Task 5, commit `2047c80`. `./gradlew :log-nats:bench` against two local NATS servers from `docker-compose.yml`, one with `sync: always` (port 4222) and one with the NATS default sync (port 4223). Each scenario starts from an empty stream. 200-byte bodies. Latency is measured per append, after a warm-up of 1000 appends.
+
+**Setup.** Apple M5 (10 cores), 24 GB, Apple SSD, macOS 27.0.1. Docker Desktop with 10 CPUs and 7.65 GiB. NATS Server 2.12.15, jnats 2.27.0, `io.synadia:batch-publish` 0.4.0, Java 25.
+
+| Scenario | `sync: always` | NATS default sync |
+| --- | --- | --- |
+| Append 1 record | p50 1.00 ms, p99 1.79 ms | p50 0.58 ms, p99 0.76 ms |
+| Append 1 + 3 records | p50 2.27 ms, p99 3.79 ms | p50 0.84 ms, p99 1.10 ms |
+| Append 1 + 50 records | p50 17.9 ms, p99 23.6 ms | p50 1.23 ms, p99 1.99 ms |
+| Append 1 + 3, 4 concurrent appenders | p50 7.53 ms, p99 11.0 ms; 2 130 records/s | p50 2.03 ms, p99 2.99 ms; 8 004 records/s |
+| Throughput, batches of 1 + 50, one appender | 2 813 records/s | 39 994 records/s |
+| Fill a log of 1 000 000 records, batches of 1 000 | 5 min 30 s (3 028 records/s) | 10.1 s (99 111 records/s) |
+| History of an entity with 1 000 records, log of 1 000 000 | median 95.8 ms | median 97.2 ms |
+| History of an entity with 100 000 records, log of 1 000 000 | median 309 ms | median 297 ms |
+
+**What the numbers say.**
+- A typical write, an outcome with three effects, is confirmed in about 2 ms with `sync: always`. Synchronous commit is not held back by the log.
+- `sync: always` costs about 3 times at small batches and about 14 times at 1 + 50: the server appears to sync each message of an atomic batch separately. Bulk imports are where it hurts: a million records take 5.5 minutes instead of 10 seconds. This is why the sync is selectable ([[The log confirms a write only after it is on disk]]).
+- Concurrent appenders share the cost: four of them reach about 25 % more records per second than one, with higher latency each.
+- Reading one entity's history does not depend on the sync setting, but grows with the size of the log: 1 000 records take about 20 ms in a log of 200 000 and about 96 ms in a log of 1 000 000. A large log needs an index for history; that is K6 and B1.
+
+**How far to trust them.**
+- NATS ran inside Docker Desktop's Linux VM. Its disk sync goes to a virtual disk on APFS, so absolute `sync: always` numbers on a Linux server with a real disk may differ. The comparison between the two settings holds.
+- One machine, one run per scenario.
