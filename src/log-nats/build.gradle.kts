@@ -10,13 +10,10 @@ dependencies {
     testImplementation(testFixtures(project(":kernel-core")))
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.testcontainers)
-    testImplementation(libs.testcontainers.junit.jupiter)
     testRuntimeOnly(libs.junit.platform.launcher)
+    testRuntimeOnly(libs.slf4j.nop)
 }
 
 tasks.withType<Test> {
     systemProperty("khora.nats.conf", rootProject.file("nats/nats-server.conf").absolutePath)
-    testLogging {
-        showStandardStreams = true
-    }
 }

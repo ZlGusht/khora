@@ -1,0 +1,356 @@
+package khora.kernel.log.nats;
+
+import io.nats.client.Connection;
+import io.nats.client.JetStream;
+import io.nats.client.JetStreamApiException;
+import io.nats.client.JetStreamManagement;
+import io.nats.client.Nats;
+import io.nats.client.PublishOptions;
+import io.nats.client.api.MessageInfo;
+import io.nats.client.api.PublishAck;
+import io.nats.client.api.StorageType;
+import io.nats.client.api.StreamConfiguration;
+import io.nats.client.impl.Headers;
+import io.synadia.bp.BatchPublishException;
+import io.synadia.bp.BatchPublisher;
+import java.io.IOException;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.function.Consumer;
+import khora.kernel.log.LogRecord;
+import khora.kernel.log.LogStore;
+import khora.kernel.log.LogStoreException;
+import khora.kernel.log.Subscription;
+
+/**
+ * A {@link LogStore} on the NATS JetStream stream {@value #STREAM}. A record is one message: the
+ * subject is {@link Subjects#forRecord}, {@code Nats-Msg-Id} is the event id, the header
+ * {@value #ENTITY_IDS} holds the entity ids (base64url, comma separated) and the data is the body.
+ * Positions are stream sequences. An append is one atomic batch.
+ */
+public final class NatsLogStore implements LogStore {
+
+    static final String STREAM = "KHORA_LOG";
+    static final String MSG_ID = "Nats-Msg-Id";
+    static final String ENTITY_IDS = "Khora-Entity-Ids";
+
+    /** Room left in a message for the headers batch publish adds (batch id and sequence). */
+    private static final int BATCH_HEADER_RESERVE = 256;
+    /** Server error: a batch holds a message id the stream already has (or holds one twice). */
+    private static final int DUPLICATE_MESSAGE_ID = 10201;
+    /** Server error: the expected last message id does not match. */
+    private static final int WRONG_LAST_MSG_ID = 10070;
+    /** Server error: no message found. */
+    private static final int NO_MESSAGE_FOUND = 10037;
+    private static final int APPEND_ATTEMPTS = 3;
+
+    private final Connection connection;
+    private final JetStream jetStream;
+    private final JetStreamManagement management;
+
+    private NatsLogStore(Connection connection) throws IOException {
+        this.connection = connection;
+        this.jetStream = connection.jetStream();
+        this.management = connection.jetStreamManagement();
+    }
+
+    /**
+     * Connects to {@code natsUrl} and creates the stream, or checks that the existing stream has the
+     * log's settings.
+     */
+    public static NatsLogStore open(String natsUrl) {
+        Connection connection;
+        try {
+            connection = Nats.connect(natsUrl);
+        } catch (IOException e) {
+            throw new LogStoreException("cannot connect to NATS at " + natsUrl, e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new LogStoreException("interrupted while connecting to NATS at " + natsUrl, e);
+        }
+        try {
+            NatsLogStore store = new NatsLogStore(connection);
+            store.ensureStream();
+            return store;
+        } catch (IOException | JetStreamApiException | RuntimeException e) {
+            closeQuietly(connection);
+            if (e instanceof LogStoreException l) {
+                throw l;
+            }
+            throw new LogStoreException("cannot open stream " + STREAM, e);
+        }
+    }
+
+    static StreamConfiguration streamConfiguration() {
+        return StreamConfiguration.builder()
+                .name(STREAM)
+                .subjects(Subjects.ALL)
+                .storageType(StorageType.File)
+                .maxAge(Duration.ZERO)
+                .maxMessages(-1)
+                .maxBytes(-1)
+                .maxMessagesPerSubject(-1)
+                .maximumMessageSize(-1)
+                .denyDelete(true)
+                .denyPurge(true)
+                .allowAtomicPublish(true)
+                .build();
+    }
+
+    private void ensureStream() throws IOException, JetStreamApiException {
+        StreamConfiguration existing;
+        try {
+            existing = management.getStreamInfo(STREAM).getConfiguration();
+        } catch (JetStreamApiException e) {
+            if (e.getErrorCode() != 404) {
+                throw e;
+            }
+            management.addStream(streamConfiguration());
+            return;
+        }
+        List<String> differences = differences(existing);
+        if (!differences.isEmpty()) {
+            throw new LogStoreException("stream " + STREAM + " exists with other settings: " + differences);
+        }
+    }
+
+    private static List<String> differences(StreamConfiguration c) {
+        List<String> d = new ArrayList<>();
+        if (!c.getSubjects().equals(List.of(Subjects.ALL))) {
+            d.add("subjects " + c.getSubjects());
+        }
+        if (c.getStorageType() != StorageType.File) {
+            d.add("storage " + c.getStorageType());
+        }
+        if (c.getMaxAge() != null && !c.getMaxAge().isZero()) {
+            d.add("max age " + c.getMaxAge());
+        }
+        if (c.getMaxMsgs() != -1) {
+            d.add("max messages " + c.getMaxMsgs());
+        }
+        if (c.getMaxBytes() != -1) {
+            d.add("max bytes " + c.getMaxBytes());
+        }
+        if (c.getMaxMsgsPerSubject() != -1) {
+            d.add("max messages per subject " + c.getMaxMsgsPerSubject());
+        }
+        if (c.getMaximumMessageSize() != -1) {
+            d.add("max message size " + c.getMaximumMessageSize());
+        }
+        if (!c.getDenyDelete()) {
+            d.add("deletes allowed");
+        }
+        if (!c.getDenyPurge()) {
+            d.add("purges allowed");
+        }
+        if (!c.getAllowAtomicPublish()) {
+            d.add("atomic publish not allowed");
+        }
+        return d;
+    }
+
+    /**
+     * Appends {@code records} as one atomic batch. A repeated event id inside {@code records} is sent
+     * once (the first wins) and every copy gets its position. If the server refuses the batch because
+     * an event id is already stored, each record is probed with a plain publish that expects a last
+     * message id no record has: for a stored event id the server answers with a duplicate ack that
+     * carries the original sequence, and for a new one it refuses and stores nothing. The new records
+     * are then sent again as one batch.
+     */
+    @Override
+    public List<Long> append(List<LogRecord> records) {
+        if (records.size() > MAX_APPEND) {
+            throw new LogStoreException("append of " + records.size() + " records exceeds " + MAX_APPEND);
+        }
+        if (records.isEmpty()) {
+            return List.of();
+        }
+        Map<String, Outgoing> unique = new LinkedHashMap<>();
+        for (LogRecord record : records) {
+            if (!unique.containsKey(record.eventId())) {
+                unique.put(record.eventId(), outgoing(record, records));
+            }
+        }
+        Map<String, Long> positions = new HashMap<>();
+        List<Outgoing> pending = new ArrayList<>(unique.values());
+        for (int attempt = 1; !pending.isEmpty(); attempt++) {
+            try {
+                List<Long> sent = publishBatch(pending);
+                for (int i = 0; i < pending.size(); i++) {
+                    positions.put(pending.get(i).eventId, sent.get(i));
+                }
+                pending = List.of();
+            } catch (BatchPublishException e) {
+                if (e.getApiErrorCode() != DUPLICATE_MESSAGE_ID || attempt == APPEND_ATTEMPTS) {
+                    throw new LogStoreException(describe(records) + " failed: " + e.getMessage(), e);
+                }
+                List<Outgoing> notStored = probe(pending, positions, records);
+                if (notStored.size() == pending.size()) {
+                    throw new LogStoreException(
+                            describe(records) + " was refused for a duplicate event id, but none is stored", e);
+                }
+                pending = notStored;
+            } catch (RuntimeException e) {
+                if (e instanceof LogStoreException) {
+                    throw e;
+                }
+                throw new LogStoreException(describe(records) + " failed: " + e.getMessage(), e);
+            }
+        }
+        return records.stream().map(r -> positions.get(r.eventId())).toList();
+    }
+
+    private record Outgoing(String eventId, String subject, Headers headers, byte[] body) {
+    }
+
+    private Outgoing outgoing(LogRecord record, List<LogRecord> records) {
+        try {
+            Headers headers = new Headers().put(MSG_ID, record.eventId());
+            if (!record.entityIds().isEmpty()) {
+                headers.put(ENTITY_IDS, String.join(",", record.entityIds().stream().map(Subjects::token).toList()));
+            }
+            Outgoing out = new Outgoing(record.eventId(), Subjects.forRecord(record), headers, record.body());
+            long size = (long) headers.serializedLength() + record.body().length + BATCH_HEADER_RESERVE;
+            if (size > connection.getMaxPayload()) {
+                throw new IllegalArgumentException("record of " + record.body().length
+                        + " bytes exceeds the server's max payload of " + connection.getMaxPayload() + " bytes");
+            }
+            return out;
+        } catch (IllegalArgumentException e) {
+            throw new LogStoreException(
+                    describe(records) + " refused, event " + record.eventId() + ": " + e.getMessage(), e);
+        }
+    }
+
+    /** Publishes {@code batch} atomically and returns the position of each message. */
+    private List<Long> publishBatch(List<Outgoing> batch) throws BatchPublishException {
+        BatchPublisher publisher = BatchPublisher.builder().connection(connection).build();
+        try {
+            for (Outgoing out : batch.subList(0, batch.size() - 1)) {
+                publisher.add(out.subject, out.headers, out.body);
+            }
+            Outgoing last = batch.getLast();
+            PublishAck ack = publisher.commit(last.subject, last.headers, last.body);
+            if (ack.getBatchSize() != batch.size()) {
+                throw new IllegalStateException(
+                        "batch of " + batch.size() + " messages was acked with size " + ack.getBatchSize());
+            }
+            long first = ack.getSeqno() - batch.size() + 1;
+            List<Long> positions = new ArrayList<>(batch.size());
+            for (int i = 0; i < batch.size(); i++) {
+                positions.add(first + i);
+            }
+            return positions;
+        } finally {
+            if (!publisher.isClosed()) {
+                publisher.discard();
+            }
+        }
+    }
+
+    /**
+     * Puts the position of each already stored record of {@code batch} into {@code positions} and
+     * returns the others. A probe publish expects a last message id that no record has, so the server
+     * stores nothing for a new event id; for a stored event id its duplicate check runs first and the
+     * ack carries the original sequence. Should the expected id ever match, the record is stored by
+     * the probe itself, and its ack still gives its position.
+     */
+    private List<Outgoing> probe(List<Outgoing> batch, Map<String, Long> positions, List<LogRecord> records) {
+        PublishOptions options = PublishOptions.builder()
+                .expectedLastMsgId("khora-probe-" + UUID.randomUUID())
+                .build();
+        List<Outgoing> notStored = new ArrayList<>();
+        for (Outgoing out : batch) {
+            try {
+                PublishAck ack = jetStream.publish(out.subject, out.headers, out.body, options);
+                positions.put(out.eventId, ack.getSeqno());
+            } catch (JetStreamApiException e) {
+                if (e.getApiErrorCode() != WRONG_LAST_MSG_ID) {
+                    throw new LogStoreException(describe(records) + " failed probing event " + out.eventId, e);
+                }
+                notStored.add(out);
+            } catch (IOException e) {
+                throw new LogStoreException(describe(records) + " failed probing event " + out.eventId, e);
+            }
+        }
+        return notStored;
+    }
+
+    @Override
+    public List<LogRecord> read(long fromPosition, int max) {
+        return scan(Math.max(fromPosition, 1), max, Subjects.ALL);
+    }
+
+    @Override
+    public List<LogRecord> history(String entityId) {
+        return scan(1, Integer.MAX_VALUE, Subjects.historyFilter(entityId));
+    }
+
+    private List<LogRecord> scan(long from, int max, String filter) {
+        List<LogRecord> found = new ArrayList<>();
+        long seq = from;
+        try {
+            while (found.size() < max) {
+                MessageInfo message;
+                try {
+                    message = management.getNextMessage(STREAM, seq, filter);
+                } catch (JetStreamApiException e) {
+                    if (e.getApiErrorCode() == NO_MESSAGE_FOUND) {
+                        break;
+                    }
+                    throw e;
+                }
+                found.add(decode(message));
+                seq = message.getSeq() + 1;
+            }
+        } catch (IOException | JetStreamApiException e) {
+            throw new LogStoreException("reading " + filter + " from position " + seq + " failed", e);
+        }
+        return found;
+    }
+
+    private static LogRecord decode(MessageInfo message) {
+        Headers headers = message.getHeaders();
+        String eventId = headers == null ? null : headers.getFirst(MSG_ID);
+        if (eventId == null) {
+            throw new LogStoreException("message " + message.getSeq() + " has no " + MSG_ID);
+        }
+        String entities = headers.getFirst(ENTITY_IDS);
+        List<String> entityIds = entities == null || entities.isEmpty()
+                ? List.of()
+                : Arrays.stream(entities.split(",")).map(Subjects::decode).toList();
+        byte[] body = message.getData() == null ? new byte[0] : message.getData();
+        return new LogRecord(message.getSeq(), eventId, Subjects.eventType(message.getSubject()), entityIds, body);
+    }
+
+    @Override
+    public Subscription subscribe(long fromPosition, Consumer<LogRecord> handler) {
+        throw new UnsupportedOperationException("subscribe is not implemented yet");
+    }
+
+    @Override
+    public void close() {
+        closeQuietly(connection);
+    }
+
+    private static void closeQuietly(Connection connection) {
+        try {
+            connection.close();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private static String describe(List<LogRecord> records) {
+        List<String> ids = records.stream().map(LogRecord::eventId).distinct().toList();
+        String shown = ids.size() <= 5 ? String.join(", ", ids)
+                : String.join(", ", ids.subList(0, 5)) + ", ... (" + (ids.size() - 5) + " more)";
+        return "append of " + records.size() + " records [" + shown + "]";
+    }
+}

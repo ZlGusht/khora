@@ -96,7 +96,7 @@ public abstract class LogStoreContract {
     }
 
     @Test
-    void subscribeDeliversExistingThenNewRecords() throws Exception {
+    protected void subscribeDeliversExistingThenNewRecords() throws Exception {
         store.append(List.of(record("e1"), record("e2")));
         List<LogRecord> received = new CopyOnWriteArrayList<>();
         Subscription subscription = store.subscribe(2, received::add);
