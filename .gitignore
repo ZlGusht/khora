@@ -6,3 +6,6 @@ __pycache__/
 # Transcripts never belong in this public repository; they live outside it.
 transcripts/
 *.transcript.md
+
+# Ignore Smart Environment folder
+.smart-env
