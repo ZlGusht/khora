@@ -141,3 +141,143 @@ public record LogRecord(
 ### Fallback rule
 
 The run switches to approach B if, by the end of step 1, an atomic batch from Java either cannot be published, or leaves part of a batch stored in the failure test (server refuses or is stopped mid-batch). Under B, `history()` scans the stream with no index, and is measured as such. *Builder's call.*
+
+## Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** a `LogStore` on NATS JetStream behind an interface, with an in-memory twin, a shared contract test, and measured append latency, throughput and history reads.
+
+**Architecture:** one Gradle build; `kernel-core` holds the interface and, as test fixtures, `InMemoryLogStore` and `LogStoreContract`; `log-nats` implements it on one JetStream stream with atomic batch publish (Orbit.java `batch-publish`). A benchmark source set in `log-nats` produces the numbers.
+
+**Tech Stack:** Java 25, Gradle 9.9.1 (Kotlin DSL, wrapper, version catalog), JUnit 5, Testcontainers, jnats, `io.synadia:batch-publish`, NATS Server `nats:2.12-alpine` (2.12.1 or later, for de-duplication inside batches).
+
+**Spec:** the Design section above.
+
+### Global Constraints
+
+- Java toolchain 25 in every module, whatever Java runs Gradle.
+- `kernel-core` has no dependency on NATS or Orbit.
+- Stream `KHORA_LOG`, subjects `khora.log.>`, file storage, no limits on age, count or size, deletes and purges denied, atomic publish allowed.
+- The server syncs every write: `sync_interval: always` in the `jetstream` block, in `docker-compose.yml` and in tests.
+- Subject per record: `khora.log.<eventType>.<base64url, no padding, of the primary entity>`, or `_` when there is no entity.
+- Positions start at 1 and are the stream sequence.
+- `Nats-Msg-Id` = event id. An append of more than 1000 records is refused, and nothing is stored.
+- Package root: `khora.kernel` (builder's call). Commits as Isiooo, local only; nothing is pushed.
+
+### Review Focus
+
+1. Entity ids with `.`, `*`, `>`, spaces or Cyrillic letters: history still finds them, and no other entity's records. Test in Task 3.
+2. A record whose body exceeds the server's max payload (1 MB default): append throws `LogStoreException`, and nothing from that append is stored. Test in Task 3.
+3. NATS unreachable: append throws `LogStoreException` within 5 seconds instead of hanging. Test in Task 4.
+4. An empty list: `append(List.of())` returns an empty list and stores nothing. Test in Task 1 (contract).
+5. The same event id twice in one batch: stored once; both entries of the returned list name the same position. Test in Task 1 (contract).
+
+---
+
+### Task 1: Build, interface, in-memory store and contract test
+
+**Files:**
+- Create: `settings.gradle.kts`, `build.gradle.kts`, `gradle/libs.versions.toml`, `gradlew`, `gradlew.bat`, `gradle/wrapper/*` (from `gradle wrapper --gradle-version 9.9.1`), add `.gradle/` and `build/` to `.gitignore`
+- Create: `src/kernel-core/build.gradle.kts` (plugins `java-library`, `java-test-fixtures`)
+- Create: `src/kernel-core/src/main/java/khora/kernel/log/{LogStore,LogRecord,Subscription,LogStoreException}.java`
+- Create: `src/kernel-core/src/testFixtures/java/khora/kernel/log/{InMemoryLogStore,LogStoreContract}.java`
+- Test: `src/kernel-core/src/test/java/khora/kernel/log/InMemoryLogStoreTest.java`
+
+**Interfaces:**
+- Produces:
+  - `interface LogStore extends AutoCloseable` with `List<Long> append(List<LogRecord>)`, `List<LogRecord> read(long fromPosition, int max)`, `List<LogRecord> history(String entityId)`, `Subscription subscribe(long fromPosition, Consumer<LogRecord> handler)`, `void close()`.
+  - `record LogRecord(long position, String eventId, String eventType, List<String> entityIds, byte[] body)`. The canonical constructor rejects an `eventType` other than `action`, `outcome`, `effect`, `observation`, and a null or blank `eventId`. Methods: `Optional<String> primaryEntity()`, `LogRecord withPosition(long)`, static `LogRecord unappended(String eventId, String eventType, List<String> entityIds, byte[] body)` (position 0). `equals` and `hashCode` compare `body` by content.
+  - `interface Subscription extends AutoCloseable { void close(); }`.
+  - `class LogStoreException extends RuntimeException`.
+  - `abstract class LogStoreContract` with `protected abstract LogStore newStore()`, run by every implementation.
+
+- [ ] **Step 1:** Create the root build: settings include `:kernel-core` with `projectDir = file("src/kernel-core")`; root build sets the Java 25 toolchain and `useJUnitPlatform()` for all subprojects; the catalog holds JUnit and, for later tasks, jnats, batch-publish and Testcontainers at their latest stable versions. Run `./gradlew help`. Expected: BUILD SUCCESSFUL.
+- [ ] **Step 2: Write the contract tests** in `LogStoreContract` (each a `@Test` method):
+  - `appendAssignsIncreasingPositions`: append e1, e2, e3, then e4: `[1, 2, 3]` then `[4]`.
+  - `readReturnsRecordsFromAPosition`: after e1..e5, `read(3, 10)` returns e3, e4, e5 with positions 3, 4, 5; `read(3, 2)` returns e3, e4.
+  - `historyReturnsRecordsByPrimaryEntity`: records with entities `[a]`, `[b]`, `[a, b]`, `[]`; `history("a")` is the first and third; `history("b")` is the second only; `history("x")` is empty.
+  - `appendOfMoreThan1000RecordsIsRefused`: 1001 records throw `LogStoreException`; `read(1, 2000)` is empty.
+  - `emptyAppendStoresNothing`: `append(List.of())` returns `List.of()`; `read(1, 10)` is empty.
+  - `duplicateEventIdIsStoredOnce`: append e1 → `[1]`; append e1 again → `[1]`; read shows one record.
+  - `duplicateEventIdInsideOneBatchIsStoredOnce`: append `[e1, e1]` → `[1, 1]`; read shows one record.
+  - `subscribeDeliversExistingThenNewRecords`: after e1, e2, `subscribe(2, …)` receives e2; append e3; it receives e3 within 5 seconds; after `close()`, append e4 is not received.
+- [ ] **Step 3:** `InMemoryLogStoreTest extends LogStoreContract`, returning `new InMemoryLogStore()`. Run `./gradlew :kernel-core:test`. Expected: FAIL, the classes do not exist.
+- [ ] **Step 4:** Implement the four main types and `InMemoryLogStore` (a synchronized list; duplicate ids kept in a map from event id to position).
+- [ ] **Step 5:** Run `./gradlew :kernel-core:test`. Expected: all contract tests PASS.
+- [ ] **Step 6: Commit** `Add the Gradle build and the LogStore interface with an in-memory store`.
+
+### Task 2: Atomic batch spike against NATS
+
+**Files:**
+- Create: `src/log-nats/build.gradle.kts` (depends on `:kernel-core`, test fixtures of `:kernel-core` for tests, jnats, batch-publish, Testcontainers); include `:log-nats` in settings
+- Create: `nats/nats-server.conf` (JetStream on, `store_dir: /data`, `sync_interval: always`); `docker-compose.yml` with service `nats` (`nats:2.12-alpine`, `-c /etc/nats/nats-server.conf`, ports 4222 and 8222, a named volume on `/data`)
+- Create: `src/log-nats/src/test/java/khora/kernel/log/nats/NatsTestServer.java`: a Testcontainers container of the same image and config, with `url()` and `stop()`/`start()` that keep the data directory
+- Test: `src/log-nats/src/test/java/khora/kernel/log/nats/AtomicBatchSpikeTest.java`
+
+**Interfaces:**
+- Produces: `NatsTestServer` (used by Tasks 3 and 4), `nats/nats-server.conf` (used by the benchmark).
+
+- [ ] **Step 1: Write the spike tests**, each creating a fresh stream with the Global Constraints settings:
+  - `batchOfFourIsStoredTogether`: an atomic batch of 4 messages on two subjects; the stream holds 4 messages with consecutive sequences.
+  - `refusedBatchStoresNothing`: a batch whose third message exceeds the max payload; publishing fails; the stream holds 0 messages.
+  - `duplicateMsgIdInsideBatch`: a batch with the same `Nats-Msg-Id` twice; record what is stored and what the ack says, and assert it.
+  - `streamRefusesDelete`: deleting a message fails.
+- [ ] **Step 2:** Run `./gradlew :log-nats:test --tests '*AtomicBatchSpikeTest'`. Expected: the first run fails only where a library call or setting is wrong; fix the setup, not the assertions.
+- [ ] **Step 3:** Write the outcome into this run, under a new heading `## Spike result`: the library versions, what each test showed, and whether the Fallback rule applies. **Stop and report to Hristiyan Ganchov** before Task 3. If the Fallback rule applies, Tasks 3 to 5 use approach B.
+- [ ] **Step 4: Commit** `Prove atomic batch publish to JetStream from Java`.
+
+### Task 3: NatsLogStore: append, read, history
+
+**Files:**
+- Create: `src/log-nats/src/main/java/khora/kernel/log/nats/{NatsLogStore,Subjects}.java`
+- Test: `src/log-nats/src/test/java/khora/kernel/log/nats/{NatsLogStoreTest,SubjectsTest}.java`
+
+**Interfaces:**
+- Consumes: `LogStore`, `LogRecord`, `LogStoreException`, `LogStoreContract` (Task 1); `NatsTestServer` (Task 2).
+- Produces: `static NatsLogStore open(String natsUrl)` (creates or checks the stream; throws `LogStoreException` if an existing `KHORA_LOG` has other settings); `Subjects.forRecord(LogRecord): String`; `Subjects.historyFilter(String entityId): String`.
+
+- [ ] **Step 1: Write failing tests:**
+  - `SubjectsTest`: `forRecord` of an effect on `p:kitchen.ivanovi` is `khora.log.effect.` + base64url of the id; an action with no entity is `khora.log.action._`; ids `a.b`, `a*`, `a>`, `a b`, `кухня` all give one valid subject token.
+  - `NatsLogStoreTest extends LogStoreContract`, `newStore()` opens on a fresh `NatsTestServer`. Plus `historyFindsEntitiesWithSpecialCharacters` (the ids above, one record each; each history has exactly its record) and `oversizedBodyStoresNothing` (two records, the second 2 MB: `LogStoreException`; `read(1, 10)` is empty).
+- [ ] **Step 2:** Run `./gradlew :log-nats:test`. Expected: FAIL, `NatsLogStore` does not exist.
+- [ ] **Step 3:** Implement `Subjects`, then `NatsLogStore.open`, `append` (refuse over 1000 before publishing; one atomic batch; positions from the acks; a duplicate's position from the ack's sequence), `read` and `history` (`Subjects.historyFilter` on `khora.log.*.<entity>`). Leave `subscribe` throwing `UnsupportedOperationException` and mark the subscribe contract test `@Disabled("Task 4")` in `NatsLogStoreTest` only.
+- [ ] **Step 4:** Run `./gradlew :log-nats:test`. Expected: PASS, except the disabled test.
+- [ ] **Step 5: Commit** `Add NatsLogStore: append, read and history`.
+
+### Task 4: Subscribe, failures and restart
+
+**Files:**
+- Modify: `src/log-nats/src/main/java/khora/kernel/log/nats/NatsLogStore.java`
+- Test: `src/log-nats/src/test/java/khora/kernel/log/nats/NatsLogStoreTest.java`
+
+**Interfaces:**
+- Consumes: Task 3.
+- Produces: a complete `NatsLogStore`.
+
+- [ ] **Step 1: Write failing tests:** remove the `@Disabled`; add
+  - `recordsSurviveARestart`: append e1..e3, stop and start the server keeping its data, open a new store: `read(1, 10)` returns e1..e3 at positions 1..3.
+  - `unreachableServerFailsFast`: open against a server, stop it, `append` of one record throws `LogStoreException` within 5 seconds.
+  - `handlerExceptionDoesNotStopTheSubscription`: a handler that throws on e1 still receives e2.
+- [ ] **Step 2:** Run `./gradlew :log-nats:test`. Expected: the new tests FAIL.
+- [ ] **Step 3:** Implement `subscribe` (builder's choice of consumer) and the timeouts (connection and publish timeouts of at most 5 seconds).
+- [ ] **Step 4:** Run `./gradlew test`. Expected: every test in both modules PASS.
+- [ ] **Step 5: Commit** `Complete NatsLogStore: subscribe, timeouts and restart`.
+
+### Task 5: Benchmark and numbers
+
+**Files:**
+- Create: `src/log-nats/src/bench/java/khora/kernel/log/nats/LogBench.java`; a `bench` source set and a `bench` `JavaExec` task in `src/log-nats/build.gradle.kts`, taking `--url`
+- Create: `nats/nats-server-default-sync.conf` (as the other, without `sync_interval`); a second compose service `nats-default-sync` on port 4223 with its own volume
+
+**Interfaces:**
+- Consumes: `NatsLogStore.open`, `LogRecord.unappended`.
+
+- [ ] **Step 1:** Implement `LogBench`. Each scenario starts from an empty stream, warms up for 1000 appends, then reports:
+  - append latency p50 and p99, over 10 000 appends each, for batches of 1, 1 + 3 and 1 + 50 records, with one appender, and for batches of 1 + 3 with 4 concurrent appenders;
+  - throughput in records per second for batches of 1 + 50 with one appender;
+  - history read time (median of 20 reads) for an entity with 1 000 and one with 100 000 records, in a log of 1 000 000 records with 200-byte bodies.
+  Output: one Markdown table per server.
+- [ ] **Step 2:** Run `docker compose up -d`, then `./gradlew :log-nats:bench --args='--url nats://localhost:4222'` and `--args='--url nats://localhost:4223'`. Expected: two tables, no errors.
+- [ ] **Step 3:** Write both tables into this run under `## Measurements`, with the machine (`sysctl -n machdep.cpu.brand_string`, memory, disk) and the versions.
+- [ ] **Step 4: Commit** `Measure the NATS log store`.
