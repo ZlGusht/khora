@@ -13,7 +13,7 @@ properties__author: agent:claude-opus-5-5
 ---
 ```toml
 Description = """
-A hub for one area of khora's design or of the work around it. Every entity in this vault is in_context_of at least one Area, so the graph has a spine: any Decision, Question, Call or loop run is one hop from its Area.
+A hub for one area of khora's design or of the work around it. Every entity in this vault is in_context_of at least one Area, so the graph has a spine: any Decision, Question, Conversation or loop run is one hop from its Area.
 
 An Area has no fields of its own. Documents in docs/ name the Areas they belong to in an `areas` list in their own frontmatter, and the Areas dashboard and the stale report read that list.
 """

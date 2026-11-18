@@ -8,7 +8,7 @@ relationships__is_a:
 relationships__in_context_of:
   - "[[Kit]]"
 relationships__originates_in:
-  - "[[Call 2026-11-18 Loop levels for development]]"
+  - "[[Conversation 2026-11-18 Loop levels for development]]"
 relationships__decided_by:
   - "[[Simeon Petkov]]"
 properties__decided_on: 2026-11-18
@@ -23,4 +23,4 @@ Roadmap and milestone work lives in khora loop runs. Issues live only in GitHub,
 
 ## Rationale
 
-Replaces kit decision 9 in docs/khora-kit.md ("work items are not entities"; proposals listed as issues), which has no Decision entity yet. Also in the call: "issues are not in blob, issues are in gh and the action loops to work on those have to be based on those".
+Replaces kit decision 9 in docs/khora-kit.md ("work items are not entities"; proposals listed as issues), which has no Decision entity yet. Also in the conversation: "issues are not in blob, issues are in gh and the action loops to work on those have to be based on those".

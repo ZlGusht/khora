@@ -62,13 +62,13 @@ class Documents(unittest.TestCase):
 
 
 class Transcripts(unittest.TestCase):
-    def test_transcript_without_call(self):
-        call = {"identity__type": "particular", "relationships__is_a": ["[[Call v1.0.0]]"],
+    def test_transcript_without_conversation(self):
+        call = {"identity__type": "particular", "relationships__is_a": ["[[Conversation v1.0.0]]"],
                 "relationships__transcript": "[[transcripts/2026-11-05]]"}
-        s = snapshot(entities={"Call 2026-11-05 X": call},
+        s = snapshot(entities={"Conversation 2026-11-05 X": call},
                      transcripts=["2026-11-05.md", "2026-11-14.md"])
         self.assertEqual(find_stale(s, TODAY),
-                         [Finding("transcript", "2026-11-14.md", "no Call links it")])
+                         [Finding("transcript", "2026-11-14.md", "no Conversation links it")])
 
 
 class Dashboards(unittest.TestCase):
@@ -124,7 +124,7 @@ class GitHubUnavailable(unittest.TestCase):
     def test_gh_unavailable_skips_only_github_checks(self):
         s = snapshot(issues=None, proposals=None, transcripts=["2026-11-14.md"])
         self.assertEqual(find_stale(s, TODAY), [
-            Finding("transcript", "2026-11-14.md", "no Call links it"),
+            Finding("transcript", "2026-11-14.md", "no Conversation links it"),
             Finding("skipped", "issues", "gh not available"),
             Finding("skipped", "proposals", "gh not available"),
         ])
@@ -132,9 +132,9 @@ class GitHubUnavailable(unittest.TestCase):
 
 class Fresh(unittest.TestCase):
     def test_fresh_vault_reports_nothing(self):
-        call = {"identity__type": "particular", "relationships__is_a": ["[[Call v1.0.0]]"],
+        call = {"identity__type": "particular", "relationships__is_a": ["[[Conversation v1.0.0]]"],
                 "relationships__transcript": "transcripts/2026-11-05.md"}
-        s = snapshot(entities={"Call 2026-11-05 X": call, "D": decision(D_ID, decided_on="2026-11-05")},
+        s = snapshot(entities={"Conversation 2026-11-05 X": call, "D": decision(D_ID, decided_on="2026-11-05")},
                      transcripts=["2026-11-05.md"],
                      documents={"docs/adr/khora-log.md": doc(f"It holds. <!-- d:{D_ID} -->\n")},
                      changed={"D": date(2026, 11, 5)},
@@ -144,10 +144,10 @@ class Fresh(unittest.TestCase):
 
 class Report(unittest.TestCase):
     def test_report_groups_by_kind(self):
-        text = render_report([Finding("transcript", "transcripts/a.md", "no Call links it"),
+        text = render_report([Finding("transcript", "transcripts/a.md", "no Conversation links it"),
                               Finding("dashboard", "dashboards/Areas.canvas", "not rendered yet")], TODAY)
         self.assertTrue(text.startswith("# Stale · 2026-11-17\n"))
-        self.assertIn("## Transcripts\n\n- `transcripts/a.md`: no Call links it\n", text)
+        self.assertIn("## Transcripts\n\n- `transcripts/a.md`: no Conversation links it\n", text)
         self.assertIn("## Dashboards\n\n- `dashboards/Areas.canvas`: not rendered yet\n", text)
 
     def test_report_when_nothing_is_stale(self):

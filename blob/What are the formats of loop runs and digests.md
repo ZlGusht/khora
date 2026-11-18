@@ -8,8 +8,8 @@ relationships__is_a:
 relationships__in_context_of:
   - "[[Kit]]"
 relationships__originates_in:
-  - "[[Call 2026-11-18 Loop levels for development]]"
+  - "[[Conversation 2026-11-18 Loop levels for development]]"
 properties__lean: "A digest is a Letter of type digest, in_context_of the parent run, linked to its run by a specific key such as digest_of [?]"
 properties__author: agent:claude-opus-5-5
 ---
-The team will commit to specific formats after the discussion. The lean is the first cut discussed in the call, not yet agreed.
+The team will commit to specific formats after the discussion. The lean is the first cut discussed in the conversation, not yet agreed.

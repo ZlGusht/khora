@@ -8,7 +8,7 @@ relationships__is_a:
 relationships__in_context_of:
   - "[[Kit]]"
 relationships__originates_in:
-  - "[[Call 2026-11-18 Loop levels for development]]"
+  - "[[Conversation 2026-11-18 Loop levels for development]]"
 relationships__decided_by:
   - "[[Simeon Petkov]]"
 properties__decided_on: 2026-11-18

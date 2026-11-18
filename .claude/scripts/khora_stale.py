@@ -117,11 +117,11 @@ def _documents(snap, decisions):
 
 
 def _transcripts(snap):
-    linked = {_name(l) for fm in snap.entities.values() if _is_a(fm, "Call v1.0.0")
+    linked = {_name(l) for fm in snap.entities.values() if _is_a(fm, "Conversation v1.0.0")
               for l in _list(fm.get("relationships__transcript"))}
     for f in sorted(snap.transcripts):
         if _name(f) not in linked:
-            yield Finding("transcript", f, "no Call links it")
+            yield Finding("transcript", f, "no Conversation links it")
 
 
 def _dashboards(snap):

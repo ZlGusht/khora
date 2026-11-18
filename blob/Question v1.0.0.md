@@ -15,11 +15,11 @@ properties__author: agent:claude-opus-5-5
 Description = """
 An open question someone will need answered, with the team's current lean. It is answered when an active Decision sets `answers` to it; that is derived from the inbound link, never stored here.
 
-Questions are written by Call Ingestion or during a loop, in_context_of their Area. A document lists an open Question as one row ending with its trace marker `<!-- q:<uuid> -->`.
+Questions are written by Conversation Ingestion or during a loop, in_context_of their Area. A document lists an open Question as one row ending with its trace marker `<!-- q:<uuid> -->`.
 """
 
 [Metadata.Relationships]
-originates_in = { type="connection", description="Where it was raised: a Call or a loop run.", optional=true }
+originates_in = { type="connection", description="Where it was raised: a Conversation or a loop run.", optional=true }
 
 [Metadata.Properties]
 lean = { type="text", description="The current lean, in one line. Empty when there is none yet.", optional=true }

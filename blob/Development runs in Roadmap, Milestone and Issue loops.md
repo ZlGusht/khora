@@ -8,7 +8,7 @@ relationships__is_a:
 relationships__in_context_of:
   - "[[Kit]]"
 relationships__originates_in:
-  - "[[Call 2026-11-18 Loop levels for development]]"
+  - "[[Conversation 2026-11-18 Loop levels for development]]"
 relationships__decided_by:
   - "[[Simeon Petkov]]"
 properties__decided_on: 2026-11-18
@@ -23,4 +23,4 @@ Development work is structured in three loop kinds, each a kind of Loop v2.0.0: 
 
 ## Rationale
 
-The levels follow standard open-source practice (roadmap, release milestone, issue and pull request); in the call: "they can't be too far from standard ones". A separate feature level and change level were proposed and declined: one loop for the issue level, with child runs for large issues. The names Roadmap Loop, Milestone Loop and Issue Loop were accepted.
+The levels follow standard open-source practice (roadmap, release milestone, issue and pull request); in the conversation: "they can't be too far from standard ones". A separate feature level and change level were proposed and declined: one loop for the issue level, with child runs for large issues. The names Roadmap Loop, Milestone Loop and Issue Loop were accepted.

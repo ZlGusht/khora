@@ -4,12 +4,13 @@ identity__type: particular
 identity__created_at: 2026-11-18
 identity__tags: []
 relationships__is_a:
-  - "[[Call v1.0.0]]"
+  - "[[Conversation v1.0.0]]"
 relationships__in_context_of:
   - "[[Kit]]"
 relationships__participants:
   - "[[Simeon Petkov]]"
 properties__date: 2026-11-18
+properties__medium: "chat"
 properties__kind: "internal"
 properties__author: agent:claude-opus-5-5
 ---
@@ -28,6 +29,8 @@ A working session between [[Simeon Petkov]] and a Claude Code agent on how work 
 **Blob and GitHub.** Roadmaps and milestones live in the blob; issues live in GitHub and seed issue loops. The blob is the source, GitHub its reflection, synced both ways when a run opens, closes and merges. This replaces kit decision 9.
 
 **Other.** Documents are wired to kit entities. Cadence loops stay separate for now. Written rules first, CI checks later. Only team members open roadmaps and milestones.
+
+**Conversation, not call.** This session was a chat, not a call. The graph now records conversations: Conversation replaces Call, with a medium property.
 
 ## Decisions
 
@@ -48,6 +51,7 @@ A working session between [[Simeon Petkov]] and a Claude Code agent on how work 
 - [[Documents are wired to kit entities]]
 - [[Cadence loops stay separate from development loops for now]]
 - [[Workflow rules are written first, CI checks later]]
+- [[Conversations replace Calls in the graph]]
 
 ## Open questions
 

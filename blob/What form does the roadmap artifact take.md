@@ -8,7 +8,7 @@ relationships__is_a:
 relationships__in_context_of:
   - "[[Kit]]"
 relationships__originates_in:
-  - "[[Call 2026-11-18 Loop levels for development]]"
+  - "[[Conversation 2026-11-18 Loop levels for development]]"
 properties__author: agent:claude-opus-5-5
 ---
 The roadmap is to have an artifact in the repository to see and work on. What it is (a canvas, a document, a dashboard) was not discussed.

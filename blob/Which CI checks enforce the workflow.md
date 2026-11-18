@@ -8,7 +8,7 @@ relationships__is_a:
 relationships__in_context_of:
   - "[[Kit]]"
 relationships__originates_in:
-  - "[[Call 2026-11-18 Loop levels for development]]"
+  - "[[Conversation 2026-11-18 Loop levels for development]]"
 properties__author: agent:claude-opus-5-5
 ---
 Written rules come first; CI checks may follow.
