@@ -281,3 +281,21 @@ The run switches to approach B if, by the end of step 1, an atomic batch from Ja
 - [ ] **Step 2:** Run `docker compose up -d`, then `./gradlew :log-nats:bench --args='--url nats://localhost:4222'` and `--args='--url nats://localhost:4223'`. Expected: two tables, no errors.
 - [ ] **Step 3:** Write both tables into this run under `## Measurements`, with the machine (`sysctl -n machdep.cpu.brand_string`, memory, disk) and the versions.
 - [ ] **Step 4: Commit** `Measure the NATS log store`.
+
+## Spike result
+
+Task 2, commit `8c8773e`. NATS Server 2.12.15 (`nats:2.12-alpine`), jnats 2.27.0, `io.synadia:batch-publish` 0.4.0. The server reports `sync_always: true`.
+
+| Test | What NATS did |
+| --- | --- |
+| A batch of 4 on two subjects | Stored together at sequences 1 to 4. |
+| A batch refused by the client (an oversized message) | jnats refuses it before anything reaches the server. 0 stored. |
+| A batch refused by the server (message 3 over a 1024-byte limit on that test's stream) | 0 stored. The error arrives only at commit, as 10176 "batch is incomplete", not the real reason. |
+| The same `Nats-Msg-Id` twice in one batch | The server refuses the whole batch (10201). 0 stored. |
+| Delete a message | Refused. |
+
+**The Fallback rule does not apply.** The run stays on approach A, confirmed by [[Hristiyan Ganchov]].
+
+Consequences for Task 3:
+- `NatsLogStore.append` removes duplicate event ids inside one batch before publishing, since the server refuses the whole batch otherwise (ledger ruling R1).
+- A server-side refusal is reported as "batch is incomplete"; `LogStoreException` should say which append failed, not why the server refused it.
