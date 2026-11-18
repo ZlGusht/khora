@@ -23,10 +23,19 @@ khora's design, and later its code, run as the khora kit: a provisional khora bu
 1. A recording is exported from Wispr Flow to the transcripts folder outside this repository (`KHORA_TRANSCRIPTS`, by default `../khora-transcripts/`), as `YYYY-MM-DD <topic>.md`, unedited (kit d8). Exported conversations go there too.
 2. `[[Conversation Ingestion v1.0.0]]` turns it into a Conversation, Decisions and Questions on a branch, and opens one pull request labelled `ingestion` (kit d9).
 3. A team member checks each Decision against its quote. Merging accepts; `status: reversed` in review rejects (kit d10).
-4. Whoever merges creates the proposed GitHub issues. Work lives in issues, not in entities.
+4. Whoever merges creates the proposed GitHub issues. Work on them runs in loop runs (see Loops).
 5. An ingestion pull request not merged by the next Team Weekly is closed (kit d11).
 6. `[[Update View v1.0.0]]` writes documents from active Decisions, with trace markers (kit d13).
 7. `bash .claude/scripts/khora-stale` reports what no longer matches; `dashboards/Stale.canvas` shows it (kit d17).
+
+## Loops
+
+- Work on the project happens in loop runs, at three levels: `[[Roadmap Loop v1.0.0]]`, `[[Milestone Loop v1.0.0]]`, `[[Issue Loop v1.0.0]]`. Read the kind before you open or continue a run: its body lists the phases.
+- Before working on an issue, find its Issue run or open one: `Issue #<n> <title>`, in_process the Milestone run of the issue's milestone, on branch `issue/<n>-<title>`.
+- Only team members open Roadmap and Milestone runs.
+- Keep a run and GitHub in step with `bash .claude/scripts/khora-sync open|close|merged "<run name>"`, when the run opens, when it closes, and when its pull request merges. `check` reports differences and changes nothing. Without arguments it prints its usage.
+- A closing run writes one `[[Digest v1.0.0]]` to its parent run. The parent's Observe reads the unresolved ones.
+- Open runs: `TABLE properties__current_phase FROM "blob" WHERE identity__type = "particular" AND properties__status = "open" AND (contains(relationships__is_a, [[Roadmap Loop v1.0.0]]) OR contains(relationships__is_a, [[Milestone Loop v1.0.0]]) OR contains(relationships__is_a, [[Issue Loop v1.0.0]]))`, through `khora-query-entities`.
 
 ## Rules for agents
 
@@ -48,7 +57,7 @@ The vault runs code when Obsidian opens it: the plugin builds in `.obsidian/plug
 
 ## Superpowers
 
-- A superpowers run is a Loop instance (kit d18). Brainstorming is the Laydown; the plan and its execution are Operate; verification and review are Observe; the retrospective is Process(v).
+- A superpowers run is an `[[Issue Loop v1.0.0]]` run (kit d18). Brainstorming is the Laydown; the plan and its execution are Operate; verification and review are Observe; the retrospective is Process(v).
 - Specs and plans go in `docs/`, not `docs/superpowers/`.
 - Decisions made in a superpowers session reach `docs/` the same way as any other: as Decisions, through a pull request.
 

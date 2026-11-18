@@ -335,9 +335,12 @@ def validate(entity: str):
 
     # I7: required fields present (non-null, non-empty)
     # Every field declared in an ancestor's schema without `optional=true` must
-    # be present on the entity with a non-empty value.
+    # be present on the entity with a non-empty value. An ancestor's schema
+    # describes instances, so a universal that extends it (a kind of Letter, say)
+    # is checked only for the identity fields every entity carries.
     missing = []
-    for section in ("identity", "relationships", "properties"):
+    sections = ("identity",) if fm.get("identity__type") == "universal" else ("identity", "relationships", "properties")
+    for section in sections:
         for k in sorted(required[section]):
             fm_key = f"{section}__{k}"
             if fm_key not in fm or is_empty(fm[fm_key]):

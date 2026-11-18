@@ -18,6 +18,7 @@ Platform-neutral helpers — always use these instead of OS-specific commands:
 - `bash .claude/scripts/khora-uuid` — a fresh lowercase UUID.
 - `bash .claude/scripts/khora-validate "<name or blob/path.md>"` — the entity validator, run with whichever Python has PyYAML.
 - `bash .claude/scripts/obs` — the CLI, pointed at the right Obsidian. Plain `obsidian` on a desktop; on headless Linux it sets the daemon's HOME and DISPLAY.
+- `bash .claude/scripts/khora-sync open|close|merged|check "<run name>"` — keeps a Milestone or Issue loop run and GitHub in step (see `CLAUDE.md`, Loops). Needs `gh`.
 - `date +%F` — today's date.
 
 Every CLI call: `obsidian vault=<vault> <verb> …`. Obsidian must be **running** with the repository folder open — the CLI talks to the running app.
