@@ -333,13 +333,7 @@ def rows_from_envelope(env):
 
 
 def graph_dump():
-    def khora_tmp():
-        if sys.platform == "darwin":
-            return subprocess.run(["getconf", "DARWIN_USER_TEMP_DIR"], capture_output=True, text=True).stdout.strip()
-        if os.name == "nt":
-            return os.path.join(os.environ["LOCALAPPDATA"], "Temp")
-        return os.environ.get("TMPDIR", "/tmp")
-    base = os.path.join(khora_tmp(), "khora", "dataview")
+    base = os.path.join(khora_common.obsidian_tmp(), "khora", "dataview")
     inp, out = os.path.join(base, "in"), os.path.join(base, "out")
     os.makedirs(inp, exist_ok=True)
     os.makedirs(out, exist_ok=True)
