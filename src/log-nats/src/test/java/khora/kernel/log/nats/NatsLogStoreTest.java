@@ -19,7 +19,6 @@ import khora.kernel.log.LogStore;
 import khora.kernel.log.LogStoreContract;
 import khora.kernel.log.LogStoreException;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 class NatsLogStoreTest extends LogStoreContract {
@@ -40,12 +39,6 @@ class NatsLogStoreTest extends LogStoreContract {
     @AfterEach
     void stopServers() {
         servers.forEach(NatsTestServer::close);
-    }
-
-    @Override
-    @Test
-    @Disabled("Task 4")
-    protected void subscribeDeliversExistingThenNewRecords() {
     }
 
     private static LogRecord record(String eventId, String entity, byte[] body) {
@@ -160,6 +153,35 @@ class NatsLogStoreTest extends LogStoreContract {
         }
         try (LogStore second = NatsLogStore.open(server.url())) {
             assertEquals(List.of("e1"), second.read(1, 10).stream().map(LogRecord::eventId).toList());
+        }
+    }
+
+    @Test
+    void recordsSurviveARestart() {
+        NatsTestServer server = newServer();
+        try (LogStore first = NatsLogStore.open(server.url())) {
+            first.append(List.of(record("e1", "a", new byte[] {1}), record("e2", "b", new byte[] {2})));
+            first.append(List.of(record("e3", "a", new byte[] {3})));
+        }
+        server.kill();
+        server.start();
+        try (LogStore second = NatsLogStore.open(server.url())) {
+            List<LogRecord> records = second.read(1, 10);
+            assertEquals(List.of("e1", "e2", "e3"), records.stream().map(LogRecord::eventId).toList());
+            assertEquals(List.of(1L, 2L, 3L), records.stream().map(LogRecord::position).toList());
+        }
+    }
+
+    @Test
+    void unreachableServerFailsFast() {
+        NatsTestServer server = newServer();
+        try (LogStore unreachable = NatsLogStore.open(server.url())) {
+            server.stop();
+            long started = System.nanoTime();
+            assertThrows(LogStoreException.class,
+                    () -> unreachable.append(List.of(record("e1", "a", new byte[] {1}))));
+            Duration took = Duration.ofNanos(System.nanoTime() - started);
+            assertTrue(took.compareTo(Duration.ofSeconds(5)) < 0, "append failed after " + took);
         }
     }
 }

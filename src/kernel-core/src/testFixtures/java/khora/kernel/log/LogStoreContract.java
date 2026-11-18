@@ -113,6 +113,23 @@ public abstract class LogStoreContract {
         assertEquals(List.of("e2", "e3"), ids(received));
     }
 
+    @Test
+    protected void handlerExceptionDoesNotStopTheSubscription() throws Exception {
+        List<LogRecord> received = new CopyOnWriteArrayList<>();
+        try (Subscription subscription = store.subscribe(1, record -> {
+            received.add(record);
+            if (record.eventId().equals("e1")) {
+                throw new IllegalStateException("handler fails on e1");
+            }
+        })) {
+            store.append(List.of(record("e1")));
+            awaitCount(received, 1);
+            store.append(List.of(record("e2")));
+            awaitCount(received, 2);
+            assertEquals(List.of("e1", "e2"), ids(received));
+        }
+    }
+
     private static void awaitCount(List<LogRecord> received, int count) throws InterruptedException {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
         while (received.size() < count && System.nanoTime() < deadline) {

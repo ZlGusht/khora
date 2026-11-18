@@ -1,7 +1,13 @@
 package khora.kernel.log.nats;
 
+import io.nats.client.support.JsonParser;
+import io.nats.client.support.JsonValue;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -16,7 +22,8 @@ import org.testcontainers.utility.MountableFile;
  * A NATS server in a container, with the image and config of {@code docker-compose.yml}.
  * The JetStream data directory is a host directory, so {@link #stop()} then {@link #start()}
  * restarts the server on the same data. The client port can change across a restart; ask
- * {@link #url()} again after {@link #start()}.
+ * {@link #url()} again after {@link #start()}. Every start checks that the server syncs every
+ * write ({@code jetstream.config.sync_always} in {@code /varz}).
  */
 public final class NatsTestServer implements AutoCloseable {
 
@@ -47,7 +54,28 @@ public final class NatsTestServer implements AutoCloseable {
                 .waitingFor(Wait.forLogMessage(".*Server is ready.*", 1));
         c.start();
         container = c;
+        requireSyncAlways();
         return this;
+    }
+
+    /** Fails unless the server's {@code /varz} reports {@code jetstream.config.sync_always: true}. */
+    private void requireSyncAlways() {
+        String varz = monitorUrl() + "/varz";
+        try (HttpClient client = HttpClient.newHttpClient()) {
+            HttpResponse<String> response = client.send(
+                    HttpRequest.newBuilder(URI.create(varz)).build(), HttpResponse.BodyHandlers.ofString());
+            JsonValue syncAlways = JsonParser.parse(response.body())
+                    .map.get("jetstream").map.get("config").map.get("sync_always");
+            if (syncAlways == null || !Boolean.TRUE.equals(syncAlways.bool)) {
+                throw new IllegalStateException("NATS test server does not sync every write: "
+                        + varz + " reports jetstream.config.sync_always = " + syncAlways);
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("interrupted reading " + varz, e);
+        }
     }
 
     /** Stops the container. The data directory is kept for the next {@link #start()}. */
@@ -58,11 +86,30 @@ public final class NatsTestServer implements AutoCloseable {
         }
     }
 
+    /**
+     * Kills the server process without a graceful shutdown ({@code docker kill}), then removes the
+     * container. The data directory is kept for the next {@link #start()}.
+     */
+    public void kill() {
+        if (container != null) {
+            container.getDockerClient().killContainerCmd(container.getContainerId()).exec();
+            stop();
+        }
+    }
+
     public String url() {
         if (container == null) {
             throw new IllegalStateException("NATS test server is not running");
         }
         return "nats://" + container.getHost() + ":" + container.getMappedPort(CLIENT_PORT);
+    }
+
+    /** The base URL of the server's HTTP monitor. */
+    public String monitorUrl() {
+        if (container == null) {
+            throw new IllegalStateException("NATS test server is not running");
+        }
+        return "http://" + container.getHost() + ":" + container.getMappedPort(MONITOR_PORT);
     }
 
     /** The server's log output so far. */

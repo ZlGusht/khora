@@ -27,7 +27,8 @@ public interface LogStore extends AutoCloseable {
 
     /**
      * Delivers the records from {@code fromPosition} on, then each new record, to {@code handler}.
-     * Delivery runs on another thread and stops when the subscription is closed.
+     * Delivery runs on another thread, one record at a time, and stops when the subscription is
+     * closed. A handler that throws does not stop the subscription: the next record is delivered.
      */
     Subscription subscribe(long fromPosition, Consumer<LogRecord> handler);
 

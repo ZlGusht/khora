@@ -99,7 +99,11 @@ public final class InMemoryLogStore implements LogStore {
                     record = records.get((int) next - 1);
                     next++;
                 }
-                handler.accept(record);
+                try {
+                    handler.accept(record);
+                } catch (RuntimeException e) {
+                    // A failing handler does not end the subscription; the next record is delivered.
+                }
             }
         }
 

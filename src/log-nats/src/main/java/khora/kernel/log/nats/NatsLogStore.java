@@ -1,17 +1,23 @@
 package khora.kernel.log.nats;
 
+import io.nats.client.ConsumeOptions;
 import io.nats.client.Connection;
+import io.nats.client.ErrorListener;
 import io.nats.client.JetStream;
 import io.nats.client.JetStreamApiException;
 import io.nats.client.JetStreamManagement;
+import io.nats.client.JetStreamOptions;
 import io.nats.client.JetStreamSubscription;
 import io.nats.client.Message;
+import io.nats.client.MessageConsumer;
 import io.nats.client.Nats;
+import io.nats.client.Options;
 import io.nats.client.PublishOptions;
 import io.nats.client.PushSubscribeOptions;
 import io.nats.client.api.ConsumerConfiguration;
 import io.nats.client.api.DeliverPolicy;
 import io.nats.client.api.DiscardPolicy;
+import io.nats.client.api.OrderedConsumerConfiguration;
 import io.nats.client.api.PublishAck;
 import io.nats.client.api.RetentionPolicy;
 import io.nats.client.api.StorageType;
@@ -28,7 +34,9 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import khora.kernel.log.LogRecord;
 import khora.kernel.log.LogStore;
@@ -40,6 +48,10 @@ import khora.kernel.log.Subscription;
  * subject is {@link Subjects#forRecord}, {@code Nats-Msg-Id} is the event id, the header
  * {@value #ENTITY_IDS} holds the entity ids (base64url, comma separated) and the data is the body.
  * Positions are stream sequences. An append is one atomic batch.
+ *
+ * <p>Connecting, every JetStream request and every publish ack wait at most {@link #TIMEOUT}.
+ * Publishes are not buffered while the connection is down, so an append against an unreachable
+ * server fails at once instead of being sent later. The client keeps reconnecting.
  */
 public final class NatsLogStore implements LogStore {
 
@@ -60,15 +72,27 @@ public final class NatsLogStore implements LogStore {
     static final Duration DUPLICATE_WINDOW = Duration.ofMinutes(2);
     /** How long a read waits for the next message it knows is there. */
     private static final Duration READ_TIMEOUT = Duration.ofSeconds(10);
+    /** The longest wait to connect, for a JetStream request, or for a publish ack. */
+    static final Duration TIMEOUT = Duration.ofSeconds(4);
+    /**
+     * A subscription's pulls expire after this, and the server sends heartbeats at half of it; missed
+     * heartbeats (after a lost connection, for example) make the client recreate the consumer.
+     */
+    private static final ConsumeOptions CONSUME_OPTIONS =
+            ConsumeOptions.builder().expiresIn(Duration.ofSeconds(5).toMillis()).build();
+    private static final System.Logger LOG = System.getLogger(NatsLogStore.class.getName());
 
     private final Connection connection;
     private final JetStream jetStream;
     private final JetStreamManagement management;
+    private final JetStreamOptions jetStreamOptions;
+    private final Set<NatsSubscription> subscriptions = ConcurrentHashMap.newKeySet();
 
     private NatsLogStore(Connection connection) throws IOException {
         this.connection = connection;
-        this.jetStream = connection.jetStream();
-        this.management = connection.jetStreamManagement();
+        this.jetStreamOptions = JetStreamOptions.builder().requestTimeout(TIMEOUT).build();
+        this.jetStream = connection.jetStream(jetStreamOptions);
+        this.management = connection.jetStreamManagement(jetStreamOptions);
     }
 
     /**
@@ -78,7 +102,7 @@ public final class NatsLogStore implements LogStore {
     public static NatsLogStore open(String natsUrl) {
         Connection connection;
         try {
-            connection = Nats.connect(natsUrl);
+            connection = Nats.connect(options(natsUrl));
         } catch (IOException e) {
             throw new LogStoreException("cannot connect to NATS at " + natsUrl, e);
         } catch (InterruptedException e) {
@@ -95,6 +119,29 @@ public final class NatsLogStore implements LogStore {
                 throw l;
             }
             throw new LogStoreException("cannot open stream " + STREAM, e);
+        }
+    }
+
+    private static Options options(String natsUrl) {
+        return Options.builder()
+                .server(natsUrl)
+                .connectionTimeout(TIMEOUT)
+                .maxReconnects(-1)
+                .reconnectBufferSize(0)
+                .errorListener(new QuietErrorListener())
+                .build();
+    }
+
+    /** Sends client errors to the {@code System.Logger} at debug level, instead of to stderr. */
+    private static final class QuietErrorListener implements ErrorListener {
+        @Override
+        public void errorOccurred(Connection conn, String error) {
+            LOG.log(System.Logger.Level.DEBUG, "NATS error: {0}", error);
+        }
+
+        @Override
+        public void exceptionOccurred(Connection conn, Exception exp) {
+            LOG.log(System.Logger.Level.DEBUG, "NATS exception", exp);
         }
     }
 
@@ -253,7 +300,8 @@ public final class NatsLogStore implements LogStore {
 
     /** Publishes {@code batch} atomically and returns the position of each message. */
     private List<Long> publishBatch(List<Outgoing> batch) throws BatchPublishException {
-        BatchPublisher publisher = BatchPublisher.builder().connection(connection).build();
+        BatchPublisher publisher = BatchPublisher.builder()
+                .connection(connection).ackTimeout(TIMEOUT.toMillis()).build();
         try {
             for (Outgoing out : batch.subList(0, batch.size() - 1)) {
                 publisher.add(out.subject, out.headers, out.body);
@@ -396,13 +444,72 @@ public final class NatsLogStore implements LogStore {
         return new LogRecord(seq, eventId, Subjects.eventType(subject), entityIds, body);
     }
 
+    /**
+     * Delivers with an ordered consumer on the whole log, starting at {@code fromPosition}. The
+     * client recreates the consumer from the next expected position if it misses messages, heartbeats
+     * or the connection. Messages are handed to {@code handler} on the connection's dispatcher thread,
+     * one at a time. A handler that throws, or a message that cannot be decoded, is logged at debug
+     * level and delivery goes on.
+     */
     @Override
     public Subscription subscribe(long fromPosition, Consumer<LogRecord> handler) {
-        throw new UnsupportedOperationException("subscribe is not implemented yet");
+        long from = Math.max(fromPosition, 1);
+        NatsSubscription subscription = new NatsSubscription(handler);
+        try {
+            subscription.consumer = connection.getStreamContext(STREAM, jetStreamOptions)
+                    .createOrderedConsumer(new OrderedConsumerConfiguration()
+                            .filterSubject(Subjects.ALL)
+                            .deliverPolicy(DeliverPolicy.ByStartSequence)
+                            .startSequence(from))
+                    .consume(CONSUME_OPTIONS, subscription::deliver);
+        } catch (IOException | JetStreamApiException | RuntimeException e) {
+            throw new LogStoreException("subscribing from position " + from + " failed", e);
+        }
+        subscriptions.add(subscription);
+        return subscription;
+    }
+
+    private final class NatsSubscription implements Subscription {
+        private final Consumer<LogRecord> handler;
+        private volatile MessageConsumer consumer;
+        private volatile boolean closed;
+
+        NatsSubscription(Consumer<LogRecord> handler) {
+            this.handler = handler;
+        }
+
+        private void deliver(Message message) {
+            if (closed) {
+                return;
+            }
+            try {
+                NatsJetStreamMetaData meta = message.metaData();
+                handler.accept(decode(meta.streamSequence(), message.getSubject(), message.getHeaders(),
+                        message.getData()));
+            } catch (RuntimeException e) {
+                LOG.log(System.Logger.Level.DEBUG, "subscription handler failed on " + message.getSubject(), e);
+            }
+        }
+
+        /** Stops delivery: no record reaches the handler once this returns, except one already in it. */
+        @Override
+        public void close() {
+            closed = true;
+            subscriptions.remove(this);
+            MessageConsumer c = consumer;
+            if (c != null) {
+                try {
+                    c.close();
+                } catch (Exception e) {
+                    LOG.log(System.Logger.Level.DEBUG, "closing a subscription failed", e);
+                }
+            }
+        }
     }
 
     @Override
     public void close() {
+        List.copyOf(subscriptions).forEach(NatsSubscription::close);
         closeQuietly(connection);
     }
 
