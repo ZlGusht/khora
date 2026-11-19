@@ -61,14 +61,20 @@ public final class InMemorySurface implements WritableSurface, ChangingSurface {
     public Result read(ReadRequest request, Context context) {
         Objects.requireNonNull(request, "request");
         Objects.requireNonNull(context, "context");
-        var action = actions.record(context, "read");
+        var action = Objects.requireNonNull(actions.record(context, "read"), "action");
         lock.lock();
         try {
             var value = Optional.ofNullable(values.get(request.target()));
             var wanted = request.time().at();
-            Completeness completeness = wanted.isEmpty() || frontier.reaches(wanted.get())
-                    ? new Completeness.Complete()
-                    : new Completeness.Partial("frontier not reached");
+            Completeness completeness;
+            if (wanted.isEmpty() || frontier.equals(wanted.get())) {
+                completeness = new Completeness.Complete();
+            } else if (!frontier.reaches(wanted.get())) {
+                completeness = new Completeness.Partial("frontier not reached");
+            } else {
+                // The stub keeps no history (History.NONE): it can only answer at its current frontier.
+                completeness = new Completeness.Partial("history not kept: value is as of the current frontier");
+            }
             return new Result(action, value, completeness, frontier, List.of());
         } finally {
             lock.unlock();
@@ -80,7 +86,7 @@ public final class InMemorySurface implements WritableSurface, ChangingSurface {
         Objects.requireNonNull(operation, "operation");
         Objects.requireNonNull(condition, "condition");
         Objects.requireNonNull(context, "context");
-        var action = actions.record(context, "write");
+        var action = Objects.requireNonNull(actions.record(context, "write"), "action");
         lock.lock();
         try {
             if (!frontier.equals(condition.read())) {

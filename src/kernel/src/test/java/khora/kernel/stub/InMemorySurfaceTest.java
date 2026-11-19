@@ -2,6 +2,7 @@ package khora.kernel.stub;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
@@ -132,5 +133,41 @@ class InMemorySurfaceTest {
 
         assertInstanceOf(WriteAnswer.Rejected.class, answer);
         assertEquals(Optional.empty(), surface.read(readLatest("x"), CONTEXT).value());
+    }
+
+    @Test
+    void readAtPastFrontierIsPartial() {
+        surface.write(new Operation("x", "1"), unread(), CONTEXT);
+        surface.write(new Operation("x", "2"), new Condition(Frontier.empty().advance("stub", 1), Optional.of("1")),
+                CONTEXT);
+        var past = Frontier.empty().advance("stub", 1);
+        var request = new ReadRequest("x", new ReadTime(Optional.of(past), TimeAxis.RECORDED, Meaning.THEN));
+
+        var result = surface.read(request, CONTEXT);
+
+        assertInstanceOf(Completeness.Partial.class, result.completeness());
+        assertEquals(Frontier.empty().advance("stub", 2), result.seen());
+    }
+
+    @Test
+    void staleFrontierAloneIsRejected() {
+        surface.write(new Operation("y", "1"), unread(), CONTEXT);
+
+        var answer = surface.write(new Operation("x", "1"), unread(), CONTEXT);
+
+        assertInstanceOf(WriteAnswer.Rejected.class, answer);
+        assertEquals(Optional.empty(), surface.read(readLatest("x"), CONTEXT).value());
+    }
+
+    @Test
+    void nullActionIdLeavesSurfaceUnchanged() {
+        Actions nullForWrites = (context, call) -> call.equals("write") ? null : new EventId("r");
+        var broken = new InMemorySurface(nullForWrites);
+
+        assertThrows(NullPointerException.class, () -> broken.write(new Operation("x", "1"), unread(), CONTEXT));
+
+        var result = broken.read(readLatest("x"), CONTEXT);
+        assertEquals(Optional.empty(), result.value());
+        assertEquals(Frontier.empty(), result.seen());
     }
 }
