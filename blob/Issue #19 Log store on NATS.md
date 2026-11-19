@@ -10,11 +10,12 @@ relationships__in_process:
   - "[[Milestone Stage 1 kernel core]]"
 relationships__in_context_of:
   - "[[Log]]"
-properties__status: open
+properties__status: closed
 properties__started_at: 2026-11-18
-properties__current_phase: Operate
+properties__current_phase: Process(v)
 properties__issue: 19
 properties__author: agent:claude-opus-5-5
+properties__ended_at: 2026-11-19
 ---
 Run for GitHub issue #19 (K2), on branch `issue/19-log-store-nats`. Superpowers brainstorming is the Laydown.
 
@@ -329,3 +330,20 @@ Task 5, commit `2047c80`. `./gradlew :log-nats:bench` against two local NATS ser
 - Latency is closed-loop: each appender sends the next append when the last one is confirmed. A stall counts as one slow sample.
 - Throughput and fill times include building the records, so with the NATS default sync they are understated by a few per cent. This does not change the comparison.
 - That the server syncs each message of an atomic batch separately is inferred from the numbers, not confirmed on the server.
+
+## Verified
+
+Done:
+- `LogStore` in `kernel-core`, with `InMemoryLogStore` and `LogStoreContract` as test fixtures; `NatsLogStore` on NATS JetStream in `log-nats`; approach A (atomic batches) held, so the fallback was not needed.
+- Disk sync selectable per deployment through `KHORA_NATS_SYNC`, `sync: always` by default.
+- Measurements, above.
+
+Not done:
+- The measurements of #19 that depend on other issues: state at a frontier (K7), recent events in a scope (K6), causes and consequences of an event (K1). No other candidate than NATS was prototyped.
+- A signal to the caller when a subscription stops on a record it cannot read; it is logged. Needed by K6.
+
+Checked:
+- `./gradlew test --rerun-tasks`: 56 tests, 0 failures, no output.
+- Every task reviewed against its brief, fixed where the review asked, and re-reviewed; then one review of the whole branch, one fix wave, and a re-review of it.
+- `khora-validate` passes on every entity this run wrote. Nothing in `docs/` was changed.
+- Open minor points, left for later: `LogRecord.body()` returns the internal array; one Javadoc sentence in `LogStore` reads a caller discipline as a guarantee; `src/README.md` says JDK 25 is optional, though Gradle needs a JVM 17 or later to start, and does not say the bench output is under `src/log-nats/build/`.
