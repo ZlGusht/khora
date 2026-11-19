@@ -35,9 +35,11 @@ import khora.kernel.log.LogRecord;
  * <p>Every scenario starts from an empty stream: the bench deletes the whole {@value NatsLogStore#STREAM}
  * stream through the JetStream management API (the stream denies deleting messages, not deleting the
  * stream) and {@link NatsLogStore#open} creates it again. So run it only against a server whose log
- * may be thrown away.
+ * may be thrown away, such as the {@code nats-default-sync} service of {@code docker-compose.yml}
+ * (port 4223). It refuses to start without {@code --wipe}, which says so.
  *
- * <p>Arguments: {@code --url nats://host:port} (required); {@code --monitor http://host:port} to read
+ * <p>Arguments: {@code --url nats://host:port} (required); {@code --wipe} (required: agrees that the
+ * log on that server is deleted); {@code --monitor http://host:port} to read
  * the server's sync setting from {@code /varz}; {@code --appends N} (10 000); {@code --warmup N}
  * (1 000); {@code --history-log N} (1 000 000, a multiple of 100 000).
  */
@@ -50,6 +52,7 @@ public final class LogBench {
     private static final int LARGE_ENTITY = 100_000;
     private static final int ENTITIES = 1000;
     private static final String[] FOLLOW_TYPES = {"outcome", "effect", "observation"};
+    private static final String WIPE = "--wipe";
 
     private final String url;
     private final int appends;
@@ -70,8 +73,14 @@ public final class LogBench {
         Map<String, String> options = parse(args);
         String url = options.get("--url");
         if (url == null) {
-            throw new IllegalArgumentException("usage: --url nats://host:port [--monitor http://host:port]"
+            throw new IllegalArgumentException("usage: --url nats://host:port --wipe [--monitor http://host:port]"
                     + " [--appends N] [--warmup N] [--history-log N]");
+        }
+        if (!options.containsKey(WIPE)) {
+            System.err.println("[bench] refused: the bench deletes the stream " + NatsLogStore.STREAM + " on " + url
+                    + " and every record in it. Pass --wipe to agree, and only against a server whose log may be"
+                    + " thrown away, e.g. --url nats://localhost:4223 --monitor http://localhost:8223 --wipe.");
+            System.exit(2);
         }
         int historyLog = Integer.parseInt(options.getOrDefault("--history-log", "1000000"));
         if (historyLog < 2 * LARGE_ENTITY || historyLog % LARGE_ENTITY != 0) {
@@ -92,8 +101,14 @@ public final class LogBench {
 
     private static Map<String, String> parse(String[] args) {
         Map<String, String> options = new LinkedHashMap<>();
-        for (int i = 0; i + 1 < args.length; i += 2) {
-            options.put(args[i], args[i + 1]);
+        for (int i = 0; i < args.length; i++) {
+            if (args[i].equals(WIPE)) {
+                options.put(WIPE, "");
+            } else if (i + 1 < args.length) {
+                options.put(args[i], args[++i]);
+            } else {
+                throw new IllegalArgumentException("missing value for " + args[i]);
+            }
         }
         return options;
     }

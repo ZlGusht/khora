@@ -1,3 +1,8 @@
+plugins {
+    // Downloads JDK 25 for the toolchain when none is installed locally.
+    id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
+}
+
 rootProject.name = "khora"
 
 include(":kernel-core")

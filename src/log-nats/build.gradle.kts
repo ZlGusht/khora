@@ -19,8 +19,10 @@ tasks.withType<Test> {
     systemProperty("java.util.logging.config.file", file("src/test/resources/logging.properties").absolutePath)
 }
 
-// The benchmark: ./gradlew :log-nats:bench --args='--url nats://localhost:4222 --monitor http://localhost:8222'
-// Not part of `test`. It deletes and recreates the log stream on the server it is given.
+// The benchmark, against the dedicated `nats-default-sync` service of docker-compose.yml:
+//   ./gradlew :log-nats:bench --args='--url nats://localhost:4223 --monitor http://localhost:8223 --wipe'
+// Not part of `test`. It deletes and recreates the log stream on the server it is given, so it
+// refuses to run without --wipe. Point it only at a server whose log may be thrown away.
 val bench = sourceSets.create("bench") {
     compileClasspath += sourceSets.main.get().output + sourceSets.main.get().compileClasspath
     runtimeClasspath += output + compileClasspath + sourceSets.main.get().runtimeClasspath
