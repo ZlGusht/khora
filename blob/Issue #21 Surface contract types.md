@@ -12,7 +12,7 @@ relationships__in_context_of:
   - "[[Surfaces]]"
 properties__status: open
 properties__started_at: 2026-11-19
-properties__current_phase: Operate
+properties__current_phase: Observe
 properties__issue: 21
 properties__author: agent:claude-opus-5-5
 ---
@@ -104,13 +104,13 @@ record Budget(long units)                     // units >= 0
 record Context(Principal principal, Grant grant, Budget budget, Optional<EventId> cause)
 ```
 
-- [ ] Download Maven 3.10.1 into the scratchpad, check its SHA-512 against Maven Central, and run `mvn -N wrapper:wrapper -Dmaven=3.10.1` in `src/kernel/`. Expected: `mvnw` and `.mvn/wrapper/maven-wrapper.properties` exist. Then delete the downloaded Maven.
-- [ ] Write `pom.xml`: groupId `khora`, artifactId `kernel`, version `0.1.0-SNAPSHOT`, the JUnit BOM 6.1.3, `junit-jupiter` in test scope, and the compiler and surefire plugins at the versions above.
-- [ ] Write `ContextTest`: `contextHoldsItsParts` (a built `Context` returns what it was given, with `cause` empty); `nullPrincipalIsRefused` (`assertThrows(NullPointerException.class, …)`, message contains `"principal"`); `blankEventIdIsRefused` (`new EventId(" ")` throws `IllegalArgumentException`); `negativeBudgetIsRefused` (`new Budget(-1)` throws `IllegalArgumentException`).
-- [ ] Run `./mvnw -q test`. Expected: compile failure, because the types don't exist.
-- [ ] Write the five records.
-- [ ] Run `./mvnw -q test`. Expected: 4 tests pass.
-- [ ] Commit: `Add the kernel Maven project and the surface call context`.
+- [x] Download Maven 3.10.1 into the scratchpad, check its SHA-512 against Maven Central, and run `mvn -N wrapper:wrapper -Dmaven=3.10.1` in `src/kernel/`. Expected: `mvnw` and `.mvn/wrapper/maven-wrapper.properties` exist. Then delete the downloaded Maven.
+- [x] Write `pom.xml`: groupId `khora`, artifactId `kernel`, version `0.1.0-SNAPSHOT`, the JUnit BOM 6.1.3, `junit-jupiter` in test scope, and the compiler and surefire plugins at the versions above.
+- [x] Write `ContextTest`: `contextHoldsItsParts` (a built `Context` returns what it was given, with `cause` empty); `nullPrincipalIsRefused` (`assertThrows(NullPointerException.class, …)`, message contains `"principal"`); `blankEventIdIsRefused` (`new EventId(" ")` throws `IllegalArgumentException`); `negativeBudgetIsRefused` (`new Budget(-1)` throws `IllegalArgumentException`).
+- [x] Run `./mvnw -q test`. Expected: compile failure, because the types don't exist.
+- [x] Write the five records.
+- [x] Run `./mvnw -q test`. Expected: 4 tests pass.
+- [x] Commit: `Add the kernel Maven project and the surface call context`.
 
 ### Task 2: Frontiers and read time
 
@@ -130,11 +130,11 @@ record ReadTime(Optional<Frontier> at, TimeAxis by, Meaning meaning)
 
 Empty `at` means "the latest frontier the surface has reached". `TimeAxis` and `Meaning` come from the query's `time` in the implementation plan's shared contracts.
 
-- [ ] Write `FrontierTest`: `emptyReachesEmpty`; `laterReachesEarlier` (`{a:5}` reaches `{a:3}`); `earlierDoesNotReachLater` (`{a:3}` does not reach `{a:5}`); `missingOriginIsNotReached` (`{a:5}` does not reach `{b:1}`); `negativePositionIsRefused`; `positionsAreCopied` (changing the map passed in doesn't change the frontier).
-- [ ] Run the tests. Expected: compile failure.
-- [ ] Write `Frontier`, `TimeAxis`, `Meaning` and `ReadTime`.
-- [ ] Run the tests. Expected: all pass.
-- [ ] Commit: `Add frontiers and read time`.
+- [x] Write `FrontierTest`: `emptyReachesEmpty`; `laterReachesEarlier` (`{a:5}` reaches `{a:3}`); `earlierDoesNotReachLater` (`{a:3}` does not reach `{a:5}`); `missingOriginIsNotReached` (`{a:5}` does not reach `{b:1}`); `negativePositionIsRefused`; `positionsAreCopied` (changing the map passed in doesn't change the frontier).
+- [x] Run the tests. Expected: compile failure.
+- [x] Write `Frontier`, `TimeAxis`, `Meaning` and `ReadTime`.
+- [x] Run the tests. Expected: all pass.
+- [x] Commit: `Add frontiers and read time`.
 
 ### Task 3: The contract types
 
@@ -174,11 +174,11 @@ interface ChangingSurface extends Surface { ChangeFeed changes(Frontier since); 
 
 `Declaration` has no `order` capability; its Javadoc says so, as provisional (Decision: The order capability is left out of the Declaration for now). `ChangingSurface.changes` takes no context; its Javadoc says so, as provisional (Decision: Surface changes take no context for now).
 
-- [ ] Write `ContractTypesTest`: `writeAnswerSwitchCoversBothCases` (a `switch` over `WriteAnswer` with no `default` returns `"unconfirmed"` or `"rejected"`); `completenessSwitchCoversBothCases` (the same over `Completeness`); `nullDeclarationFieldIsRefused` (null `effects` throws `NullPointerException` naming `effects`); `resultAnnotationsAreCopied` (changing the list passed in doesn't change the result).
-- [ ] Run the tests. Expected: compile failure.
-- [ ] Write the types.
-- [ ] Run the tests. Expected: all pass.
-- [ ] Commit: `Add the surface contract types`.
+- [x] Write `ContractTypesTest`: `writeAnswerSwitchCoversBothCases` (a `switch` over `WriteAnswer` with no `default` returns `"unconfirmed"` or `"rejected"`); `completenessSwitchCoversBothCases` (the same over `Completeness`); `nullDeclarationFieldIsRefused` (null `effects` throws `NullPointerException` naming `effects`); `resultAnnotationsAreCopied` (changing the list passed in doesn't change the result).
+- [x] Run the tests. Expected: compile failure.
+- [x] Write the types.
+- [x] Run the tests. Expected: all pass.
+- [x] Commit: `Add the surface contract types`.
 
 ### Task 4: The stub surface: declares, read and write
 
@@ -194,11 +194,11 @@ interface ChangingSurface extends Surface { ChangeFeed changes(Frontier since); 
 - `write` calls `actions.record(context, "write")` once. If the current frontier differs from `condition.read`, or the current value differs from `condition.expected` (empty means the target has no value), it answers `Rejected` and changes nothing. Otherwise it applies the write, advances the frontier, and answers `Unconfirmed`.
 - `changes` throws `UnsupportedOperationException` until Task 5.
 
-- [ ] Write `InMemorySurfaceTest`, with a counting `Actions` that returns `new EventId("a" + n)`: `declaresConditionalWrites`; `eachReadIsOneAction` (two reads record two `"read"` actions, and each `Result.action` is the recorded id); `eachWriteIsOneAction`; `writeThenReadSeesValue` (write `x=1` at the empty frontier, read latest: `Complete`, value `1`, `seen` `{stub:1}`); `readBeyondFrontierIsPartial` (read at `{stub:5}` on a new stub gives `Partial`); `staleConditionIsRejected` (two writes both conditioned on the empty frontier: the second is `Rejected`, and the value stays the first); `unexpectedValueIsRejected`.
-- [ ] Run the tests. Expected: compile failure.
-- [ ] Write `InMemorySurface`.
-- [ ] Run the tests. Expected: all pass.
-- [ ] Commit: `Add an in-memory stub surface`.
+- [x] Write `InMemorySurfaceTest`, with a counting `Actions` that returns `new EventId("a" + n)`: `declaresConditionalWrites`; `eachReadIsOneAction` (two reads record two `"read"` actions, and each `Result.action` is the recorded id); `eachWriteIsOneAction`; `writeThenReadSeesValue` (write `x=1` at the empty frontier, read latest: `Complete`, value `1`, `seen` `{stub:1}`); `readBeyondFrontierIsPartial` (read at `{stub:5}` on a new stub gives `Partial`); `staleConditionIsRejected` (two writes both conditioned on the empty frontier: the second is `Rejected`, and the value stays the first); `unexpectedValueIsRejected`.
+- [x] Run the tests. Expected: compile failure.
+- [x] Write `InMemorySurface`.
+- [x] Run the tests. Expected: all pass.
+- [x] Commit: `Add an in-memory stub surface`.
 
 ### Task 5: The stub surface: changes
 
@@ -207,8 +207,23 @@ interface ChangingSurface extends Surface { ChangeFeed changes(Frontier since); 
 - `changes(since)` returns a feed that first yields every applied write after `since`, in order, then blocks for new ones. Each write appends a `Change` with the write's action id and the frontier after it.
 - Several feeds may be open at once. A closed feed returns empty from `next()`, including a `next()` already blocked.
 
-- [ ] Write `InMemorySurfaceChangesTest`: `feedReplaysWritesAfterSince` (three writes, feed from `{stub:1}` yields the second and third); `feedDeliversLaterWrite` (a virtual thread blocks on `next()`, a write is applied, the thread gets it within 1 s); `closeWakesBlockedNext` (a blocked `next()` returns empty within 1 s of `close()`); `closeIsIdempotent`.
-- [ ] Run the tests. Expected: `UnsupportedOperationException`.
-- [ ] Implement the feed with a lock and condition over the surface's change list; each feed keeps its own read position.
-- [ ] Run `./mvnw -q test`. Expected: every test in the project passes.
-- [ ] Commit: `Let the stub surface report its changes`.
+- [x] Write `InMemorySurfaceChangesTest`: `feedReplaysWritesAfterSince` (three writes, feed from `{stub:1}` yields the second and third); `feedDeliversLaterWrite` (a virtual thread blocks on `next()`, a write is applied, the thread gets it within 1 s); `closeWakesBlockedNext` (a blocked `next()` returns empty within 1 s of `close()`); `closeIsIdempotent`.
+- [x] Run the tests. Expected: `UnsupportedOperationException`.
+- [x] Implement the feed with a lock and condition over the surface's change list; each feed keeps its own read position.
+- [x] Run `./mvnw -q test`. Expected: every test in the project passes.
+- [x] Commit: `Let the stub surface report its changes`.
+
+## Verified
+
+**Done:** Tasks 1–5 of the plan, in `src/kernel/`, package `khora.kernel`: the call context, frontiers and read time, the contract types, and an in-memory stub surface that implements `WritableSurface` and `ChangingSurface`. 29 tests pass on Java 25 with Maven 3.10.1.
+
+**Checked:**
+- Each test was seen failing before its code was written. The stale-frontier test was checked against a version of the stub without the check.
+- A fresh reviewer read the whole branch. Its one Important finding (a read at a past frontier came back `Complete` with today's value) and two findings raised to Important (the stale-frontier check had no test of its own; a `null` action id left the stub half-written) were fixed, each with a test.
+- `khora-validate` passes on every entity this run wrote.
+- `khora-stale`: this run's Decisions make `docs/adr/surfaces.md`, `docs/adr/runtime-and-executors.md` and `docs/implementation-plan.md` stale. Update View brings them in, in a later run.
+- No sentence was added to `docs/`.
+
+**Not done:**
+- The Maven download is not pinned by checksum (see [[The Maven wrapper cannot pin a checksum on machines without unzip]]).
+- Deferred review findings: `{stub:0}` and the empty frontier mean different things, and a condition naming another origin is always rejected; collection nulls don't name their field; four types say only "Provisional."; the call kind in `Actions` is a string; the stub records actions outside its lock, so action order can differ from change order. The frontier ones belong to K1, the ordering one to K3.
