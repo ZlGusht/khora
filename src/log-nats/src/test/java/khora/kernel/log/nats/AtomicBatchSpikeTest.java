@@ -8,6 +8,7 @@ import io.nats.client.Connection;
 import io.nats.client.JetStreamApiException;
 import io.nats.client.JetStreamManagement;
 import io.nats.client.Nats;
+import io.nats.client.PublishOptions;
 import io.nats.client.api.MessageInfo;
 import io.nats.client.api.PublishAck;
 import io.nats.client.api.StorageType;
@@ -29,8 +30,12 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Spike: does atomic batch publish to JetStream work from Java, with io.synadia:batch-publish
- * against nats:2.12-alpine? Each test creates a fresh stream with the log's settings.
+ * against {@value NatsTestServer#IMAGE}? Each test creates a fresh stream with the log's settings.
  * The tests print what NATS did, prefixed with "SPIKE", so the run can record it.
+ *
+ * <p>They also pin the server behaviour {@link NatsLogStore}'s duplicate handling depends on, observed
+ * on 2.12.15: a batch holding a stored message id is refused with error 10201, and the duplicate check
+ * runs before the expected-last-msg-id check. Run them again before changing the image.
  */
 class AtomicBatchSpikeTest {
 
@@ -169,6 +174,43 @@ class AtomicBatchSpikeTest {
         report("duplicateMsgId stream msgs: " + storedCount());
         assertEquals(10201, failure.getApiErrorCode());
         assertEquals(0, storedCount(), "a batch with a duplicate Nats-Msg-Id must leave nothing stored");
+    }
+
+    @Test
+    void batchHoldingAStoredMsgIdIsRefused() throws Exception {
+        // Observed on 2.12.15: API error 10201, and nothing of the batch is stored.
+        connection.jetStream().publish("khora.log.a", msgId("stored-1"), bytes("m0"));
+        BatchPublisher batch = BatchPublisher.builder().connection(connection).build();
+        BatchPublishException failure = assertThrows(BatchPublishException.class, () -> {
+            batch.add("khora.log.a", msgId("new-1"), bytes("m1"));
+            batch.commit("khora.log.a", msgId("stored-1"), bytes("m2"));
+        });
+        report("storedMsgIdInBatch failure: " + describe(failure));
+        if (!batch.isClosed()) {
+            batch.discard();
+        }
+        assertEquals(10201, failure.getApiErrorCode());
+        assertEquals(1, storedCount(), "a batch holding a stored Nats-Msg-Id must leave nothing stored");
+    }
+
+    @Test
+    void duplicateCheckRunsBeforeExpectedLastMsgId() throws Exception {
+        // Observed on 2.12.15: for a stored id the server answers with a duplicate ack carrying the
+        // original sequence, although the expected last message id does not match; for a new id it
+        // refuses with API error 10070 and stores nothing.
+        PublishAck original = connection.jetStream().publish("khora.log.a", msgId("stored-1"), bytes("m0"));
+        PublishOptions wrongLast = PublishOptions.builder().expectedLastMsgId("no-such-id").build();
+        PublishAck duplicate = connection.jetStream()
+                .publish("khora.log.a", msgId("stored-1"), bytes("m0"), wrongLast);
+        report("probe of a stored id: " + describe(duplicate));
+        assertTrue(duplicate.isDuplicate());
+        assertEquals(original.getSeqno(), duplicate.getSeqno());
+
+        JetStreamApiException refused = assertThrows(JetStreamApiException.class, () -> connection.jetStream()
+                .publish("khora.log.a", msgId("new-1"), bytes("m1"), wrongLast));
+        report("probe of a new id: " + describe(refused));
+        assertEquals(10070, refused.getApiErrorCode());
+        assertEquals(1, storedCount());
     }
 
     @Test

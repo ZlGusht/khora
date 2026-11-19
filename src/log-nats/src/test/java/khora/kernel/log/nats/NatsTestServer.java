@@ -27,7 +27,12 @@ import org.testcontainers.utility.MountableFile;
  */
 public final class NatsTestServer implements AutoCloseable {
 
-    public static final String IMAGE = "nats:2.12-alpine";
+    /**
+     * Pinned, as in {@code docker-compose.yml}: {@link NatsLogStore}'s duplicate handling depends on
+     * server behaviour observed on 2.12.15 (error 10201 for a batch holding a stored event id; the
+     * duplicate check runs before the expected-last-msg-id check). {@code AtomicBatchSpikeTest} pins it.
+     */
+    public static final String IMAGE = "nats:2.12.15-alpine";
     private static final int CLIENT_PORT = 4222;
     private static final int MONITOR_PORT = 8222;
 
