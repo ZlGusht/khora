@@ -225,5 +225,4 @@ interface ChangingSurface extends Surface { ChangeFeed changes(Frontier since); 
 - No sentence was added to `docs/`.
 
 **Not done:**
-- The Maven download is not pinned by checksum (see [[The Maven wrapper cannot pin a checksum on machines without unzip]]).
 - Deferred review findings: `{stub:0}` and the empty frontier mean different things, and a condition naming another origin is always rejected; collection nulls don't name their field; four types say only "Provisional."; the call kind in `Actions` is a string; the stub records actions outside its lock, so action order can differ from change order. The frontier ones belong to K1, the ordering one to K3.
