@@ -6,7 +6,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 
-/** A {@link LogStore} in memory, for tests and as the reference for the contract. */
+/**
+ * A {@link LogStore} in memory, for tests and as the reference for the contract. Its deduplication
+ * window has no limit: an event id is never stored twice.
+ */
 public final class InMemoryLogStore implements LogStore {
 
     private final List<LogRecord> records = new ArrayList<>();
@@ -16,6 +19,9 @@ public final class InMemoryLogStore implements LogStore {
 
     @Override
     public synchronized List<Long> append(List<LogRecord> batch) {
+        if (closed) {
+            throw new LogStoreException("append to a closed log store");
+        }
         if (batch.size() > MAX_APPEND) {
             throw new LogStoreException("append of " + batch.size() + " records exceeds " + MAX_APPEND);
         }
@@ -46,6 +52,9 @@ public final class InMemoryLogStore implements LogStore {
 
     @Override
     public synchronized List<LogRecord> history(String entityId) {
+        if (entityId == null || entityId.isBlank()) {
+            throw new IllegalArgumentException("entity id must not be null or blank");
+        }
         return records.stream()
                 .filter(r -> r.primaryEntity().filter(entityId::equals).isPresent())
                 .toList();

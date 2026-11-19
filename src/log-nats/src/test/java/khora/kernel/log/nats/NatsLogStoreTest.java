@@ -168,6 +168,9 @@ class NatsLogStoreTest extends LogStoreContract {
             first.append(List.of(record("e1", "a", new byte[] {1}), record("e2", "b", new byte[] {2})));
             first.append(List.of(record("e3", "a", new byte[] {3})));
         }
+        // SIGKILL stops the server process but leaves the host's page cache intact, so this proves
+        // that positions survive an ungraceful stop, not that writes were fsynced. Durability rests
+        // on the sync_always check NatsTestServer makes against /varz on every start.
         server.kill();
         server.start();
         try (LogStore second = NatsLogStore.open(server.url())) {

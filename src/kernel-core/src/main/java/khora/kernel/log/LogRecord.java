@@ -9,6 +9,12 @@ import java.util.Set;
 /**
  * One entry of the log. {@code position} is 0 until the record is appended.
  * The first of {@code entityIds} is the primary entity.
+ *
+ * <p>The constructor refuses, with {@link IllegalArgumentException}: an event id that is null,
+ * blank, not printable ASCII, or starts or ends with a space; an event type other than action,
+ * outcome, effect or observation; a null or blank entity id. {@code body} is copied, so changing
+ * the caller's array changes nothing here.
+ * Equality compares the body's content.
  */
 public record LogRecord(long position, String eventId, String eventType, List<String> entityIds, byte[] body) {
 
@@ -18,12 +24,25 @@ public record LogRecord(long position, String eventId, String eventType, List<St
         if (eventId == null || eventId.isBlank()) {
             throw new IllegalArgumentException("eventId must not be null or blank");
         }
-        if (!EVENT_TYPES.contains(eventType)) {
+        if (!eventId.chars().allMatch(c -> c >= 0x20 && c <= 0x7e)) {
+            throw new IllegalArgumentException("eventId must be printable ASCII (0x20 to 0x7E)");
+        }
+        if (eventId.charAt(0) == ' ' || eventId.charAt(eventId.length() - 1) == ' ') {
+            // NATS trims header values, so such an id would be read back without its spaces.
+            throw new IllegalArgumentException("eventId must not start or end with a space");
+        }
+        if (eventType == null || !EVENT_TYPES.contains(eventType)) {
             throw new IllegalArgumentException(
                     "eventType must be one of action, outcome, effect, observation: " + eventType);
         }
-        entityIds = List.copyOf(Objects.requireNonNull(entityIds, "entityIds"));
-        Objects.requireNonNull(body, "body");
+        Objects.requireNonNull(entityIds, "entityIds");
+        for (String entityId : entityIds) {
+            if (entityId == null || entityId.isBlank()) {
+                throw new IllegalArgumentException("entity ids must not be null or blank: " + entityIds);
+            }
+        }
+        entityIds = List.copyOf(entityIds);
+        body = Objects.requireNonNull(body, "body").clone();
     }
 
     public static LogRecord unappended(String eventId, String eventType, List<String> entityIds, byte[] body) {

@@ -253,6 +253,9 @@ public final class NatsLogStore implements LogStore {
      */
     @Override
     public List<Long> append(List<LogRecord> records) {
+        if (connection.getStatus() == Connection.Status.CLOSED) {
+            throw new LogStoreException("append to a closed log store");
+        }
         if (records.size() > MAX_APPEND) {
             throw new LogStoreException("append of " + records.size() + " records exceeds " + MAX_APPEND);
         }
@@ -378,6 +381,9 @@ public final class NatsLogStore implements LogStore {
 
     @Override
     public List<LogRecord> history(String entityId) {
+        if (entityId == null || entityId.isBlank()) {
+            throw new IllegalArgumentException("entity id must not be null or blank");
+        }
         return scan(1, Integer.MAX_VALUE, Subjects.historyFilter(entityId));
     }
 

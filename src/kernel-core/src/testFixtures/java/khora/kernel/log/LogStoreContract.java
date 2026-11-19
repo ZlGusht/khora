@@ -96,7 +96,35 @@ public abstract class LogStoreContract {
     }
 
     @Test
-    protected void subscribeDeliversExistingThenNewRecords() throws Exception {
+    void appendAfterCloseIsRefused() {
+        store.close();
+        assertThrows(LogStoreException.class, () -> store.append(List.of(record("e1"))));
+    }
+
+    @Test
+    void historyOfABlankEntityIsRefused() {
+        assertThrows(IllegalArgumentException.class, () -> store.history(""));
+        assertThrows(IllegalArgumentException.class, () -> store.history(" "));
+        assertThrows(IllegalArgumentException.class, () -> store.history(null));
+    }
+
+    @Test
+    void eventIdIsReadBackUnchanged() {
+        String eventId = "id with spaces ~!@#$%^&*()";
+        store.append(List.of(record(eventId, "a")));
+        assertEquals(List.of(eventId), ids(store.read(1, 10)));
+    }
+
+    @Test
+    void bodyChangedAfterAppendIsNotStored() {
+        byte[] body = {1, 2, 3};
+        store.append(List.of(LogRecord.unappended("e1", "action", List.of("a"), body)));
+        body[0] = 9;
+        assertEquals(1, store.read(1, 10).getFirst().body()[0]);
+    }
+
+    @Test
+    void subscribeDeliversExistingThenNewRecords() throws Exception {
         store.append(List.of(record("e1"), record("e2")));
         List<LogRecord> received = new CopyOnWriteArrayList<>();
         Subscription subscription = store.subscribe(2, received::add);
@@ -114,7 +142,7 @@ public abstract class LogStoreContract {
     }
 
     @Test
-    protected void handlerExceptionDoesNotStopTheSubscription() throws Exception {
+    void handlerExceptionDoesNotStopTheSubscription() throws Exception {
         List<LogRecord> received = new CopyOnWriteArrayList<>();
         try (Subscription subscription = store.subscribe(1, record -> {
             received.add(record);
