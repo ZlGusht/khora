@@ -1,5 +1,6 @@
 package khora.kernel.stub;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -7,6 +8,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.locks.ReentrantLock;
 import khora.kernel.surface.Actions;
+import khora.kernel.surface.Change;
 import khora.kernel.surface.ChangeFeed;
 import khora.kernel.surface.ChangingSurface;
 import khora.kernel.surface.Completeness;
@@ -40,6 +42,8 @@ public final class InMemorySurface implements WritableSurface, ChangingSurface {
 
     private final Actions actions;
     private final ReentrantLock lock = new ReentrantLock();
+    private final java.util.concurrent.locks.Condition changed = lock.newCondition();
+    private final List<Change> changes = new ArrayList<>();
     private final Map<String, String> values = new HashMap<>();
     private Frontier frontier = Frontier.empty();
     private long applied;
@@ -89,6 +93,8 @@ public final class InMemorySurface implements WritableSurface, ChangingSurface {
             values.put(operation.target(), operation.value());
             applied++;
             frontier = frontier.advance(ORIGIN, applied);
+            changes.add(new Change(action, operation.target(), operation.value(), frontier));
+            changed.signalAll();
             return new WriteAnswer.Unconfirmed(action);
         } finally {
             lock.unlock();
@@ -97,6 +103,45 @@ public final class InMemorySurface implements WritableSurface, ChangingSurface {
 
     @Override
     public ChangeFeed changes(Frontier since) {
-        throw new UnsupportedOperationException("changes are not implemented yet");
+        Objects.requireNonNull(since, "since");
+        return new Feed(since.positions().getOrDefault(ORIGIN, 0L));
+    }
+
+    /** A feed over the surface's change list, with its own read position. */
+    private final class Feed implements ChangeFeed {
+        /** Index of the next change to return: changes up to {@code since} are skipped. */
+        private long position;
+        private boolean closed;
+
+        Feed(long since) {
+            this.position = since;
+        }
+
+        @Override
+        public Optional<Change> next() throws InterruptedException {
+            lock.lock();
+            try {
+                while (!closed && position >= changes.size()) {
+                    changed.await();
+                }
+                if (closed) {
+                    return Optional.empty();
+                }
+                return Optional.of(changes.get((int) position++));
+            } finally {
+                lock.unlock();
+            }
+        }
+
+        @Override
+        public void close() {
+            lock.lock();
+            try {
+                closed = true;
+                changed.signalAll();
+            } finally {
+                lock.unlock();
+            }
+        }
     }
 }
