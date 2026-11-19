@@ -29,13 +29,10 @@ import khora.kernel.surface.Writes;
 /**
  * A stub surface that holds values in memory, for tests and for building against the contract.
  *
- * <p>Its one origin is {@value #ORIGIN}. Its frontier is {@code {stub: n}} after n applied writes,
- * and empty before the first.
+ * <p>It reports a new frontier after each applied write and recognises only frontiers it reported.
+ * It keeps no history, so it answers only at its current frontier.
  */
 public final class InMemorySurface implements WritableSurface, ChangingSurface {
-
-    /** The name of the stub's one origin. */
-    public static final String ORIGIN = "stub";
 
     private static final Declaration DECLARATION =
             new Declaration(true, Effects.NATIVE, History.NONE, Reads.DETERMINISTIC, Writes.CONDITIONAL);
@@ -45,8 +42,9 @@ public final class InMemorySurface implements WritableSurface, ChangingSurface {
     private final java.util.concurrent.locks.Condition changed = lock.newCondition();
     private final List<Change> changes = new ArrayList<>();
     private final Map<String, String> values = new HashMap<>();
-    private Frontier frontier = Frontier.empty();
-    private long applied;
+    /** Every frontier the stub reported, in order: the one after n changes is at index n. */
+    private final List<Frontier> frontiers = new ArrayList<>(List.of(new Frontier("stub:0")));
+    private Frontier frontier = frontiers.getFirst();
 
     public InMemorySurface(Actions actions) {
         this.actions = Objects.requireNonNull(actions, "actions");
@@ -66,15 +64,10 @@ public final class InMemorySurface implements WritableSurface, ChangingSurface {
         try {
             var value = Optional.ofNullable(values.get(request.target()));
             var wanted = request.time().at();
-            Completeness completeness;
-            if (wanted.isEmpty() || frontier.equals(wanted.get())) {
-                completeness = new Completeness.Complete();
-            } else if (!frontier.reaches(wanted.get())) {
-                completeness = new Completeness.Partial("frontier not reached");
-            } else {
-                // The stub keeps no history (History.NONE): it can only answer at its current frontier.
-                completeness = new Completeness.Partial("history not kept: value is as of the current frontier");
-            }
+            // The stub keeps no history (History.NONE): it can only answer at its current frontier.
+            Completeness completeness = wanted.isEmpty() || frontier.equals(wanted.get())
+                    ? new Completeness.Complete()
+                    : new Completeness.Partial("only the current frontier can be read: value is as of it");
             return new Result(action, value, completeness, frontier, List.of());
         } finally {
             lock.unlock();
@@ -97,8 +90,8 @@ public final class InMemorySurface implements WritableSurface, ChangingSurface {
                 return new WriteAnswer.Rejected(action, "the value differs from the one the write expected");
             }
             values.put(operation.target(), operation.value());
-            applied++;
-            frontier = frontier.advance(ORIGIN, applied);
+            frontier = new Frontier("stub:" + frontiers.size());
+            frontiers.add(frontier);
             changes.add(new Change(action, operation.target(), operation.value(), frontier));
             changed.signalAll();
             return new WriteAnswer.Unconfirmed(action);
@@ -110,16 +103,25 @@ public final class InMemorySurface implements WritableSurface, ChangingSurface {
     @Override
     public ChangeFeed changes(Frontier since) {
         Objects.requireNonNull(since, "since");
-        return new Feed(since.positions().getOrDefault(ORIGIN, 0L));
+        lock.lock();
+        try {
+            int position = frontiers.indexOf(since);
+            if (position < 0) {
+                throw new IllegalArgumentException("not a frontier this surface reported: " + since.value());
+            }
+            return new Feed(position);
+        } finally {
+            lock.unlock();
+        }
     }
 
     /** A feed over the surface's change list, with its own read position. */
     private final class Feed implements ChangeFeed {
         /** Index of the next change to return: changes up to {@code since} are skipped. */
-        private long position;
+        private int position;
         private boolean closed;
 
-        Feed(long since) {
+        Feed(int since) {
             this.position = since;
         }
 
@@ -133,7 +135,7 @@ public final class InMemorySurface implements WritableSurface, ChangingSurface {
                 if (closed) {
                     return Optional.empty();
                 }
-                return Optional.of(changes.get((int) position++));
+                return Optional.of(changes.get(position++));
             } finally {
                 lock.unlock();
             }

@@ -1,44 +1,19 @@
 package khora.kernel.surface;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Objects;
 
 /**
- * One position per origin a read depends on (ADR-0XY, Terms).
+ * The point a read happens at, or a write was conditioned on (ADR-0XY, Terms).
  *
- * <p>Provisional: origins are plain names and positions are plain counts.
- *
- * @param positions origin to position; every position is zero or more
+ * <p>Provisional: a placeholder that only names a frontier. What a frontier is, and how frontiers
+ * compare, combine and stay valid across origins, layers and branches, is decided in K1 (#18).
+ * Until then a surface only recognises frontiers it reported itself.
  */
-public record Frontier(Map<String, Long> positions) {
+public record Frontier(String value) {
     public Frontier {
-        Objects.requireNonNull(positions, "positions");
-        positions = Map.copyOf(positions);
-        positions.forEach((origin, position) -> {
-            if (position < 0) {
-                throw new IllegalArgumentException("position of " + origin + " is negative: " + position);
-            }
-        });
-    }
-
-    /** The frontier before anything happened. */
-    public static Frontier empty() {
-        return new Frontier(Map.of());
-    }
-
-    /** A new frontier with {@code origin} at {@code position}. */
-    public Frontier advance(String origin, long position) {
-        Objects.requireNonNull(origin, "origin");
-        var next = new HashMap<>(positions);
-        next.put(origin, position);
-        return new Frontier(next);
-    }
-
-    /** Whether every origin in {@code wanted} is here at an equal or later position. */
-    public boolean reaches(Frontier wanted) {
-        Objects.requireNonNull(wanted, "wanted");
-        return wanted.positions.entrySet().stream()
-                .allMatch(e -> positions.getOrDefault(e.getKey(), -1L) >= e.getValue());
+        Objects.requireNonNull(value, "value");
+        if (value.isBlank()) {
+            throw new IllegalArgumentException("value is blank");
+        }
     }
 }

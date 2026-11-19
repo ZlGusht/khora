@@ -50,7 +50,7 @@ class ContractTypesTest {
         var annotations = new ArrayList<Annotation>();
         annotations.add(new Annotation("as observed at 10:42"));
         var result = new Result(new EventId("a1"), Optional.empty(), new Completeness.Complete(),
-                Frontier.empty(), annotations);
+                new Frontier("f1"), annotations);
 
         annotations.add(new Annotation("not reproducible"));
 

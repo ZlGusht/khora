@@ -215,7 +215,7 @@ interface ChangingSurface extends Surface { ChangeFeed changes(Frontier since); 
 
 ## Verified
 
-**Done:** Tasks 1–5 of the plan, in `src/kernel/`, package `khora.kernel`: the call context, frontiers and read time, the contract types, and an in-memory stub surface that implements `WritableSurface` and `ChangingSurface`. 29 tests pass on Java 25 with Maven 3.10.1.
+**Done:** Tasks 1–5 of the plan, in `src/kernel/`, package `khora.kernel`: the call context, frontiers and read time, the contract types, and an in-memory stub surface that implements `WritableSurface` and `ChangingSurface`. 27 tests pass on Java 25 with Maven 3.10.1.
 
 **Checked:**
 - Each test was seen failing before its code was written. The stale-frontier test was checked against a version of the stub without the check.
@@ -225,4 +225,5 @@ interface ChangingSurface extends Surface { ChangeFeed changes(Frontier since); 
 - No sentence was added to `docs/`.
 
 **Not done:**
-- Deferred review findings: `{stub:0}` and the empty frontier mean different things, and a condition naming another origin is always rejected; collection nulls don't name their field; four types say only "Provisional."; the call kind in `Actions` is a string; the stub records actions outside its lock, so action order can differ from change order. The frontier ones belong to K1, the ordering one to K3.
+- Frontiers are a placeholder that only names a frontier; `ReadTime` holds only that frontier, without the time axis and meaning (they come with K8's `Query`). Why, and what K1 has to handle: [[Frontiers need more than one position per origin]].
+- Deferred review findings: collection nulls don't name their field; four types say only "Provisional."; the call kind in `Actions` is a string; the stub records actions outside its lock, so action order can differ from change order. The ordering one belongs to K3.
