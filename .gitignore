@@ -9,3 +9,6 @@ transcripts/
 
 # Ignore Smart Environment folder
 .smart-env
+
+# Java build output
+src/kernel/target/
