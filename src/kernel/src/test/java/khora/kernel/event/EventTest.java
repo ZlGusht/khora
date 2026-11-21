@@ -1,0 +1,91 @@
+package khora.kernel.event;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.util.List;
+import java.util.Optional;
+import org.junit.jupiter.api.Test;
+
+class EventTest {
+
+    static final String SALT = "00".repeat(16);
+    static final By BY = new By("anna", Optional.empty(), "g3", "projects");
+    static final EventId A = EventId.hashOf("a");
+    static final EventId B = EventId.hashOf("b");
+
+    static Event event(List<EventId> causes, String salt) {
+        return Event.create(causes, 1000, Optional.empty(), BY, Basic.entity(), salt);
+    }
+
+    @Test
+    void eventRoundTrips() {
+        var e = Event.create(List.of(A, B), 1000, Optional.of(900L),
+                new By("anna", Optional.of("ivan"), "g3", "projects"), Basic.entity(), SALT);
+        var back = EventJson.read(EventJson.write(e));
+        assertEquals(e, back);
+        assertEquals(e.id(), back.id());
+    }
+
+    @Test
+    void idIsSha256OfCanonicalJsonWithoutId() {
+        var e = event(List.of(A), SALT);
+        assertEquals(EventId.hashOf(EventJson.toJson(e, false).canonical()), e.id());
+        assertTrue(e.id().value().matches("sha256:[0-9a-f]{64}"));
+        assertFalse(EventJson.toJson(e, false).get("id").isPresent());
+    }
+
+    @Test
+    void tamperedEventIsRefused() {
+        var text = EventJson.write(event(List.of(), SALT));
+        var tampered = text.replace("\"recorded\":1000", "\"recorded\":1001");
+        assertNotEquals(text, tampered);
+        assertThrows(IllegalArgumentException.class, () -> EventJson.read(tampered));
+    }
+
+    @Test
+    void sameContentGetsDifferentIdsWithDifferentSalts() {
+        var one = Event.create(List.of(), 1000, Optional.empty(), BY, Basic.entity());
+        var two = Event.create(List.of(), 1000, Optional.empty(), BY, Basic.entity());
+        assertNotEquals(one.id(), two.id());
+        assertTrue(one.salt().matches("[0-9a-f]{32}"));
+    }
+
+    @Test
+    void causesOrderDoesNotMatter() {
+        assertEquals(event(List.of(B, A), SALT).id(), event(List.of(A, B), SALT).id());
+        assertEquals(event(List.of(A, B), SALT).id(), event(List.of(A, B, A), SALT).id());
+    }
+
+    @Test
+    void firstEventHasNoCauses() {
+        var e = event(List.of(), SALT);
+        assertEquals(e, EventJson.read(EventJson.write(e)));
+        assertTrue(EventJson.write(e).contains("\"causes\":[]"));
+    }
+
+    @Test
+    void absentOptionalsAreOmitted() {
+        var text = EventJson.write(event(List.of(), SALT));
+        assertFalse(text.contains("occurred"));
+        assertFalse(text.contains("on_behalf_of"));
+    }
+
+    @Test
+    void writtenJsonHasThePinnedShape() {
+        var e = event(List.of(A), SALT);
+        var expected = "{\"action\":{\"args\":{},\"definition\":\"" + Basic.ASSERT.value() + "\"},"
+                + "\"by\":{\"grant\":\"g3\",\"principal\":\"anna\",\"via\":\"projects\"},"
+                + "\"causes\":[\"" + A.value() + "\"],\"id\":\"" + e.id().value() + "\","
+                + "\"recorded\":1000,\"salt\":\"" + SALT + "\"}";
+        assertEquals(expected, EventJson.write(e));
+    }
+
+    @Test
+    void malformedSaltIsRefused() {
+        assertThrows(IllegalArgumentException.class, () -> event(List.of(), "xyz"));
+    }
+}
