@@ -9,7 +9,7 @@ relationships__in_context_of:
   - "[[Design]]"
 relationships__originates_in:
   - "[[Issue #21 Surface contract types]]"
-properties__lean: Everything is reified and keeps identity; virtual entities keep that tractable.
+properties__lean: "Answered: identity comes from events; a lasting thing is identified by the event that created it."
 properties__author: agent:claude-opus-5-5
 ---
 Raised by [[Simeon Petkov]] while reviewing the kernel's first Java types. Every definition the kernel writes should obey khora's own language, so each is an entity. The shape and structure of entities are not defined yet.

@@ -44,6 +44,15 @@ Issue #21 (plan task K4) of [[Milestone Stage 1 kernel core]]: the surface contr
 - [[Kernel types taken from ADRs are provisional]]
 - [[The order capability is left out of the Declaration for now]]
 - [[Surface changes take no context for now]]
+- [[Events are the basic unit of khora]]
+
+## Questions
+
+- [[Which parts of an entity are reified and keep identity]], answered by [[Events are the basic unit of khora]]
+- [[What the basic event vocabulary contains]]
+- [[Whether reads are events]]
+- [[How overlapping event vocabularies are aligned]]
+- [[How translations between vocabulary versions are kept]]
 
 ## Plan
 
