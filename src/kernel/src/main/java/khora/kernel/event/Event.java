@@ -42,7 +42,9 @@ public record Event(EventId id, SortedSet<EventId> causes, long recorded, Option
         if (!salt.matches("[0-9a-f]{32}")) {
             throw new IllegalArgumentException("salt is not 32 lowercase hex digits");
         }
-        causes = Collections.unmodifiableSortedSet(new TreeSet<>(causes));
+        var sortedCauses = new TreeSet<EventId>();
+        sortedCauses.addAll(causes);
+        causes = Collections.unmodifiableSortedSet(sortedCauses);
         var expected = EventId.hashOf(EventJson.content(causes, recorded, occurred, by, salt, action).canonical());
         if (!expected.equals(id)) {
             throw new IllegalArgumentException("id does not match content");
@@ -60,7 +62,8 @@ public record Event(EventId id, SortedSet<EventId> causes, long recorded, Option
     /** A new event with the given salt. */
     public static Event create(Collection<EventId> causes, long recorded, Optional<Long> occurred, By by,
             Action action, String salt) {
-        var sorted = new TreeSet<>(causes);
+        var sorted = new TreeSet<EventId>();
+        sorted.addAll(causes);
         var id = EventId.hashOf(EventJson.content(sorted, recorded, occurred, by, salt, action).canonical());
         return new Event(id, sorted, recorded, occurred, by, salt, action);
     }

@@ -6,11 +6,16 @@ import java.util.TreeMap;
 /**
  * A recursive-descent parser for the JSON subset {@link Json} holds.
  *
- * <p>Provisional: refuses numbers that are not 64-bit integers, booleans and null.
+ * <p>Provisional: refuses numbers that are not 64-bit integers, booleans, null, and nesting deeper
+ * than {@link #MAX_DEPTH}.
  */
 final class JsonParser {
+    /** Deeper input is refused rather than overflowing the stack. */
+    static final int MAX_DEPTH = 1000;
+
     private final String text;
     private int pos;
+    private int depth;
 
     JsonParser(String text) {
         this.text = text;
@@ -32,8 +37,14 @@ final class JsonParser {
         }
         char c = text.charAt(pos);
         return switch (c) {
-            case '{' -> parseObject();
-            case '[' -> parseArray();
+            case '{', '[' -> {
+                if (++depth > MAX_DEPTH) {
+                    throw error("nested deeper than " + MAX_DEPTH);
+                }
+                var nested = c == '{' ? (Json) parseObject() : parseArray();
+                depth--;
+                yield nested;
+            }
             case '"' -> new Json.Str(parseString());
             default -> {
                 if (c == '-' || (c >= '0' && c <= '9')) {

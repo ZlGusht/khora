@@ -10,6 +10,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import org.junit.jupiter.api.BeforeEach;
+import java.util.Comparator;
 import org.junit.jupiter.api.Test;
 
 class FrontierTest {
@@ -113,5 +114,13 @@ class FrontierTest {
         var frontier = new Frontier(ids);
         ids.add(e2.id());
         assertEquals(Set.of(e1.id()), frontier.heads());
+    }
+
+    @Test
+    void headsIgnoreTheCallersComparator() {
+        var reversed = new TreeSet<EventId>(Comparator.reverseOrder());
+        reversed.addAll(List.of(e3.id(), e4.id()));
+        assertEquals(null, new Frontier(reversed).heads().comparator());
+        assertEquals(heads(e3, e4), new Frontier(reversed));
     }
 }

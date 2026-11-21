@@ -34,7 +34,7 @@ public sealed interface Json permits Json.Obj, Json.Arr, Json.Str, Json.Int {
             Objects.requireNonNull(members, "members");
             var copy = new TreeMap<String, Json>();
             members.forEach((key, value) -> copy.put(
-                    Objects.requireNonNull(key, "key"), Objects.requireNonNull(value, "value")));
+                    checkUnicode(Objects.requireNonNull(key, "key")), Objects.requireNonNull(value, "value")));
             members = Collections.unmodifiableSortedMap(copy);
         }
 
@@ -85,12 +85,25 @@ public sealed interface Json permits Json.Obj, Json.Arr, Json.Str, Json.Int {
     /** A string. */
     record Str(String value) implements Json {
         public Str {
-            Objects.requireNonNull(value, "value");
+            checkUnicode(Objects.requireNonNull(value, "value"));
         }
     }
 
     /** A 64-bit integer. */
     record Int(long value) implements Json {}
+
+    /** Refuses lone surrogates: canonical JSON needs valid Unicode, and UTF-8 cannot encode them. */
+    private static String checkUnicode(String s) {
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (Character.isHighSurrogate(c) && i + 1 < s.length() && Character.isLowSurrogate(s.charAt(i + 1))) {
+                i++;
+            } else if (Character.isSurrogate(c)) {
+                throw new IllegalArgumentException("lone surrogate at " + i);
+            }
+        }
+        return s;
+    }
 
     private static void write(Json value, StringBuilder out) {
         switch (value) {

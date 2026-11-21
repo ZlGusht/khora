@@ -18,7 +18,9 @@ import java.util.TreeSet;
 public record Frontier(SortedSet<EventId> heads) {
     public Frontier {
         Objects.requireNonNull(heads, "heads");
-        heads = Collections.unmodifiableSortedSet(new TreeSet<>(heads));
+        var sorted = new TreeSet<EventId>();
+        sorted.addAll(heads);
+        heads = Collections.unmodifiableSortedSet(sorted);
     }
 
     /** The frontier before anything happened. */

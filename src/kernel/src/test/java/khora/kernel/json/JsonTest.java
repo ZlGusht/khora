@@ -74,4 +74,19 @@ class JsonTest {
         assertThrows(IllegalArgumentException.class, () -> value.obj("s"));
         assertThrows(IllegalArgumentException.class, () -> value.arr("s"));
     }
+
+    @Test
+    void loneSurrogatesAreRefused() {
+        assertThrows(IllegalArgumentException.class, () -> new Json.Str("a\uD800"));
+        assertThrows(IllegalArgumentException.class, () -> new Json.Str("\uDC00b"));
+        assertThrows(IllegalArgumentException.class, () -> Json.parse("\"\\ud800\""));
+        assertThrows(IllegalArgumentException.class, () -> Json.Obj.of(Map.of("\uDC00", new Json.Int(1))));
+        assertEquals("😀", new Json.Str("😀").value());
+    }
+
+    @Test
+    void deepNestingIsRefusedNotOverflowed() {
+        assertThrows(IllegalArgumentException.class, () -> Json.parse("[".repeat(200_000)));
+        assertThrows(IllegalArgumentException.class, () -> Json.parse("{\"a\":".repeat(200_000)));
+    }
 }

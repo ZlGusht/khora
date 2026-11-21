@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.concurrent.atomic.AtomicLong;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import org.junit.jupiter.api.Test;
 
 class HlcTest {
@@ -46,5 +47,13 @@ class HlcTest {
         var t = Hlc.pack(123_456, 7);
         assertEquals(123_456, Hlc.millis(t));
         assertEquals(7, Hlc.counter(t));
+    }
+
+    @Test
+    void refusesToPassTheLargestTime() {
+        assertThrows(IllegalArgumentException.class, () -> new Hlc(() -> 1000).next(Long.MAX_VALUE));
+        var clock = new Hlc(() -> 1000);
+        assertEquals(Long.MAX_VALUE, clock.next(Long.MAX_VALUE - 1));
+        assertThrows(IllegalArgumentException.class, clock::next);
     }
 }

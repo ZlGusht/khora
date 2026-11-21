@@ -8,6 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Comparator;
+import java.util.TreeSet;
 import org.junit.jupiter.api.Test;
 
 class EventTest {
@@ -87,5 +89,15 @@ class EventTest {
     @Test
     void malformedSaltIsRefused() {
         assertThrows(IllegalArgumentException.class, () -> event(List.of(), "xyz"));
+    }
+
+    @Test
+    void causesIgnoreTheCallersComparator() {
+        var e = event(List.of(A, B), SALT);
+        var reversed = new TreeSet<EventId>(Comparator.reverseOrder());
+        reversed.addAll(List.of(A, B));
+        var same = new Event(e.id(), reversed, e.recorded(), e.occurred(), e.by(), e.salt(), e.action());
+        assertEquals(e, same);
+        assertEquals(null, same.causes().comparator());
     }
 }

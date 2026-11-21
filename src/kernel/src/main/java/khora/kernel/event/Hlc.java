@@ -30,8 +30,15 @@ public final class Hlc {
         return next(Long.MIN_VALUE);
     }
 
-    /** A time later than {@code after} and than every time this clock gave before. */
+    /**
+     * A time later than {@code after} and than every time this clock gave before.
+     *
+     * @throws IllegalArgumentException when no such time exists
+     */
     public synchronized long next(long after) {
+        if (after == Long.MAX_VALUE || last == Long.MAX_VALUE) {
+            throw new IllegalArgumentException("no time is later than the largest one");
+        }
         var candidate = Math.max(pack(wallMillis.getAsLong(), 0), Math.max(last + 1, after + 1));
         last = candidate;
         return candidate;
