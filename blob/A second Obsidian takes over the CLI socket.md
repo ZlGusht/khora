@@ -26,5 +26,6 @@ Several agents cannot yet work on one vault safely, or on several vaults on one 
 - The Obsidian CLI connects through one socket per user, `$XDG_RUNTIME_DIR/.obsidian-cli.sock`. The newest Obsidian takes it over, whatever its config home.
 - The khora plugin's queue answers every request in its `in/` folder on each command, so two Obsidians sharing a temp folder would answer each other's queries.
 - One vault means one working tree, on one branch. Entities written for one run sit untracked in another run's checkout until committed, and must be kept out of its commits by hand.
+- `khora-sync` refuses to run in a worktree, because the vault points at the main checkout. Run from the main checkout instead, it names that checkout's branch. The Issue #18 run's opening comment was posted by hand.
 
 This matters if the team runs a fleet of agents.
