@@ -15,10 +15,11 @@ relationships__decided_by:
 relationships__about:
   - "[[Assertions are tuples with identity]]"
 properties__decided_on: 2026-11-22
-properties__status: "active"
-properties__kind: "design"
-properties__quote: "let an event carry several tuples"
+properties__status: active
+properties__kind: design
+properties__quote: let an event carry several tuples
 properties__author: agent:claude-opus-5-5
+relationships__supersedes: "[[An assert's id is the identity of what it asserts]]"
 ---
 ## Statement
 

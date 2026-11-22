@@ -74,16 +74,24 @@ class AssertionTest {
                 Json.Obj.of(Map.of("value", Json.Obj.of(Map.of(
                         "ref", new Json.Str(P.value()), "literal", new Json.Str("x"))))),
                 Json.Obj.of(Map.of("value", Json.Obj.of(Map.of("literal", Json.Obj.of(Map.of())))))}) {
-            var action = new Action(Basic.ASSERT, Json.Obj.of(Map.of("tuples", new Json.Arr(List.of(tuple)))));
-            assertThrows(IllegalArgumentException.class, () -> Assertion.in(action), tuple.canonical());
+            assertThrows(IllegalArgumentException.class,
+                    () -> new Action(Basic.ASSERT, Json.Obj.of(Map.of("tuples", new Json.Arr(List.of(tuple))))),
+                    tuple.canonical());
         }
-        assertThrows(IllegalArgumentException.class,
-                () -> Assertion.in(new Action(Basic.ASSERT, Json.Obj.of(Map.of()))));
+        assertThrows(IllegalArgumentException.class, () -> new Action(Basic.ASSERT, Json.Obj.of(Map.of())));
     }
 
     @Test
     void retractionIsATupleWithTheRetractedAttribute() {
         assertEquals(Assertion.of(P, Basic.RETRACTED, new Assertion.Literal(new Json.Str("true"))),
                 Assertion.retraction(P));
+    }
+
+    @Test
+    void anAssertActionCannotBeBuiltWithBadTuples() {
+        assertThrows(IllegalArgumentException.class,
+                () -> new Action(Basic.ASSERT, Json.Obj.of(Map.of("tuples", new Json.Arr(List.of())))));
+        assertThrows(IllegalArgumentException.class,
+                () -> new Action(Basic.ASSERT, Json.Obj.of(Map.of("x", new Json.Int(1)))));
     }
 }

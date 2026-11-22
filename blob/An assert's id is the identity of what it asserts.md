@@ -15,9 +15,9 @@ relationships__decided_by:
 relationships__about:
   - "[[Events are the basic unit of khora]]"
 properties__decided_on: 2026-11-21
-properties__status: "active"
-properties__kind: "design"
-properties__quote: "every assert keeps an id and it helps identify multiple things, entities, their properties, relationships, behaviors"
+properties__status: superseded
+properties__kind: design
+properties__quote: every assert keeps an id and it helps identify multiple things, entities, their properties, relationships, behaviors
 properties__author: agent:claude-opus-5-5
 ---
 ## Statement

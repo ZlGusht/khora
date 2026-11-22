@@ -13,7 +13,7 @@ relationships__in_context_of:
   - "[[Runtime]]"
 properties__status: open
 properties__started_at: 2026-11-19
-properties__current_phase: Operate
+properties__current_phase: Observe
 properties__issue: 18
 properties__author: agent:claude-opus-5-5
 ---
@@ -230,3 +230,13 @@ Start only after the Issue #21 run has closed; rebase onto its final branch firs
 - [ ] **Step 2:** Validate the format in `EventId`; replace the placeholders as listed.
 - [ ] **Step 3:** Run `./mvnw -q test` → the whole suite passes, with no `-Xlint` warnings.
 - [ ] **Step 4: Commit** `Replace the EventId and Frontier placeholders`.
+
+## Observe
+
+**Done.** Events are envelopes; an accepted action is one kind, with who acted. An assert carries one or more tuples (identity, attribute, value), each identified by `<event id>/<index>`; `(,,)` instantiates an entity. Event ids are salted SHA-256 hashes of canonical JSON. Recorded time is a hybrid logical clock. An in-memory event graph refuses missing causes, times not after the causes, and duplicates. Frontiers are sets of events closed under causes, which can be validated, compared and combined. K4's `EventId` and `Frontier` placeholders are replaced, and `Basic` has the `read` definition. The design is drawn by meaning in `dashboards/Event Model.canvas`.
+
+**Not done.** Named links for reads, translations and reactions; other kinds of event; keeping rejected actions; attribute definitions; atomic writes across events (K3); conflict checks (K9). The done-when item on effects no longer applies: effects are not events.
+
+**Checked.** 80 tests pass with no `-Xlint` warnings. Every entity this run wrote validates. Two whole-branch reviews: the first found four Important issues (lone surrogates, deep nesting, clock overflow, foreign comparators), the second four more (unknown JSON members dropped, asserts not validated on construction, the canvas stating causes as what was read, two conflicting Decisions); all were fixed, the code ones with a test that failed first. `khora-stale` reports documents older than this run's Decisions, which is expected until Update View runs after the merge. No deciding sentence was added to `docs/`.
+
+**Flagged** as Letters on this run: security (who acted is claimed, not proven; salts not shredded; no size limits on parsed JSON; named identities and event ids share one form), change later (large integers versus RFC 8785; named links; the stub's frontiers; the clock serves one writer; documents lag the Decisions), performance (frontier walks; double hashing and copying; reads multiply the log).

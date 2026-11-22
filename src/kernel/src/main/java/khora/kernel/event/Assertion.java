@@ -95,7 +95,11 @@ public record Assertion(Optional<Identity> identity, Optional<Identity> attribut
         if (!action.definition().equals(Basic.ASSERT)) {
             return Optional.empty();
         }
-        var args = action.args();
+        return Optional.of(parse(action.args()));
+    }
+
+    /** The tuples of an assert's arguments; refuses anything but one or more well-formed tuples. */
+    static List<Assertion> parse(Json.Obj args) {
         if (!args.members().keySet().equals(Set.of("tuples"))) {
             throw new IllegalArgumentException("an assert's arguments are its tuples");
         }
@@ -109,7 +113,7 @@ public record Assertion(Optional<Identity> identity, Optional<Identity> attribut
         if (tuples.isEmpty()) {
             throw new IllegalArgumentException("an assert carries at least one tuple");
         }
-        return Optional.of(List.copyOf(tuples));
+        return List.copyOf(tuples);
     }
 
     private Json.Obj toJson() {

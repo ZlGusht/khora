@@ -101,4 +101,18 @@ class EventTest {
         assertEquals(e, same);
         assertEquals(null, same.causes().comparator());
     }
+
+    @Test
+    void unknownMembersAreRefusedAtEveryLevel() {
+        var text = EventJson.write(Event.create(List.of(A), 1000, Optional.empty(), new AcceptedAction(BY,
+                Assertion.action(Assertion.entity())), SALT));
+        for (var tampered : List.of(
+                text.replaceFirst("^\\{", "{\"evil\":\"x\","),
+                text.replace("{\"accepted_action\":{", "{\"accepted_action\":{\"evil\":\"x\","),
+                text.replace("{\"action\":{", "{\"action\":{\"evil\":\"x\","),
+                text.replace("\"by\":{", "\"by\":{\"evil\":\"x\","))) {
+            org.junit.jupiter.api.Assertions.assertNotEquals(text, tampered);
+            assertThrows(IllegalArgumentException.class, () -> EventJson.read(tampered), tampered);
+        }
+    }
 }
