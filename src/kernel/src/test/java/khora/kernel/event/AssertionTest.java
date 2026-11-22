@@ -3,6 +3,7 @@ package khora.kernel.event;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import khora.kernel.json.Json;
@@ -10,58 +11,74 @@ import org.junit.jupiter.api.Test;
 
 class AssertionTest {
 
-    static final EventId P = EventId.hashOf("p");
-    static final EventId NAME = EventId.hashOf("name");
-    static final EventId ANNA = EventId.hashOf("anna");
+    static final Identity P = Identity.named("p");
+    static final Identity NAME = Identity.named("name");
+    static final Identity ANNA = Identity.named("anna");
 
     @Test
     void entityIsTheEmptyTuple() {
-        var action = Assertion.entity().toAction();
+        var action = Assertion.action(Assertion.entity());
         assertEquals(Basic.ASSERT, action.definition());
-        assertEquals("{}", action.args().canonical());
+        assertEquals("{\"tuples\":[{}]}", action.args().canonical());
     }
 
     @Test
     void literalValueIsMarked() {
         var a = Assertion.of(P, NAME, new Assertion.Literal(new Json.Str("Kitchen")));
-        assertEquals("{\"attribute\":\"" + NAME.value() + "\",\"identity\":\"" + P.value()
-                + "\",\"value\":{\"literal\":\"Kitchen\"}}", a.toAction().args().canonical());
+        assertEquals("{\"tuples\":[{\"attribute\":\"" + NAME.value() + "\",\"identity\":\"" + P.value()
+                + "\",\"value\":{\"literal\":\"Kitchen\"}}]}", Assertion.action(a).args().canonical());
     }
 
     @Test
     void referenceValueIsMarked() {
-        var a = Assertion.of(ANNA, EventId.hashOf("owns"), new Assertion.Ref(P));
-        assertEquals("{\"ref\":\"" + P.value() + "\"}", a.toAction().args().obj("value").canonical());
+        var a = Assertion.of(ANNA, Identity.named("owns"), new Assertion.Ref(P));
+        assertEquals("{\"ref\":\"" + P.value() + "\"}",
+                Assertion.action(a).args().canonical().replaceAll(".*\"value\":(\\{[^}]*\\}).*", "$1"));
     }
 
     @Test
-    void tuplesRoundTripThroughActions() {
-        for (var a : new Assertion[] {
+    void severalTuplesRoundTripInOrder() {
+        var tuples = List.of(
                 Assertion.entity(),
                 Assertion.of(P, NAME, new Assertion.Literal(new Json.Int(7))),
                 Assertion.of(ANNA, NAME, new Assertion.Ref(P)),
-                new Assertion(Optional.of(P), Optional.of(NAME), Optional.empty())}) {
-            assertEquals(Optional.of(a), Assertion.from(a.toAction()));
-        }
+                new Assertion(Optional.of(P), Optional.of(NAME), Optional.empty()));
+        assertEquals(Optional.of(tuples), Assertion.in(Assertion.action(tuples)));
     }
 
     @Test
-    void otherActionsAreNotAssertions() {
-        var other = new Action(EventId.hashOf("orders/place"), Json.Obj.of(Map.of()));
-        assertEquals(Optional.empty(), Assertion.from(other));
+    void tuplesOfOneEventAreIdentifiedByIndex() {
+        var e = EventId.hashOf("e");
+        assertEquals(Identity.of(e, 0), Assertion.identityIn(e, 0));
     }
 
     @Test
-    void malformedAssertionsAreRefused() {
-        for (var args : new Json.Obj[] {
+    void anAssertNeedsATuple() {
+        assertThrows(IllegalArgumentException.class, () -> Assertion.action(List.of()));
+        assertThrows(IllegalArgumentException.class,
+                () -> Assertion.in(new Action(Basic.ASSERT, Json.Obj.of(Map.of("tuples", new Json.Arr(List.of()))))));
+    }
+
+    @Test
+    void otherActionsCarryNoAssertions() {
+        var other = new Action(Identity.named("orders/place"), Json.Obj.of(Map.of()));
+        assertEquals(Optional.empty(), Assertion.in(other));
+    }
+
+    @Test
+    void malformedTuplesAreRefused() {
+        for (var tuple : new Json.Obj[] {
                 Json.Obj.of(Map.of("subject", new Json.Str(P.value()))),
                 Json.Obj.of(Map.of("identity", new Json.Int(1))),
+                Json.Obj.of(Map.of("identity", new Json.Str("not an identity"))),
                 Json.Obj.of(Map.of("value", Json.Obj.of(Map.of(
                         "ref", new Json.Str(P.value()), "literal", new Json.Str("x"))))),
                 Json.Obj.of(Map.of("value", Json.Obj.of(Map.of("literal", Json.Obj.of(Map.of())))))}) {
-            assertThrows(IllegalArgumentException.class, () -> Assertion.from(new Action(Basic.ASSERT, args)),
-                    args.canonical());
+            var action = new Action(Basic.ASSERT, Json.Obj.of(Map.of("tuples", new Json.Arr(List.of(tuple)))));
+            assertThrows(IllegalArgumentException.class, () -> Assertion.in(action), tuple.canonical());
         }
+        assertThrows(IllegalArgumentException.class,
+                () -> Assertion.in(new Action(Basic.ASSERT, Json.Obj.of(Map.of()))));
     }
 
     @Test

@@ -8,8 +8,8 @@ class BasicTest {
 
     @Test
     void wellKnownIdsAreHashesOfTheirNames() {
-        assertEquals(EventId.hashOf("khora/basic/assert"), Basic.ASSERT);
-        assertEquals(EventId.hashOf("khora/basic/retracted"), Basic.RETRACTED);
-        assertEquals(EventId.hashOf("khora/basic/label"), Basic.LABEL);
+        assertEquals(Identity.named("khora/basic/assert"), Basic.ASSERT);
+        assertEquals(Identity.named("khora/basic/retracted"), Basic.RETRACTED);
+        assertEquals(Identity.named("khora/basic/label"), Basic.LABEL);
     }
 }

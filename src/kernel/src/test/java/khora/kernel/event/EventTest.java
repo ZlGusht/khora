@@ -20,13 +20,13 @@ class EventTest {
     static final EventId B = EventId.hashOf("b");
 
     static Event event(List<EventId> causes, String salt) {
-        return Event.create(causes, 1000, Optional.empty(), BY, Assertion.entity().toAction(), salt);
+        return Event.create(causes, 1000, Optional.empty(), new AcceptedAction(BY, Assertion.action(Assertion.entity())), salt);
     }
 
     @Test
     void eventRoundTrips() {
         var e = Event.create(List.of(A, B), 1000, Optional.of(900L),
-                new By("anna", Optional.of("ivan"), "g3", "projects"), Assertion.entity().toAction(), SALT);
+                new AcceptedAction(new By("anna", Optional.of("ivan"), "g3", "projects"), Assertion.action(Assertion.entity())), SALT);
         var back = EventJson.read(EventJson.write(e));
         assertEquals(e, back);
         assertEquals(e.id(), back.id());
@@ -50,8 +50,8 @@ class EventTest {
 
     @Test
     void sameContentGetsDifferentIdsWithDifferentSalts() {
-        var one = Event.create(List.of(), 1000, Optional.empty(), BY, Assertion.entity().toAction());
-        var two = Event.create(List.of(), 1000, Optional.empty(), BY, Assertion.entity().toAction());
+        var one = Event.create(List.of(), 1000, Optional.empty(), new AcceptedAction(BY, Assertion.action(Assertion.entity())));
+        var two = Event.create(List.of(), 1000, Optional.empty(), new AcceptedAction(BY, Assertion.action(Assertion.entity())));
         assertNotEquals(one.id(), two.id());
         assertTrue(one.salt().matches("[0-9a-f]{32}"));
     }
@@ -79,8 +79,9 @@ class EventTest {
     @Test
     void writtenJsonHasThePinnedShape() {
         var e = event(List.of(A), SALT);
-        var expected = "{\"action\":{\"args\":{},\"definition\":\"" + Basic.ASSERT.value() + "\"},"
-                + "\"by\":{\"grant\":\"g3\",\"principal\":\"anna\",\"via\":\"projects\"},"
+        var expected = "{\"body\":{\"accepted_action\":{\"action\":{\"args\":{\"tuples\":[{}]},"
+                + "\"definition\":\"" + Basic.ASSERT.value() + "\"},"
+                + "\"by\":{\"grant\":\"g3\",\"principal\":\"anna\",\"via\":\"projects\"}}},"
                 + "\"causes\":[\"" + A.value() + "\"],\"id\":\"" + e.id().value() + "\","
                 + "\"recorded\":1000,\"salt\":\"" + SALT + "\"}";
         assertEquals(expected, EventJson.write(e));
@@ -96,7 +97,7 @@ class EventTest {
         var e = event(List.of(A, B), SALT);
         var reversed = new TreeSet<EventId>(Comparator.reverseOrder());
         reversed.addAll(List.of(A, B));
-        var same = new Event(e.id(), reversed, e.recorded(), e.occurred(), e.by(), e.salt(), e.action());
+        var same = new Event(e.id(), reversed, e.recorded(), e.occurred(), e.salt(), e.body());
         assertEquals(e, same);
         assertEquals(null, same.causes().comparator());
     }
