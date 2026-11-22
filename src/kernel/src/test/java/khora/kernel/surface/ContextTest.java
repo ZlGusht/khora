@@ -21,7 +21,7 @@ class ContextTest {
         assertEquals(principal, context.principal());
         assertEquals(grant, context.grant());
         assertEquals(budget, context.budget());
-        assertTrue(context.cause().isEmpty());
+        assertTrue(context.trigger().isEmpty());
     }
 
     @Test

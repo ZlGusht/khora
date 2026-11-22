@@ -61,6 +61,8 @@ Issue #21 (plan task K4) of [[Milestone Stage 1 kernel core]]: the surface contr
 
 ## Plan
 
+The plan as it was carried out. The review changed three things afterwards: `Frontier` became a placeholder that only names a frontier, `TimeAxis` and `Meaning` were dropped from `ReadTime`, and `Context.cause` was renamed `trigger` ([[An event's causes are what it knew]]).
+
 > **For agentic workers:** use superpowers:executing-plans or superpowers:subagent-driven-development to carry out this plan task by task. Steps use checkboxes.
 
 **Goal:** the surface contract from ADR-0XY decisions 1 and 2 as Java types, with an in-memory stub surface that implements it.
@@ -240,5 +242,6 @@ interface ChangingSurface extends Surface { ChangeFeed changes(Frontier since); 
 
 **Not done:**
 - Frontiers are a placeholder that only names a frontier; `ReadTime` holds only that frontier, without the time axis and meaning (they come with K8's `Query`). Why, and what K1 has to handle: [[Frontiers need more than one position per origin]].
+- `Effects` and a rejected write's id do not fit K1 yet: K1 has no effect events, and only accepted actions are events. Both are marked in their Javadoc.
 - Deferred review findings: collection nulls don't name their field; four types say only "Provisional."; the call kind in `Actions` is a string; the stub records actions outside its lock, so action order can differ from change order. The ordering one belongs to K3.
 - The contract is not yet reshaped around events ([[Events are the basic unit of khora]]): writes take a basic set, not a surface's own event, and `changes` yields values, not events. K4 merges as provisional, before K1 (#18), whose branch builds on it; the reshaping is a follow-up issue after K1. What K1 has to follow: [[Causes and reads for K1's events]].

@@ -4,7 +4,8 @@ import java.util.Objects;
 import khora.kernel.event.EventId;
 
 /**
- * What a write call answers (ADR-0XY decisions 1 and 8). Confirmation arrives later, through changes.
+ * What a write call answers (ADR-0XY decisions 1 and 8). Confirmation arrives later, through
+ * {@link ChangingSurface#changes}.
  *
  * <p>Provisional.
  */

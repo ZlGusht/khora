@@ -3,11 +3,12 @@ package khora.kernel.surface;
 import khora.kernel.event.EventId;
 
 /**
- * Where a surface records the action each call is (ADR-0YA decision 2: one call is one action).
+ * Where a surface records the action each call is (ADR-0YA decision 2: one call is one action). Reads
+ * are recorded too: a read is an action someone takes ([[Reads are events]]).
  *
- * Reads are recorded too: a read is an action someone takes ([[Reads are events]]).
- *
- * <p>Provisional: K3 and K10 back it with the log.
+ * <p>Provisional: K3 and K10 back it with the log. A write is recorded before the surface decides on
+ * it, so a rejected write has an id too; in K1 only accepted actions are events, and how rejections
+ * are kept is not decided yet.
  */
 public interface Actions {
 

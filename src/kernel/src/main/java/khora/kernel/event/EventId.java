@@ -5,7 +5,7 @@ import java.util.Objects;
 /**
  * The id of an event in the log.
  *
- * <p>Provisional: a placeholder until K1 (#18) defines event ids as content hashes over their causes.
+ * <p>Provisional: a placeholder. K1 (#18) replaces it with salted hashes of an event's canonical JSON.
  */
 public record EventId(String value) {
     public EventId {
