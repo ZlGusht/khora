@@ -7,223 +7,256 @@
 			"width": 1200,
 			"height": 189,
 			"type": "text",
-			"text": "## Event Model\nThe kernel's event model from K1 (#18, PR #36).\n\nColours: purple = types, orange = header and Reading, red = open or flagged, none = Decisions.\n\nRendered 2026-11-22 by agent:claude-opus-5-5",
+			"text": "## Event Model\nWhat khora's events mean: identity from what happened, structure from assertions, coherence from frontiers. From K1 (#18, PR #36).\n\nColours: orange = header and Reading, purple = concepts, green = the example, red = not yet decided, none = Decisions.\n\nRendered 2026-11-22 by agent:claude-opus-5-5",
 			"color": "2"
 		},
 		{
-			"id": "g-f9bdf542b054fa",
+			"id": "g-055fe026353d0e",
 			"type": "group",
-			"label": "Event envelope",
+			"label": "The three ideas",
 			"x": 720,
 			"y": 309,
-			"width": 440,
-			"height": 796
+			"width": 1240,
+			"height": 352
 		},
 		{
-			"id": "g-fbe3e03f52accb",
+			"id": "g-14cee7c940bfd9",
 			"x": 760,
-			"y": 379,
-			"width": 360,
-			"height": 266,
-			"type": "text",
-			"text": "**Event** *(record)*\n```\nid        sha256:<hex>\ncauses    sorted set of EventId\nrecorded  Hlc time\noccurred? ms\nsalt      32 hex\nbody      Body\n```\nThe constructor recomputes the id and refuses a mismatch.",
-			"color": "6"
-		},
-		{
-			"id": "g-9e9a17c2a8b852",
-			"x": 760,
-			"y": 685,
-			"width": 360,
-			"height": 146,
-			"type": "text",
-			"text": "**Body** *(sealed)*\nWhat happened: one kind of event.\nOnly kind so far: `AcceptedAction`. More kinds are added here.",
-			"color": "6"
-		},
-		{
-			"id": "g-d1b416be4bb0b5",
-			"x": 760,
-			"y": 871,
-			"width": 360,
-			"height": 194,
-			"type": "text",
-			"text": "**AcceptedAction** `{ by, action }`\n**By** `{ principal, on_behalf_of?, grant, via }`, plain names for now.\n**Action** `{ definition: Identity, args: Json }`. The definition says vocabulary and version.",
-			"color": "6"
-		},
-		{
-			"id": "g-62f96fbf3d6b97",
-			"type": "group",
-			"label": "Assertions",
-			"x": 1280,
-			"y": 309,
-			"width": 440,
-			"height": 982
-		},
-		{
-			"id": "g-94403005fbbc15",
-			"x": 1320,
 			"y": 379,
 			"width": 360,
 			"height": 218,
 			"type": "text",
-			"text": "**Assertion** `(identity?, attribute?, value?)`\nAn assert action carries one or more tuples, appended together.\nTuple *n* of event *e* is `e/n`.\nAny mix of present and absent parts is accepted; meaning is left open.",
+			"text": "**Things are identified by what happened to them**\nNo one decides in advance what deserves identity. Whatever was asserted has it already, so anything can be referred to, annotated or reasoned about later.\n*[[Events are the basic unit of khora]]*",
 			"color": "6"
 		},
 		{
-			"id": "g-b106636ef9b68b",
-			"x": 1320,
-			"y": 637,
+			"id": "g-82aba7f0373abb",
+			"x": 1160,
+			"y": 379,
 			"width": 360,
-			"height": 146,
+			"height": 242,
 			"type": "text",
-			"text": "**Value** *(sealed)*\n`Literal` (string or integer): `{\"literal\": …}`\n`Ref` (an Identity): `{\"ref\": …}`",
+			"text": "**One syntax gives structure, meaning stays open**\nEvery statement is a tuple (identity, attribute, value). Entities, properties, relationships and retractions share it, so surfaces treat them alike. What a tuple means comes from its attribute.\n*[[Assertions are tuples with identity]]*",
 			"color": "6"
 		},
 		{
-			"id": "g-0eb2db8a230325",
-			"x": 1320,
-			"y": 823,
+			"id": "g-12575bc4bf13d5",
+			"x": 1560,
+			"y": 379,
 			"width": 360,
-			"height": 194,
+			"height": 218,
 			"type": "text",
-			"text": "**Examples**\n```\nx/0 = (,,)                entity\nx/1 = (x/0, name, \"Kitchen\")\ny/0 = (anna, owns, ref x/0)\ny/1 = (y/0, since, 2024)\nz/0 = (x/1, retracted, \"true\")\n```"
-		},
-		{
-			"id": "g-96ad7d10d3ab80",
-			"x": 1320,
-			"y": 1057,
-			"width": 360,
-			"height": 194,
-			"type": "text",
-			"text": "**Identity** `sha256:<hex>` or `sha256:<hex>/<n>`\nTuples, attributes, definitions.\n**Basic**: well-known identities `assert`, `retracted`, `label` (hashes of `khora/basic/<name>`).",
+			"text": "**Surfaces agree by reading at the same frontier**\nA frontier is a set of events, closed under their causes. Two surfaces built on the same events show consistent views when they read at the same frontier.\n*[[Events are the basic unit of khora]]*",
 			"color": "6"
 		},
 		{
-			"id": "g-0620ad13ac5dc1",
+			"id": "g-9aff7572a798db",
 			"type": "group",
-			"label": "Ids and time",
+			"label": "Example: Anna creates a project, Ivan renames it",
 			"x": 720,
-			"y": 1411,
-			"width": 440,
-			"height": 676
+			"y": 781,
+			"width": 2040,
+			"height": 304,
+			"color": "4"
 		},
 		{
-			"id": "g-f277affcc23a84",
+			"id": "g-23d7731727cd53",
 			"x": 760,
-			"y": 1481,
+			"y": 851,
 			"width": 360,
 			"height": 170,
 			"type": "text",
-			"text": "**EventId** `sha256:` + SHA-256 of the event's canonical JSON without `id`.\nThe salt stops guessing content from the id; the hash keeps integrity and commits to history.",
-			"color": "6"
+			"text": "**1. Anna acts**\nAnna, under her grant, through the projects surface, asks to create a project called Kitchen.\nIt is a request, not yet a fact.",
+			"color": "4"
 		},
 		{
-			"id": "g-54d44d21565b2b",
-			"x": 760,
-			"y": 1691,
+			"id": "g-a4f27dbad2bc3e",
+			"x": 1160,
+			"y": 851,
 			"width": 360,
 			"height": 170,
 			"type": "text",
-			"text": "**Json** (canonical, RFC 8785 subset)\nObjects, arrays, strings, 64-bit integers. Sorted keys, no whitespace.\nRefuses lone surrogates, nesting deeper than 1000. Own code, no dependencies.",
-			"color": "6"
+			"text": "**2. khora accepts: event e**\nThe accepted action becomes event **e**, carrying two tuples:\n`e/0 = (,,)`: a new thing\n`e/1 = (e/0, name, \"Kitchen\")`",
+			"color": "4"
 		},
 		{
-			"id": "g-9d719d3fe25c07",
-			"x": 760,
-			"y": 1901,
-			"width": 360,
-			"height": 146,
-			"type": "text",
-			"text": "**Hlc** hybrid logical clock\nms << 16 | counter in one long. `next(after)` is later than `after` and than every earlier result. Refuses past `Long.MAX_VALUE`.",
-			"color": "6"
-		},
-		{
-			"id": "g-b4358a63c45322",
-			"type": "group",
-			"label": "Event graph and frontiers",
-			"x": 1280,
-			"y": 1411,
-			"width": 440,
-			"height": 676
-		},
-		{
-			"id": "g-4b7312238598e6",
-			"x": 1320,
-			"y": 1481,
+			"id": "g-944907db7c41da",
+			"x": 1560,
+			"y": 851,
 			"width": 360,
 			"height": 170,
 			"type": "text",
-			"text": "**EventGraph** in memory (stand-in until K2)\n`append` returns `Appended` or `Refused`: `MISSING_CAUSE`, `NOT_AFTER_CAUSES`, `DUPLICATE`.\nEvents without causes are roots.",
-			"color": "6"
+			"text": "**3. Identities come from e**\nThe project *is* `e/0`.\nIts name, as a statement, is `e/1`, so it can be annotated or retracted later.\nNo id was invented.",
+			"color": "4"
 		},
 		{
-			"id": "g-5662f815088466",
-			"x": 1320,
-			"y": 1691,
+			"id": "g-70174dfa2514f5",
+			"x": 1960,
+			"y": 851,
 			"width": 360,
-			"height": 122,
+			"height": 170,
 			"type": "text",
-			"text": "**Frontier** `{ heads }`: the heads and everything that caused them.\n`Frontier.of(ids, source)` reduces to heads.",
-			"color": "6"
+			"text": "**4. Ivan renames: event f, caused by e**\nIvan read the project at frontier {e}.\n`f/0 = (e/1, retracted, \"true\")`\n`f/1 = (e/0, name, \"Studio\")`\nBoth land together, or neither.",
+			"color": "4"
 		},
 		{
-			"id": "g-c98400d1877d54",
-			"x": 1320,
-			"y": 1853,
+			"id": "g-1f50d02c7a90be",
+			"x": 2360,
+			"y": 851,
 			"width": 360,
 			"height": 194,
 			"type": "text",
-			"text": "**FrontierCheck**\n`validate`: `Valid` or `Invalid(missing)`, which refuses a frontier lacking a cause.\n`compare`: BEFORE, AFTER, EQUAL, CONCURRENT.\n`combine`: heads of the union.\nIterative walks.",
+			"text": "**5. Surfaces read at frontiers**\nAt {e}: Kitchen. At {f}: Studio.\nA surface that has only taken in {e} answers for {e}, or waits.\nHistory shows who renamed it, and why it is Studio.",
+			"color": "4"
+		},
+		{
+			"id": "g-c1aa49132f5078",
+			"type": "group",
+			"label": "Concepts: meaning first, code second",
+			"x": 720,
+			"y": 1205,
+			"width": 1240,
+			"height": 796
+		},
+		{
+			"id": "g-a672491fc8eec0",
+			"x": 760,
+			"y": 1275,
+			"width": 360,
+			"height": 194,
+			"type": "text",
+			"text": "**Event**: something that happened, kept forever with what caused it.\nWhy: the log holds only events; identity and history come from them.\n*In code: `Event`, an envelope around a `Body`.*",
+			"color": "6"
+		},
+		{
+			"id": "g-45844101ff61f8",
+			"x": 1160,
+			"y": 1275,
+			"width": 360,
+			"height": 194,
+			"type": "text",
+			"text": "**Accepted action**: one kind of event. A principal asked, khora accepted.\nWhy: a request already says what should be true; no separate outcome or effect is needed.\n*In code: `AcceptedAction { by, action }`.*",
+			"color": "6"
+		},
+		{
+			"id": "g-d3eca79dfaf8e4",
+			"x": 1560,
+			"y": 1275,
+			"width": 360,
+			"height": 194,
+			"type": "text",
+			"text": "**Assertion**: a statement (identity, attribute, value). `(,,)` brings a new thing into being.\nWhy: one shape for every kind of statement.\n*In code: `Assertion`; an assert carries several.*",
+			"color": "6"
+		},
+		{
+			"id": "g-75f24120240691",
+			"x": 760,
+			"y": 1509,
+			"width": 360,
+			"height": 218,
+			"type": "text",
+			"text": "**Identity**: what a statement or a thing is known by: its event and its place in it, `e/n`.\nWhy: identity without coordination or naming.\n*In code: `Identity`; well-known ones in `Basic`.*",
+			"color": "6"
+		},
+		{
+			"id": "g-e6a595708eb197",
+			"x": 1160,
+			"y": 1509,
+			"width": 360,
+			"height": 194,
+			"type": "text",
+			"text": "**Attribute**: itself a thing with identity. It carries the meaning of the tuples that use it: whether a new value replaces or adds, and its type.\n*In code: an `Identity`; definitions are not built yet.*",
+			"color": "6"
+		},
+		{
+			"id": "g-69418d9006b811",
+			"x": 1560,
+			"y": 1509,
+			"width": 360,
+			"height": 170,
+			"type": "text",
+			"text": "**Cause**: what an event came from. For an action, what its principal had read.\nWhy: \"how did this come to be\" (PRD provenance) and the order between events.\n*In code: `causes`; refused when missing.*",
+			"color": "6"
+		},
+		{
+			"id": "g-772ff2b9e8ebf9",
+			"x": 760,
+			"y": 1767,
+			"width": 360,
+			"height": 194,
+			"type": "text",
+			"text": "**Frontier**: a set of events with all their causes, named by its newest events.\nWhy: the point a read happens at, and what surfaces agree on. Two frontiers can be concurrent.\n*In code: `Frontier`, `FrontierCheck`.*",
+			"color": "6"
+		},
+		{
+			"id": "g-a0cc27560c3992",
+			"x": 1160,
+			"y": 1767,
+			"width": 360,
+			"height": 194,
+			"type": "text",
+			"text": "**Event id**: a salted hash of the event.\nWhy: tamper-evident, and newest events commit to a whole history, which matters between khoras. The salt stops anyone guessing content from an id.\n*In code: `EventId`, canonical `Json`.*",
+			"color": "6"
+		},
+		{
+			"id": "g-9f8ca76fda0499",
+			"x": 1560,
+			"y": 1767,
+			"width": 360,
+			"height": 170,
+			"type": "text",
+			"text": "**Recorded time**: close to wall time, never backwards, always after the causes.\nWhy: past reads \"as of 3 pm\", and order across writers later; little use yet.\n*In code: `Hlc`.*",
 			"color": "6"
 		},
 		{
 			"id": "g-411c155cb6606e",
 			"type": "group",
-			"label": "Decisions (Issue #18 run)",
+			"label": "Decisions it rests on",
 			"x": 720,
-			"y": 2207,
+			"y": 2121,
 			"width": 840,
-			"height": 676
+			"height": 556
 		},
 		{
 			"id": "g-533a898ae41fdb",
 			"x": 760,
-			"y": 2277,
+			"y": 2191,
 			"width": 360,
-			"height": 170,
+			"height": 122,
 			"type": "text",
-			"text": "**[[An accepted action is one kind of event]]**\n*design · active*\nSupersedes [[An event is an accepted action, and an assert is the basic action]]."
+			"text": "**[[An accepted action is one kind of event]]**\n*design · active*"
 		},
 		{
 			"id": "g-1d4f031a1fa928",
 			"x": 1160,
-			"y": 2277,
+			"y": 2191,
 			"width": 360,
-			"height": 122,
+			"height": 98,
 			"type": "text",
-			"text": "**[[Assertions are tuples with identity]]**\n*design · active*\n`(,,)` instantiates an entity."
+			"text": "**[[Assertions are tuples with identity]]**\n*design · active*"
 		},
 		{
 			"id": "g-c7f1e3a8119e81",
 			"x": 760,
-			"y": 2487,
+			"y": 2353,
 			"width": 360,
-			"height": 122,
+			"height": 98,
 			"type": "text",
-			"text": "**[[An event carries several assertions]]**\n*design · active*\nIdentified by `<event id>/<index>`."
+			"text": "**[[An event carries several assertions]]**\n*design · active*"
 		},
 		{
 			"id": "g-2b441e8b0741c5",
 			"x": 1160,
-			"y": 2487,
+			"y": 2353,
 			"width": 360,
-			"height": 170,
+			"height": 122,
 			"type": "text",
-			"text": "**[[Event ids are salted hashes of canonical JSON]]**\n*design · active*\nKept for integrity and history, for interoperability."
+			"text": "**[[Event ids are salted hashes of canonical JSON]]**\n*design · active*"
 		},
 		{
 			"id": "g-2216eff4c331d7",
 			"x": 760,
-			"y": 2697,
+			"y": 2515,
 			"width": 360,
 			"height": 122,
 			"type": "text",
@@ -232,30 +265,30 @@
 		{
 			"id": "g-2cda1b0c2c1d78",
 			"x": 1160,
-			"y": 2697,
+			"y": 2515,
 			"width": 360,
-			"height": 146,
+			"height": 98,
 			"type": "text",
-			"text": "**[[Events are the basic unit of khora]]**\n*design · from the Issue #21 run*\nFrontiers are sets of events closed under causes."
+			"text": "**[[Events are the basic unit of khora]]**\n*design · from the Issue #21 run*"
 		},
 		{
 			"id": "g-c33964c4314ac4",
 			"x": 1680,
-			"y": 2207,
+			"y": 2121,
 			"width": 360,
-			"height": 242,
+			"height": 218,
 			"type": "text",
-			"text": "**Reading · 2026-11-22**\n- Built and tested: 80 tests, PR #36 (draft, stacked on #35).\n- Nothing reads assertions yet; the tuple model pays off from K6 and B2.\n- Event kinds beyond accepted actions: not decided.\n- A genesis event per log: not decided.",
+			"text": "**Reading · 2026-11-22**\n- The model is built and tested in K1; nothing reads assertions yet. The meaning pays off once a surface does (K6, B2).\n- Attributes carry meaning, but attribute definitions do not exist yet, so a rename relies on an explicit retraction.",
 			"color": "2"
 		},
 		{
 			"id": "g-8203949e9e7e79",
 			"x": 1680,
-			"y": 2489,
+			"y": 2379,
 			"width": 360,
-			"height": 362,
+			"height": 290,
 			"type": "text",
-			"text": "**Open or flagged**\n- Task 6: replace K4's `EventId` and `Frontier` placeholders, after the Issue #21 run closes.\n- Security: `By` names are unauthenticated; the salt is in plain text.\n- Performance: `compare` walks whole histories; `EventGraph` has one lock.\n- Change later: attribute definitions (cardinality, type); atomic multi-event writes (K3).\n- Deferred minors: see the ledger and PR #36.",
+			"text": "**Not yet decided**\n- What other kinds of event there are, beyond accepted actions.\n- Whether each log starts with one genesis event.\n- What partial tuples, such as `(p, name, —)`, mean.\n- How rejected requests are kept.\n- How a surface's own events translate into tuples, and back.",
 			"color": "1"
 		},
 		{
@@ -264,38 +297,45 @@
 			"x": 0,
 			"y": 0,
 			"width": 560,
-			"height": 525,
+			"height": 549,
 			"color": "6",
-			"text": "## Spec · Event Model\n\n**Purpose:** show the kernel's event model as built in [[Issue #18 Event types ids and clock]] (K1): the event envelope, assertions, ids, the clock, the event graph and frontiers.\n\n**Show:** each kernel type with its fields and rules; the Decisions it rests on; what is open or deferred.\n\n**Context:** the run's Design section, its Decisions, and `src/kernel/src/main/java/khora/kernel/event` and `json`.\n\n**Judgement:** show what the code does today, not the ADRs. Mark provisional parts.\n\n**Layout:** row 1 the envelope and assertions; row 2 ids, clock, graph and frontiers; row 3 Decisions and the Reading.\n\n**Triggers:** re-render when the event package or the run's Decisions change.\n\n*Draft spec by agent:claude-opus-5-5, to be agreed with a team member.*"
+			"text": "## Spec · Event Model\n\n**Purpose:** show what khora's event model *means*, as built in [[Issue #18 Event types ids and clock]] (K1): how things get identity, how structure is asserted, and how surfaces stay coherent.\n\n**Show:** the three ideas; a worked example of people acting over time; each concept with its meaning, why it exists and how it is used, with its code name second; the Decisions it rests on; what is not yet decided.\n\n**Context:** the run's Design section and its Decisions; [[Events are the basic unit of khora]]; the code in `src/kernel/.../event` only to check the canvas matches it.\n\n**Judgement:** meaning before mechanics. Every claim traces to a Decision. Mark what is provisional or open.\n\n**Layout:** row 1 the ideas; row 2 the example; row 3 the concepts; row 4 Decisions and the Reading.\n\n**Triggers:** re-render when the run's Decisions change.\n\n*Draft spec by agent:claude-opus-5-5, to be agreed with a team member.*"
 		}
 	],
 	"edges": [
 		{
-			"id": "g-d4b34b1e2a4bdd",
-			"fromNode": "g-fbe3e03f52accb",
-			"fromSide": "bottom",
-			"toNode": "g-9e9a17c2a8b852",
-			"toSide": "top",
+			"id": "g-db5dbd2a34fab3",
+			"fromNode": "g-23d7731727cd53",
+			"fromSide": "right",
+			"toNode": "g-a4f27dbad2bc3e",
+			"toSide": "left",
 			"toEnd": "arrow",
-			"label": "body"
+			"label": "accepted"
 		},
 		{
-			"id": "g-cc86cb4ee06c69",
-			"fromNode": "g-9e9a17c2a8b852",
-			"fromSide": "bottom",
-			"toNode": "g-d1b416be4bb0b5",
-			"toSide": "top",
-			"toEnd": "arrow",
-			"label": "kind"
+			"id": "g-fec2ba84139c36",
+			"fromNode": "g-a4f27dbad2bc3e",
+			"fromSide": "right",
+			"toNode": "g-944907db7c41da",
+			"toSide": "left",
+			"toEnd": "arrow"
 		},
 		{
-			"id": "g-f92a0ddda9da51",
-			"fromNode": "g-94403005fbbc15",
-			"fromSide": "bottom",
-			"toNode": "g-b106636ef9b68b",
-			"toSide": "top",
+			"id": "g-ad5570e345dd5c",
+			"fromNode": "g-944907db7c41da",
+			"fromSide": "right",
+			"toNode": "g-70174dfa2514f5",
+			"toSide": "left",
 			"toEnd": "arrow",
-			"label": "value"
+			"label": "later"
+		},
+		{
+			"id": "g-486f11e3a8e27e",
+			"fromNode": "g-70174dfa2514f5",
+			"fromSide": "right",
+			"toNode": "g-1f50d02c7a90be",
+			"toSide": "left",
+			"toEnd": "arrow"
 		}
 	]
 }
