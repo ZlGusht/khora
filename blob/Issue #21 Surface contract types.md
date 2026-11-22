@@ -45,12 +45,14 @@ Issue #21 (plan task K4) of [[Milestone Stage 1 kernel core]]: the surface contr
 - [[The order capability is left out of the Declaration for now]]
 - [[Surface changes take no context for now]]
 - [[Events are the basic unit of khora]]
+- [[Reads are events]]
+- [[An event's causes are what it knew]]
 
 ## Questions
 
 - [[Which parts of an entity are reified and keep identity]], answered by [[Events are the basic unit of khora]]
 - [[What the basic event vocabulary contains]]
-- [[Whether reads are events]]
+- [[Whether reads are events]], answered by [[Reads are events]]
 - [[How overlapping event vocabularies are aligned]]
 - [[How translations between vocabulary versions are kept]]
 
@@ -236,3 +238,4 @@ interface ChangingSurface extends Surface { ChangeFeed changes(Frontier since); 
 **Not done:**
 - Frontiers are a placeholder that only names a frontier; `ReadTime` holds only that frontier, without the time axis and meaning (they come with K8's `Query`). Why, and what K1 has to handle: [[Frontiers need more than one position per origin]].
 - Deferred review findings: collection nulls don't name their field; four types say only "Provisional."; the call kind in `Actions` is a string; the stub records actions outside its lock, so action order can differ from change order. The ordering one belongs to K3.
+- The contract is not yet reshaped around events ([[Events are the basic unit of khora]]): writes take a basic set, not a surface's own event, and `changes` yields values, not events. K4 merges as provisional, before K1 (#18), whose branch builds on it; the reshaping is a follow-up issue after K1. What K1 has to follow: [[Causes and reads for K1's events]].

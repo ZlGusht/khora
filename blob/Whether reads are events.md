@@ -9,7 +9,7 @@ relationships__in_context_of:
   - "[[Design]]"
 relationships__originates_in:
   - "[[Issue #21 Surface contract types]]"
-properties__lean: ""
+properties__lean: "Answered: reads are events, as actions done by someone."
 properties__author: agent:claude-opus-5-5
 ---
 If every read is an event, reads can outnumber writes and bound the log. Are reads events like any other, or traces kept only where a scope requires them?

@@ -6,7 +6,8 @@ import khora.kernel.event.EventId;
 /**
  * One change a surface reports.
  *
- * <p>Provisional: a value set on a target until changes carry effects (K1) and outcomes (K9).
+ * <p>Provisional: a value set on a target. Under [[Events are the basic unit of khora]] surfaces are
+ * connected by event streams, so a change becomes an event; this changes after K1 (#18).
  *
  * @param event the event behind the change
  * @param target what changed
