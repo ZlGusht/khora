@@ -3,9 +3,9 @@ package khora.kernel.surface;
 /**
  * A surface that reports its changes (ADR-0XY decision 1).
  *
- * <p>Provisional: {@code changes} takes no context, as in the ADR, so a feed has no principal and
- * access to it cannot be checked yet. The feed yields {@link Change}s, not yet
- * events ([[Events are the basic unit of khora]]).
+ * <p>Out with events: goes. Every surface has an event stream, read from a frontier with a context,
+ * so {@code changes} moves to {@link Surface} as the stream
+ * ([[Every surface has one event stream, read from a frontier]]).
  */
 public interface ChangingSurface extends Surface {
 

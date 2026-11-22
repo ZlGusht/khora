@@ -12,9 +12,9 @@ relationships__originates_in:
 relationships__decided_by:
   - "[[Simeon Petkov]]"
 properties__decided_on: 2026-11-19
-properties__status: "active"
-properties__kind: "design"
-properties__quote: "changes can be left out without context for now"
+properties__status: superseded
+properties__kind: design
+properties__quote: changes can be left out without context for now
 properties__author: agent:claude-opus-5-5
 ---
 ## Statement

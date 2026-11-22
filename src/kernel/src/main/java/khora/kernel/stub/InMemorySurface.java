@@ -31,6 +31,9 @@ import khora.kernel.surface.Writes;
  *
  * <p>It reports a new frontier after each applied write and recognises only frontiers it reported.
  * It keeps no history, so it answers only at its current frontier.
+ *
+ * <p>Out with events: the map of values and the change list go. The stub keeps events and works out
+ * values from them, and serves its event stream.
  */
 public final class InMemorySurface implements WritableSurface, ChangingSurface {
 

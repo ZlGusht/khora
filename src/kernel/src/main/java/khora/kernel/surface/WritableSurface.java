@@ -3,8 +3,8 @@ package khora.kernel.surface;
 /**
  * A surface that takes writes (ADR-0XY decisions 1, 7 and 8). Each write is one action.
  *
- * <p>Provisional: the write takes an {@link Operation}, not yet a surface's own event
- * ([[Events are the basic unit of khora]]).
+ * <p>Out with events: the interface stays, as writes stay optional. {@code write} takes a surface's
+ * own event in place of an {@link Operation} ([[Events are the basic unit of khora]]).
  */
 public interface WritableSurface extends Surface {
 

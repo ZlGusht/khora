@@ -5,7 +5,8 @@ import java.util.Objects;
 /**
  * The id of an event in the log.
  *
- * <p>Provisional: a placeholder. K1 (#18) replaces it with salted hashes of an event's canonical JSON.
+ * <p>Out with events: the placeholder constructor goes. K1 (#18) makes ids salted hashes of an
+ * event's canonical JSON.
  */
 public record EventId(String value) {
     public EventId {

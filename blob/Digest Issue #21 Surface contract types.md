@@ -22,7 +22,7 @@ Not done: the contract is not shaped around events. Writes take a basic set and 
 
 ## Findings
 
-- The run's main result is design, not code: [[Events are the basic unit of khora]], [[Reads are events]] and [[An event's causes are what it knew]]. They answer [[Which parts of an entity are reified and keep identity]] and [[Whether reads are events]].
+- The run's main result is design, not code: [[Events are the basic unit of khora]], [[Reads are events]] , [[An event's causes are what it knew]] and [[Every surface has one event stream, read from a frontier]]. They answer [[Which parts of an entity are reified and keep identity]] and [[Whether reads are events]].
 - The ADRs are not a reliable spec for the kernel. Where ADR-0XY was unclear (the read's time axis and meaning, what a frontier is), the types were cut back rather than guessed.
 - A single list of causes cannot carry knowledge, translation and triggering at once; each needs its own named link.
 
@@ -33,7 +33,11 @@ Not done: the contract is not shaped around events. Writes take a basic set and 
 
 ## Considerations
 
-- Create the proposed issue "The surface contract speaks events": `write` takes a surface's own event and records the basic events made from it, `changes()` yields events, `Change` and `Operation` go, and the stub keeps events and derives values. After K1 merges.
+- Create the proposed issue "The surface contract speaks events", after K1 merges. Everything it removes or replaces is marked "Out with events" in the Javadoc:
+  - `Surface` gains `events(since, context)`, the surface's event stream ([[Every surface has one event stream, read from a frontier]]); `ChangingSurface` and `Change` go, and `ChangeFeed` yields events.
+  - `write` takes a surface's own event, and each basic event made from it names it as its source; `Operation` and `Condition.expected` go.
+  - `Actions` loses its call-kind string, as each call is an event with its own definition.
+  - The stub keeps events and derives values from them.
 - An Update View run: this run's Decisions make `docs/adr/surfaces.md`, `docs/adr/runtime-and-executors.md` and `docs/implementation-plan.md` stale, and change ADR-0YA and ADR-0YB.
 - The milestone's gate speaks of "an outcome and effects", but K1 no longer has effect events. The gate may need restating.
 - Open: [[Frontiers need more than one position per origin]] (K1 covers the khora log only), [[What the basic event vocabulary contains]], [[How overlapping event vocabularies are aligned]], [[How translations between vocabulary versions are kept]].

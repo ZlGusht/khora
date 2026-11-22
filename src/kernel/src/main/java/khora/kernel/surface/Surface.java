@@ -5,6 +5,9 @@ package khora.kernel.surface;
  *
  * <p>Provisional. A surface that takes writes also implements {@link WritableSurface}; one that
  * reports changes implements {@link ChangingSurface}.
+ *
+ * <p>Out with events: gains the surface's event stream, read from a frontier with a context, in
+ * place of {@link ChangingSurface} ([[Every surface has one event stream, read from a frontier]]).
  */
 public interface Surface {
 

@@ -16,7 +16,8 @@ public interface Actions {
      * Records one action.
      *
      * @param context the call's context
-     * @param call which call it is: {@code "read"} or {@code "write"}
+     * @param call which call it is: {@code "read"} or {@code "write"}. Out with events: goes, as each
+ *     call is an event with its own definition
      * @return the action's id
      */
     EventId record(Context context, String call);

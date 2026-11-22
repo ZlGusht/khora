@@ -5,8 +5,8 @@ import java.util.Objects;
 /**
  * What a write asks to change.
  *
- * <p>Provisional: sets {@code target} to {@code value}. Under [[Events are the basic unit of khora]] a
- * write is a surface's own event, translated down into basic events; this changes after K1 (#18).
+ * <p>Out with events: goes. A write is a surface's own event, translated down into basic events
+ * ([[Events are the basic unit of khora]]).
  *
  * @param target what to change
  * @param value its new value

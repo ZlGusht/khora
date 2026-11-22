@@ -5,7 +5,9 @@ import java.util.Optional;
 /**
  * A live feed of a surface's changes, read on a virtual thread.
  *
- * <p>Provisional: {@code java.util.concurrent.Flow} can be adapted to it later.
+ * <p>Out with events: becomes the feed of a surface's event stream, yielding events. Its blocking
+ * {@code next} and {@code close} stay ([[Every surface has one event stream, read from a frontier]]).
+ * {@code java.util.concurrent.Flow} can be adapted to it later.
  */
 public interface ChangeFeed extends AutoCloseable {
 
