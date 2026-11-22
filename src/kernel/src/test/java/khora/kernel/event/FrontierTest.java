@@ -25,7 +25,7 @@ class FrontierTest {
 
     static Event event(long recorded, Event... causes) {
         return Event.create(java.util.Arrays.stream(causes).map(Event::id).toList(), recorded, Optional.empty(), BY,
-                Basic.entity());
+                Assertion.entity().toAction());
     }
 
     static Frontier heads(Event... events) {

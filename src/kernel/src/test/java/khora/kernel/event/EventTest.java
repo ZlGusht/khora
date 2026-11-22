@@ -20,13 +20,13 @@ class EventTest {
     static final EventId B = EventId.hashOf("b");
 
     static Event event(List<EventId> causes, String salt) {
-        return Event.create(causes, 1000, Optional.empty(), BY, Basic.entity(), salt);
+        return Event.create(causes, 1000, Optional.empty(), BY, Assertion.entity().toAction(), salt);
     }
 
     @Test
     void eventRoundTrips() {
         var e = Event.create(List.of(A, B), 1000, Optional.of(900L),
-                new By("anna", Optional.of("ivan"), "g3", "projects"), Basic.entity(), SALT);
+                new By("anna", Optional.of("ivan"), "g3", "projects"), Assertion.entity().toAction(), SALT);
         var back = EventJson.read(EventJson.write(e));
         assertEquals(e, back);
         assertEquals(e.id(), back.id());
@@ -50,8 +50,8 @@ class EventTest {
 
     @Test
     void sameContentGetsDifferentIdsWithDifferentSalts() {
-        var one = Event.create(List.of(), 1000, Optional.empty(), BY, Basic.entity());
-        var two = Event.create(List.of(), 1000, Optional.empty(), BY, Basic.entity());
+        var one = Event.create(List.of(), 1000, Optional.empty(), BY, Assertion.entity().toAction());
+        var two = Event.create(List.of(), 1000, Optional.empty(), BY, Assertion.entity().toAction());
         assertNotEquals(one.id(), two.id());
         assertTrue(one.salt().matches("[0-9a-f]{32}"));
     }

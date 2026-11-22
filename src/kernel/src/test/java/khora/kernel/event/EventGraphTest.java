@@ -13,7 +13,7 @@ class EventGraphTest {
     static final By BY = new By("anna", Optional.empty(), "g3", "projects");
 
     static Event event(long recorded, EventId... causes) {
-        return Event.create(List.of(causes), recorded, Optional.empty(), BY, Basic.entity());
+        return Event.create(List.of(causes), recorded, Optional.empty(), BY, Assertion.entity().toAction());
     }
 
     @Test

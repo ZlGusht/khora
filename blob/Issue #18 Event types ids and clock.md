@@ -37,6 +37,7 @@ Issue #18 (plan task K1) of [[Milestone Stage 1 kernel core]]: the four event ty
 - [[An event is an accepted action, and an assert is the basic action]]
 - [[An assert's id is the identity of what it asserts]]
 - [[Event ids are salted hashes of canonical JSON]]
+- [[Assertions are tuples with identity]]
 
 Taken in from the Issue #21 run: [[Events are the basic unit of khora]] (a frontier is the set of events a surface has taken in, closed under causes; K1 decides the basic vocabulary).
 
@@ -46,7 +47,7 @@ Types are provisional ([[Kernel types taken from ADRs are provisional]]); unions
 
 - **Event:** `id, causes, recorded, occurred?, by { principal, on_behalf_of?, grant, via }, salt, action`. `causes` are the heads of what the action read.
 - **Action:** `{ definition, args }`. `definition` is the id of the action's definition, which says its vocabulary and version. The basic vocabulary has one action, `assert`, with a fixed well-known id the kernel ships; a reserved `retracted` attribute marks retraction. Other definitions are opaque to the kernel for now.
-- **Assert shapes (provisional):** an entity; a property of an entity; a relationship between entities, with its relator; a behavior bound to an entity. The assert's id is the identity of the asserted thing.
+- **Assertions:** one assert action carries one tuple `(identity?, attribute?, value?)`, so the event's id is the assertion's identity. `(,,)` instantiates an entity. A value is a literal (string or integer) or a reference to an identity, and says which. Attributes are identities; `retracted` and `label` are well-known ones. Which partial tuples mean what is left open.
 - **Id:** `sha256:<hex>` of the event's canonical JSON (RFC 8785) without the id itself. Values are strings, integers and ids.
 - **Clock:** a hybrid logical clock: wall milliseconds and a counter packed into one long. `now()` never goes backwards; `after(causes)` is later than every cause.
 - **Frontier:** a set of head event ids, standing for the heads and all their causes. Operations: compare (before, after, equal, concurrent), combine (union, reduced to heads), and a closure check against an event graph that refuses a frontier whose events or causes are unknown. Replaces K4's `Frontier` placeholder; the event id replaces K4's `EventId` placeholder.
