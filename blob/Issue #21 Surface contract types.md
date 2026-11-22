@@ -10,11 +10,12 @@ relationships__in_process:
   - "[[Milestone Stage 1 kernel core]]"
 relationships__in_context_of:
   - "[[Surfaces]]"
-properties__status: open
+properties__status: closed
 properties__started_at: 2026-11-19
-properties__current_phase: Observe
+properties__current_phase: Process(v)
 properties__issue: 21
 properties__author: agent:claude-opus-5-5
+properties__ended_at: 2026-11-22
 ---
 Issue #21 (plan task K4) of [[Milestone Stage 1 kernel core]]: the surface contract, its declaration and its context as Java types. Opened with [[Simeon Petkov]].
 
