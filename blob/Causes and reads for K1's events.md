@@ -13,7 +13,7 @@ relationships__relates_to:
   - "[[Reads are events]]"
 properties__type: task
 properties__priority: 2
-properties__resolved: false
+properties__resolved: true
 properties__author: agent:claude-opus-5-5
 ---
 ## Context
@@ -26,3 +26,5 @@ The Issue #21 run (K4) reviewed PR #36 and agreed two Decisions with [[Simeon Pe
 - **Reads:** a read is an accepted action with a basic read definition. `Basic` has only `assert` so far.
 - **Task 6, frontier equality:** the plan has the stub surface compare frontiers by equality, but `Frontier`'s constructor does not reduce to heads. `{a, b}` where `a` caused `b` and `{b}` are the same set but unequal, so a valid write would be rejected as stale. Compare with `FrontierCheck.compare`, or reduce in the constructor.
 - **Identity:** a bare `sha256:…` is both a well-known name and an event id; nothing says which.
+
+Resolved in the Process(v) of [[Issue #18 Event types ids and clock]]: causes now mean what an event knew, in `Event`'s Javadoc; `Basic.READ` exists, though a read's arguments and named links do not ([[Reads, translations and reactions have no named links yet]]); the stub keeps frontier equality by ruling, flagged in [[The stub surface's frontiers are not real frontiers]]; the identity ambiguity is [[Named identities and event ids share one form]].

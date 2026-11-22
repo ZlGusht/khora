@@ -11,11 +11,12 @@ relationships__in_process:
 relationships__in_context_of:
   - "[[Log]]"
   - "[[Runtime]]"
-properties__status: open
+properties__status: closed
 properties__started_at: 2026-11-19
-properties__current_phase: Observe
+properties__current_phase: Process(v)
 properties__issue: 18
 properties__author: agent:claude-opus-5-5
+properties__ended_at: 2026-11-22
 ---
 Issue #18 (plan task K1) of [[Milestone Stage 1 kernel core]]: the four event types, their content-hash ids and the hybrid logical clock, in Java. Opened with [[Simeon Petkov]]. It runs in parallel with [[Issue #21 Surface contract types]].
 
