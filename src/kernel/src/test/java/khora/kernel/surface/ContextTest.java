@@ -32,8 +32,10 @@ class ContextTest {
     }
 
     @Test
-    void blankEventIdIsRefused() {
-        assertThrows(IllegalArgumentException.class, () -> new EventId(" "));
+    void malformedEventIdIsRefused() {
+        for (var value : new String[] {" ", "a1", "sha256:XYZ", EventId.hashOf("x").value() + "/0"}) {
+            assertThrows(IllegalArgumentException.class, () -> new EventId(value), value);
+        }
     }
 
     @Test

@@ -11,5 +11,6 @@ class BasicTest {
         assertEquals(Identity.named("khora/basic/assert"), Basic.ASSERT);
         assertEquals(Identity.named("khora/basic/retracted"), Basic.RETRACTED);
         assertEquals(Identity.named("khora/basic/label"), Basic.LABEL);
+        assertEquals(Identity.named("khora/basic/read"), Basic.READ);
     }
 }

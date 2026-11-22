@@ -7,17 +7,17 @@ import java.util.HexFormat;
 import java.util.Objects;
 
 /**
- * The id of an event in the log, and of whatever an assert asserts.
+ * The id of an event: {@code sha256:} and the SHA-256 of the event's canonical JSON
+ * ([[Event ids are salted hashes of canonical JSON]]).
  *
- * <p>Provisional: a placeholder until K1 (#18) defines event ids as content hashes over their causes.
- * {@link #hashOf} already makes K1's ids; the constructor starts refusing other values when the
- * placeholder is replaced.
+ * <p>Provisional: the hash function is fixed until interoperability chooses an identity scheme
+ * (ADR-0XZ decision 21).
  */
 public record EventId(String value) implements Comparable<EventId> {
     public EventId {
         Objects.requireNonNull(value, "value");
-        if (value.isBlank()) {
-            throw new IllegalArgumentException("value is blank");
+        if (!value.matches("sha256:[0-9a-f]{64}")) {
+            throw new IllegalArgumentException("not an event id: " + value);
         }
     }
 

@@ -1,5 +1,7 @@
 package khora.kernel.stub;
 
+import khora.kernel.TestIds;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -16,7 +18,7 @@ import khora.kernel.surface.Completeness;
 import khora.kernel.surface.Condition;
 import khora.kernel.surface.Context;
 import khora.kernel.surface.Effects;
-import khora.kernel.surface.Frontier;
+import khora.kernel.event.Frontier;
 import khora.kernel.surface.Grant;
 import khora.kernel.surface.History;
 import khora.kernel.surface.Operation;
@@ -40,7 +42,7 @@ class InMemorySurfaceTest {
         @Override
         public synchronized EventId record(Context context, String call) {
             calls.add(call);
-            var id = new EventId("a" + (ids.size() + 1));
+            var id = TestIds.id(ids.size() + 1);
             ids.add(id);
             return id;
         }
@@ -126,7 +128,7 @@ class InMemorySurfaceTest {
 
     @Test
     void readAtUnknownFrontierIsPartial() {
-        var result = surface.read(readAt("x", new Frontier("somewhere else")), CONTEXT);
+        var result = surface.read(readAt("x", TestIds.frontier(999)), CONTEXT);
 
         assertInstanceOf(Completeness.Partial.class, result.completeness());
     }
@@ -177,7 +179,7 @@ class InMemorySurfaceTest {
 
     @Test
     void nullActionIdLeavesSurfaceUnchanged() {
-        Actions nullForWrites = (context, call) -> call.equals("write") ? null : new EventId("r");
+        Actions nullForWrites = (context, call) -> call.equals("write") ? null : TestIds.id(0);
         var broken = new InMemorySurface(nullForWrites);
         var before = asRead(broken, "x");
 

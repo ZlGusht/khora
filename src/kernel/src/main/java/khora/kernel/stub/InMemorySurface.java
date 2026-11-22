@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.locks.ReentrantLock;
 import khora.kernel.surface.Actions;
 import khora.kernel.surface.Change;
@@ -16,7 +18,7 @@ import khora.kernel.surface.Condition;
 import khora.kernel.surface.Context;
 import khora.kernel.surface.Declaration;
 import khora.kernel.surface.Effects;
-import khora.kernel.surface.Frontier;
+import khora.kernel.event.Frontier;
 import khora.kernel.surface.History;
 import khora.kernel.surface.Operation;
 import khora.kernel.surface.ReadRequest;
@@ -29,7 +31,8 @@ import khora.kernel.surface.Writes;
 /**
  * A stub surface that holds values in memory, for tests and for building against the contract.
  *
- * <p>It reports a new frontier after each applied write and recognises only frontiers it reported.
+ * <p>It reports a new frontier after each applied write, made of that write's action, and recognises
+ * only frontiers it reported, by equality.
  * It keeps no history, so it answers only at its current frontier.
  *
  * <p>Out with events: the map of values and the change list go. The stub keeps events and works out
@@ -46,7 +49,7 @@ public final class InMemorySurface implements WritableSurface, ChangingSurface {
     private final List<Change> changes = new ArrayList<>();
     private final Map<String, String> values = new HashMap<>();
     /** Every frontier the stub reported, in order: the one after n changes is at index n. */
-    private final List<Frontier> frontiers = new ArrayList<>(List.of(new Frontier("stub:0")));
+    private final List<Frontier> frontiers = new ArrayList<>(List.of(Frontier.empty()));
     private Frontier frontier = frontiers.getFirst();
 
     public InMemorySurface(Actions actions) {
@@ -93,7 +96,7 @@ public final class InMemorySurface implements WritableSurface, ChangingSurface {
                 return new WriteAnswer.Rejected(action, "the value differs from the one the write expected");
             }
             values.put(operation.target(), operation.value());
-            frontier = new Frontier("stub:" + frontiers.size());
+            frontier = new Frontier(new TreeSet<>(Set.of(action)));
             frontiers.add(frontier);
             changes.add(new Change(action, operation.target(), operation.value(), frontier));
             changed.signalAll();
@@ -110,7 +113,7 @@ public final class InMemorySurface implements WritableSurface, ChangingSurface {
         try {
             int position = frontiers.indexOf(since);
             if (position < 0) {
-                throw new IllegalArgumentException("not a frontier this surface reported: " + since.value());
+                throw new IllegalArgumentException("not a frontier this surface reported: " + since.heads());
             }
             return new Feed(position);
         } finally {

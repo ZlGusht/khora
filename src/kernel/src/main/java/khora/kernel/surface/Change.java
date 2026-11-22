@@ -1,5 +1,6 @@
 package khora.kernel.surface;
 
+import khora.kernel.event.Frontier;
 import java.util.Objects;
 import khora.kernel.event.EventId;
 

@@ -1,5 +1,7 @@
 package khora.kernel.surface;
 
+import khora.kernel.event.Frontier;
+
 /**
  * A surface that reports its changes (ADR-0XY decision 1).
  *

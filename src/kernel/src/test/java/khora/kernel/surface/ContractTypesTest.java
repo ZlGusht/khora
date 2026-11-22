@@ -1,5 +1,7 @@
 package khora.kernel.surface;
 
+import khora.kernel.TestIds;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -27,7 +29,7 @@ class ContractTypesTest {
 
     @Test
     void writeAnswerSwitchCoversBothCases() {
-        var action = new EventId("a1");
+        var action = TestIds.id(1);
         assertEquals("unconfirmed", describe(new WriteAnswer.Unconfirmed(action)));
         assertEquals("rejected", describe(new WriteAnswer.Rejected(action, "stale")));
     }
@@ -49,8 +51,8 @@ class ContractTypesTest {
     void resultAnnotationsAreCopied() {
         var annotations = new ArrayList<Annotation>();
         annotations.add(new Annotation("as observed at 10:42"));
-        var result = new Result(new EventId("a1"), Optional.empty(), new Completeness.Complete(),
-                new Frontier("f1"), annotations);
+        var result = new Result(TestIds.id(1), Optional.empty(), new Completeness.Complete(),
+                TestIds.frontier(1), annotations);
 
         annotations.add(new Annotation("not reproducible"));
 

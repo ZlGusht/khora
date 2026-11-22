@@ -41,13 +41,13 @@ Issue #18 (plan task K1) of [[Milestone Stage 1 kernel core]]: the four event ty
 - [[Event ids are salted hashes of canonical JSON]]
 - [[Assertions are tuples with identity]]
 
-Taken in from the Issue #21 run: [[Events are the basic unit of khora]] (a frontier is the set of events a surface has taken in, closed under causes; K1 decides the basic vocabulary).
+Taken in from the Issue #21 run: [[An event's causes are what it knew]], [[Reads are events]] (a read is an accepted action with the basic `read` definition; its named links are not defined yet), and [[Events are the basic unit of khora]] (a frontier is the set of events a surface has taken in, closed under causes; K1 decides the basic vocabulary).
 
 ## Design
 
 Types are provisional ([[Kernel types taken from ADRs are provisional]]); unions are sealed interfaces with records ([[Contract unions are sealed interfaces with records]]).
 
-- **Event:** an envelope `id, causes, recorded, occurred?, salt, body`. A body is one kind of event; for now the only kind is an accepted action, `{ by { principal, on_behalf_of?, grant, via }, action }`. `causes` are the events it was caused by: for an accepted action, the heads of what it read.
+- **Event:** an envelope `id, causes, recorded, occurred?, salt, body`. A body is one kind of event; for now the only kind is an accepted action, `{ by { principal, on_behalf_of?, grant, via }, action }`. `causes` are the events it happened after and knew of, and nothing else; what it read, translated or reacted to are named links in its body ([[An event's causes are what it knew]]).
 - **Action:** `{ definition, args }`. `definition` is the id of the action's definition, which says its vocabulary and version. The basic vocabulary has one action, `assert`, with a fixed well-known id the kernel ships; a reserved `retracted` attribute marks retraction. Other definitions are opaque to the kernel for now.
 - **Assertions:** an assert action carries one or more tuples `(identity?, attribute?, value?)`, appended together. Each is identified by `<event id>/<index>`. `(,,)` instantiates an entity. A value is a literal (string or integer) or a reference to an identity, and says which. Attributes are identities; `retracted` and `label` are well-known ones. Which partial tuples mean what is left open.
 - **Id:** `sha256:<hex>` of the event's canonical JSON (RFC 8785) without the id itself. Values are strings, integers and ids.

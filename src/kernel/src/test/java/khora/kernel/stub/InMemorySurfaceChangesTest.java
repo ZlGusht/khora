@@ -1,5 +1,7 @@
 package khora.kernel.stub;
 
+import khora.kernel.TestIds;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -9,7 +11,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import khora.kernel.surface.Change;
 import khora.kernel.surface.ChangeFeed;
-import khora.kernel.surface.Frontier;
+import khora.kernel.event.Frontier;
 import khora.kernel.surface.Operation;
 import khora.kernel.surface.WriteAnswer;
 import org.junit.jupiter.api.BeforeEach;
@@ -81,7 +83,7 @@ class InMemorySurfaceChangesTest {
 
     @Test
     void unknownSinceIsRefused() {
-        assertThrows(IllegalArgumentException.class, () -> surface.changes(new Frontier("somewhere else")));
+        assertThrows(IllegalArgumentException.class, () -> surface.changes(TestIds.frontier(999)));
     }
 
     @Test

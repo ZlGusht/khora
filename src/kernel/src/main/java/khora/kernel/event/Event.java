@@ -20,7 +20,9 @@ import java.util.TreeSet;
  * <p>Provisional: the fields follow the Issue #18 design and may change during execution.
  *
  * @param id the hash of everything else
- * @param causes the events this one was caused by: for an accepted action, the heads of what it read
+ * @param causes the events this one happened after and knew of, and nothing else
+ *     ([[An event's causes are what it knew]]); what it read, translated or reacted to are named
+ *     links in its body, not causes
  * @param recorded the hybrid logical clock time it was recorded at ({@link Hlc})
  * @param occurred when it happened, in milliseconds, if earlier than recorded
  * @param salt 16 random bytes as 32 lowercase hex digits, so the id cannot be guessed from content
