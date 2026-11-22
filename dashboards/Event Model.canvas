@@ -5,9 +5,9 @@
 			"x": 720,
 			"y": 0,
 			"width": 1200,
-			"height": 189,
+			"height": 213,
 			"type": "text",
-			"text": "## Event Model\nWhat khora's events mean: identity from what happened, structure from assertions, coherence from frontiers. From K1 (#18, PR #36).\n\nColours: orange = header and Reading, purple = concepts, green = the example, red = not yet decided, none = Decisions.\n\nRendered 2026-11-22 by agent:claude-opus-5-5",
+			"text": "## Event Model\nWhat khora's events mean: identity from what happened, structure from assertions, coherence from frontiers. From K1 (#18, PR #36).\n\nColours: orange = header and Reading, purple = concepts, green = examples, red = not yet decided or a conflict, none = Decisions. *Suggestion* marks proposals not yet decided.\n\nRendered 2026-11-22 by agent:claude-opus-5-5",
 			"color": "2"
 		},
 		{
@@ -15,212 +15,309 @@
 			"type": "group",
 			"label": "The three ideas",
 			"x": 720,
-			"y": 309,
+			"y": 333,
 			"width": 1240,
-			"height": 352
+			"height": 304
 		},
 		{
 			"id": "g-14cee7c940bfd9",
 			"x": 760,
-			"y": 379,
+			"y": 403,
 			"width": 360,
-			"height": 218,
+			"height": 194,
 			"type": "text",
-			"text": "**Things are identified by what happened to them**\nNo one decides in advance what deserves identity. Whatever was asserted has it already, so anything can be referred to, annotated or reasoned about later.\n*[[Events are the basic unit of khora]]*",
+			"text": "**Things are identified by what happened to them**\nWhatever was asserted already has identity, so anything can be referred to, annotated or reasoned about later.\n*[[Events are the basic unit of khora]]*",
 			"color": "6"
 		},
 		{
 			"id": "g-82aba7f0373abb",
 			"x": 1160,
-			"y": 379,
+			"y": 403,
 			"width": 360,
-			"height": 242,
+			"height": 194,
 			"type": "text",
-			"text": "**One syntax gives structure, meaning stays open**\nEvery statement is a tuple (identity, attribute, value). Entities, properties, relationships and retractions share it, so surfaces treat them alike. What a tuple means comes from its attribute.\n*[[Assertions are tuples with identity]]*",
+			"text": "**One syntax gives structure, meaning stays open**\nEvery statement is a tuple (identity, attribute, value); its attribute says what it means.\n*[[Assertions are tuples with identity]]*",
 			"color": "6"
 		},
 		{
 			"id": "g-12575bc4bf13d5",
 			"x": 1560,
-			"y": 379,
+			"y": 403,
 			"width": 360,
-			"height": 218,
+			"height": 194,
 			"type": "text",
-			"text": "**Surfaces agree by reading at the same frontier**\nA frontier is a set of events, closed under their causes. Two surfaces built on the same events show consistent views when they read at the same frontier.\n*[[Events are the basic unit of khora]]*",
+			"text": "**Surfaces agree by reading at the same frontier**\nA frontier is a set of events closed under their causes. Only the events relevant to a read belong in its frontier.\n*[[Events are the basic unit of khora]]*",
+			"color": "6"
+		},
+		{
+			"id": "g-d20e055662edd2",
+			"type": "group",
+			"label": "What an event is",
+			"x": 720,
+			"y": 757,
+			"width": 1320,
+			"height": 918
+		},
+		{
+			"id": "g-45844101ff61f8",
+			"x": 1000,
+			"y": 827,
+			"width": 360,
+			"height": 146,
+			"type": "text",
+			"text": "**Accepted action**\nA principal asked; khora accepted. Who acted and what they did.\n*In code: `AcceptedAction { by, action }`.*",
+			"color": "6"
+		},
+		{
+			"id": "g-aeef32a5e6f8c1",
+			"x": 1400,
+			"y": 827,
+			"width": 360,
+			"height": 98,
+			"type": "text",
+			"text": "**Other kinds of event**\nNot decided yet.",
+			"color": "1"
+		},
+		{
+			"id": "g-a0cc27560c3992",
+			"x": 1000,
+			"y": 1465,
+			"width": 360,
+			"height": 170,
+			"type": "text",
+			"text": "**Event id**\nA salted hash: tamper-evident, and the newest events commit to a whole history. The salt keeps content private.\n*In code: `EventId`, canonical `Json`.*",
+			"color": "6"
+		},
+		{
+			"id": "g-772ff2b9e8ebf9",
+			"x": 1400,
+			"y": 1465,
+			"width": 360,
+			"height": 170,
+			"type": "text",
+			"text": "**Frontier**\nA set of events with all their causes, named by its newest ones. The point a read happens at.\n*In code: `Frontier`, `FrontierCheck`.*",
+			"color": "6"
+		},
+		{
+			"id": "g-69418d9006b811",
+			"x": 760,
+			"y": 1053,
+			"width": 360,
+			"height": 146,
+			"type": "text",
+			"text": "**Cause**\nWhat an event came from. For an action: what it read. Gives \"how did this come to be\".\n*In code: `causes`.*",
+			"color": "6"
+		},
+		{
+			"id": "g-9f8ca76fda0499",
+			"x": 760,
+			"y": 1239,
+			"width": 360,
+			"height": 146,
+			"type": "text",
+			"text": "**Recorded time**\nClose to wall time, never backwards, after the causes.\n*In code: `Hlc`.*",
+			"color": "6"
+		},
+		{
+			"id": "g-a672491fc8eec0",
+			"x": 1200,
+			"y": 1134,
+			"width": 360,
+			"height": 170,
+			"type": "text",
+			"text": "**Event**\nSomething that happened, kept forever with what caused it.\n*In code: `Event`, an envelope around a `Body`.*",
+			"color": "6"
+		},
+		{
+			"id": "g-d3eca79dfaf8e4",
+			"x": 1640,
+			"y": 1146,
+			"width": 360,
+			"height": 146,
+			"type": "text",
+			"text": "**Assertions it carries**\nAn accepted assert carries one or more statements, appended together or not at all.\n*In code: `Assertion`.*",
+			"color": "6"
+		},
+		{
+			"id": "g-5edb8f947937c8",
+			"type": "group",
+			"label": "What an assertion says",
+			"x": 2160,
+			"y": 757,
+			"width": 1320,
+			"height": 780
+		},
+		{
+			"id": "g-e6a595708eb197",
+			"x": 2640,
+			"y": 827,
+			"width": 360,
+			"height": 194,
+			"type": "text",
+			"text": "**Attribute**\nA thing with identity. It carries the meaning: does a new value replace or add, what type. Definitions not built yet.\n*Well-known: `label`, `retracted` in `Basic`.*",
+			"color": "6"
+		},
+		{
+			"id": "g-3a4eb8bc8248f3",
+			"x": 2640,
+			"y": 1351,
+			"width": 360,
+			"height": 146,
+			"type": "text",
+			"text": "**Statements about statements**\nA tuple's identity can be the identity of another tuple: a retraction, a confidence, a source, \"since 2024\".",
+			"color": "6"
+		},
+		{
+			"id": "g-75f24120240691",
+			"x": 2200,
+			"y": 1101,
+			"width": 360,
+			"height": 170,
+			"type": "text",
+			"text": "**Identity**\nThe thing the statement is about, itself the identity of an earlier assertion. No ids are invented.\n*In code: `Identity`.*",
+			"color": "6"
+		},
+		{
+			"id": "g-68c846b5539955",
+			"x": 2640,
+			"y": 1113,
+			"width": 360,
+			"height": 146,
+			"type": "text",
+			"text": "**Assertion `(identity, attribute, value)`**\nOne statement. It has identity of its own: `e/n`, its event and its place in it.\n`(,,)` brings a new thing into being.",
+			"color": "6"
+		},
+		{
+			"id": "g-82882999890d27",
+			"x": 3080,
+			"y": 1101,
+			"width": 360,
+			"height": 170,
+			"type": "text",
+			"text": "**Value**\nA literal (text or number), or a reference to another thing's identity, which makes the statement a relationship.\n*In code: `Literal`, `Ref`.*",
 			"color": "6"
 		},
 		{
 			"id": "g-9aff7572a798db",
 			"type": "group",
-			"label": "Example: Anna creates a project, Ivan renames it",
+			"label": "Example 1: Anna creates a project, Ivan renames it",
 			"x": 720,
-			"y": 781,
-			"width": 2040,
-			"height": 304,
-			"color": "4"
+			"y": 1795,
+			"width": 1640,
+			"height": 280
 		},
 		{
 			"id": "g-23d7731727cd53",
 			"x": 760,
-			"y": 851,
+			"y": 1865,
 			"width": 360,
-			"height": 170,
+			"height": 146,
 			"type": "text",
-			"text": "**1. Anna acts**\nAnna, under her grant, through the projects surface, asks to create a project called Kitchen.\nIt is a request, not yet a fact.",
+			"text": "**Anna acts**\nUnder her grant, through the projects surface, she asks to create a project called Kitchen. A request, not yet a fact.",
 			"color": "4"
 		},
 		{
 			"id": "g-a4f27dbad2bc3e",
 			"x": 1160,
-			"y": 851,
+			"y": 1865,
 			"width": 360,
 			"height": 170,
 			"type": "text",
-			"text": "**2. khora accepts: event e**\nThe accepted action becomes event **e**, carrying two tuples:\n`e/0 = (,,)`: a new thing\n`e/1 = (e/0, name, \"Kitchen\")`",
-			"color": "4"
-		},
-		{
-			"id": "g-944907db7c41da",
-			"x": 1560,
-			"y": 851,
-			"width": 360,
-			"height": 170,
-			"type": "text",
-			"text": "**3. Identities come from e**\nThe project *is* `e/0`.\nIts name, as a statement, is `e/1`, so it can be annotated or retracted later.\nNo id was invented.",
+			"text": "**Event e**\n`e/0 = (,,)`: the project\n`e/1 = (e/0, name, \"Kitchen\")`\nThe project *is* `e/0`; its name, as a statement, is `e/1`.",
 			"color": "4"
 		},
 		{
 			"id": "g-70174dfa2514f5",
-			"x": 1960,
-			"y": 851,
+			"x": 1560,
+			"y": 1865,
 			"width": 360,
-			"height": 170,
+			"height": 146,
 			"type": "text",
-			"text": "**4. Ivan renames: event f, caused by e**\nIvan read the project at frontier {e}.\n`f/0 = (e/1, retracted, \"true\")`\n`f/1 = (e/0, name, \"Studio\")`\nBoth land together, or neither.",
+			"text": "**Event f**, caused by e\nIvan read the project at {e}.\n`f/0 = (e/1, retracted, \"true\")`\n`f/1 = (e/0, name, \"Studio\")`",
 			"color": "4"
 		},
 		{
 			"id": "g-1f50d02c7a90be",
-			"x": 2360,
-			"y": 851,
+			"x": 1960,
+			"y": 1865,
 			"width": 360,
-			"height": 194,
+			"height": 146,
 			"type": "text",
-			"text": "**5. Surfaces read at frontiers**\nAt {e}: Kitchen. At {f}: Studio.\nA surface that has only taken in {e} answers for {e}, or waits.\nHistory shows who renamed it, and why it is Studio.",
+			"text": "**Reads**\nAt {e}: Kitchen. At {f}: Studio.\nThe history shows who renamed it and from what.",
 			"color": "4"
 		},
 		{
-			"id": "g-c1aa49132f5078",
+			"id": "g-8ddbe42ed355fe",
 			"type": "group",
-			"label": "Concepts: meaning first, code second",
+			"label": "Example 2: threads that do not touch each other",
 			"x": 720,
-			"y": 1205,
-			"width": 1240,
-			"height": 796
+			"y": 2195,
+			"width": 2040,
+			"height": 304
 		},
 		{
-			"id": "g-a672491fc8eec0",
+			"id": "g-5094f65201789d",
 			"x": 760,
-			"y": 1275,
+			"y": 2265,
 			"width": 360,
-			"height": 194,
+			"height": 146,
 			"type": "text",
-			"text": "**Event**: something that happened, kept forever with what caused it.\nWhy: the log holds only events; identity and history come from them.\n*In code: `Event`, an envelope around a `Body`.*",
-			"color": "6"
+			"text": "**Event g**: Bob issues an invoice\nAnother thread. It read nothing about the project, so it has no cause in common with f or h.",
+			"color": "4"
 		},
 		{
-			"id": "g-45844101ff61f8",
+			"id": "g-48a534e676a8fb",
 			"x": 1160,
-			"y": 1275,
+			"y": 2265,
 			"width": 360,
-			"height": 194,
+			"height": 80,
 			"type": "text",
-			"text": "**Accepted action**: one kind of event. A principal asked, khora accepted.\nWhy: a request already says what should be true; no separate outcome or effect is needed.\n*In code: `AcceptedAction { by, action }`.*",
-			"color": "6"
+			"text": "**Event e**: the project and its name",
+			"color": "4"
 		},
 		{
-			"id": "g-d3eca79dfaf8e4",
+			"id": "g-f0aeb192e4a56a",
 			"x": 1560,
-			"y": 1275,
+			"y": 2265,
+			"width": 360,
+			"height": 98,
+			"type": "text",
+			"text": "**Event f**: Ivan renames to Studio\nCauses: {e}, only what he read.",
+			"color": "4"
+		},
+		{
+			"id": "g-28b8719800bbe1",
+			"x": 1960,
+			"y": 2265,
+			"width": 360,
+			"height": 146,
+			"type": "text",
+			"text": "**Event h**: Mia renames to Atelier\nCauses: {e}. Concurrent with f, and about the same `(e/0, name)`: **a conflict**, for the attribute's merge rule.",
+			"color": "1"
+		},
+		{
+			"id": "g-44aa073b3e6afd",
+			"x": 2360,
+			"y": 2265,
 			"width": 360,
 			"height": 194,
 			"type": "text",
-			"text": "**Assertion**: a statement (identity, attribute, value). `(,,)` brings a new thing into being.\nWhy: one shape for every kind of statement.\n*In code: `Assertion`; an assert carries several.*",
-			"color": "6"
-		},
-		{
-			"id": "g-75f24120240691",
-			"x": 760,
-			"y": 1509,
-			"width": 360,
-			"height": 218,
-			"type": "text",
-			"text": "**Identity**: what a statement or a thing is known by: its event and its place in it, `e/n`.\nWhy: identity without coordination or naming.\n*In code: `Identity`; well-known ones in `Basic`.*",
-			"color": "6"
-		},
-		{
-			"id": "g-e6a595708eb197",
-			"x": 1160,
-			"y": 1509,
-			"width": 360,
-			"height": 194,
-			"type": "text",
-			"text": "**Attribute**: itself a thing with identity. It carries the meaning of the tuples that use it: whether a new value replaces or adds, and its type.\n*In code: an `Identity`; definitions are not built yet.*",
-			"color": "6"
-		},
-		{
-			"id": "g-69418d9006b811",
-			"x": 1560,
-			"y": 1509,
-			"width": 360,
-			"height": 170,
-			"type": "text",
-			"text": "**Cause**: what an event came from. For an action, what its principal had read.\nWhy: \"how did this come to be\" (PRD provenance) and the order between events.\n*In code: `causes`; refused when missing.*",
-			"color": "6"
-		},
-		{
-			"id": "g-772ff2b9e8ebf9",
-			"x": 760,
-			"y": 1767,
-			"width": 360,
-			"height": 194,
-			"type": "text",
-			"text": "**Frontier**: a set of events with all their causes, named by its newest events.\nWhy: the point a read happens at, and what surfaces agree on. Two frontiers can be concurrent.\n*In code: `Frontier`, `FrontierCheck`.*",
-			"color": "6"
-		},
-		{
-			"id": "g-a0cc27560c3992",
-			"x": 1160,
-			"y": 1767,
-			"width": 360,
-			"height": 194,
-			"type": "text",
-			"text": "**Event id**: a salted hash of the event.\nWhy: tamper-evident, and newest events commit to a whole history, which matters between khoras. The salt stops anyone guessing content from an id.\n*In code: `EventId`, canonical `Json`.*",
-			"color": "6"
-		},
-		{
-			"id": "g-9f8ca76fda0499",
-			"x": 1560,
-			"y": 1767,
-			"width": 360,
-			"height": 170,
-			"type": "text",
-			"text": "**Recorded time**: close to wall time, never backwards, always after the causes.\nWhy: past reads \"as of 3 pm\", and order across writers later; little use yet.\n*In code: `Hlc`.*",
-			"color": "6"
+			"text": "**What g does to reads**\nNothing. A read of the project at {e} or {f} needs only those events. g is concurrent with f, but touches nothing f read, so it is not a conflict.\n*Suggestion*",
+			"color": "4"
 		},
 		{
 			"id": "g-411c155cb6606e",
 			"type": "group",
 			"label": "Decisions it rests on",
 			"x": 720,
-			"y": 2121,
+			"y": 2619,
 			"width": 840,
 			"height": 556
 		},
 		{
 			"id": "g-533a898ae41fdb",
 			"x": 760,
-			"y": 2191,
+			"y": 2689,
 			"width": 360,
 			"height": 122,
 			"type": "text",
@@ -229,7 +326,7 @@
 		{
 			"id": "g-1d4f031a1fa928",
 			"x": 1160,
-			"y": 2191,
+			"y": 2689,
 			"width": 360,
 			"height": 98,
 			"type": "text",
@@ -238,7 +335,7 @@
 		{
 			"id": "g-c7f1e3a8119e81",
 			"x": 760,
-			"y": 2353,
+			"y": 2851,
 			"width": 360,
 			"height": 98,
 			"type": "text",
@@ -247,7 +344,7 @@
 		{
 			"id": "g-2b441e8b0741c5",
 			"x": 1160,
-			"y": 2353,
+			"y": 2851,
 			"width": 360,
 			"height": 122,
 			"type": "text",
@@ -256,7 +353,7 @@
 		{
 			"id": "g-2216eff4c331d7",
 			"x": 760,
-			"y": 2515,
+			"y": 3013,
 			"width": 360,
 			"height": 122,
 			"type": "text",
@@ -265,7 +362,7 @@
 		{
 			"id": "g-2cda1b0c2c1d78",
 			"x": 1160,
-			"y": 2515,
+			"y": 3013,
 			"width": 360,
 			"height": 98,
 			"type": "text",
@@ -274,21 +371,21 @@
 		{
 			"id": "g-c33964c4314ac4",
 			"x": 1680,
-			"y": 2121,
+			"y": 2619,
 			"width": 360,
-			"height": 218,
+			"height": 194,
 			"type": "text",
-			"text": "**Reading · 2026-11-22**\n- The model is built and tested in K1; nothing reads assertions yet. The meaning pays off once a surface does (K6, B2).\n- Attributes carry meaning, but attribute definitions do not exist yet, so a rename relies on an explicit retraction.",
+			"text": "**Reading · 2026-11-22**\n- Built and tested in K1; nothing reads assertions yet.\n- Relevance is not in the code: causes are whatever the caller passes, and nothing checks conflicts yet (K9).",
 			"color": "2"
 		},
 		{
 			"id": "g-8203949e9e7e79",
 			"x": 1680,
-			"y": 2379,
+			"y": 2853,
 			"width": 360,
-			"height": 290,
+			"height": 266,
 			"type": "text",
-			"text": "**Not yet decided**\n- What other kinds of event there are, beyond accepted actions.\n- Whether each log starts with one genesis event.\n- What partial tuples, such as `(p, name, —)`, mean.\n- How rejected requests are kept.\n- How a surface's own events translate into tuples, and back.",
+			"text": "**Not yet decided**\n- Other kinds of event; a genesis event per log.\n- What partial tuples mean; how rejections are kept.\n- *Suggestion:* an action's causes are only what it read; a write conflicts only with concurrent events about what it read; a result reports the frontier of what it read.",
 			"color": "1"
 		},
 		{
@@ -299,43 +396,172 @@
 			"width": 560,
 			"height": 549,
 			"color": "6",
-			"text": "## Spec · Event Model\n\n**Purpose:** show what khora's event model *means*, as built in [[Issue #18 Event types ids and clock]] (K1): how things get identity, how structure is asserted, and how surfaces stay coherent.\n\n**Show:** the three ideas; a worked example of people acting over time; each concept with its meaning, why it exists and how it is used, with its code name second; the Decisions it rests on; what is not yet decided.\n\n**Context:** the run's Design section and its Decisions; [[Events are the basic unit of khora]]; the code in `src/kernel/.../event` only to check the canvas matches it.\n\n**Judgement:** meaning before mechanics. Every claim traces to a Decision. Mark what is provisional or open.\n\n**Layout:** row 1 the ideas; row 2 the example; row 3 the concepts; row 4 Decisions and the Reading.\n\n**Triggers:** re-render when the run's Decisions change.\n\n*Draft spec by agent:claude-opus-5-5, to be agreed with a team member.*"
+			"text": "## Spec · Event Model\n\n**Purpose:** show what khora's event model *means*, as built in [[Issue #18 Event types ids and clock]] (K1): how things get identity, how structure is asserted, and how surfaces stay coherent.\n\n**Show:** the three ideas; how the concepts relate, as connections; worked examples of people acting over time, including threads that do not touch each other; each concept with its meaning, why it exists and how it is used, with its code name second; the Decisions it rests on; what is not yet decided.\n\n**Context:** the run's Design section and its Decisions; [[Events are the basic unit of khora]]; the code in `src/kernel/.../event` only to check the canvas matches it.\n\n**Judgement:** meaning before mechanics. Every claim traces to a Decision. Mark what is provisional or open.\n\n**Layout:** row 1 the ideas; row 2 the concepts as two hubs with labelled connections; rows 3 and 4 the examples; row 5 Decisions and the Reading.\n\n**Triggers:** re-render when the run's Decisions change.\n\n*Draft spec by agent:claude-opus-5-5, to be agreed with a team member.*"
 		}
 	],
 	"edges": [
 		{
-			"id": "g-db5dbd2a34fab3",
+			"id": "g-429af2338f0765",
+			"fromNode": "g-45844101ff61f8",
+			"fromSide": "bottom",
+			"toNode": "g-a672491fc8eec0",
+			"toSide": "top",
+			"toEnd": "arrow",
+			"label": "is a kind of"
+		},
+		{
+			"id": "g-56fa83a607c590",
+			"fromNode": "g-aeef32a5e6f8c1",
+			"fromSide": "bottom",
+			"toNode": "g-a672491fc8eec0",
+			"toSide": "top",
+			"toEnd": "arrow",
+			"label": "is a kind of"
+		},
+		{
+			"id": "g-8d9d449061f2f3",
+			"fromNode": "g-a672491fc8eec0",
+			"fromSide": "left",
+			"toNode": "g-69418d9006b811",
+			"toSide": "right",
+			"toEnd": "arrow",
+			"label": "caused by"
+		},
+		{
+			"id": "g-8e1580bc55aee6",
+			"fromNode": "g-a672491fc8eec0",
+			"fromSide": "left",
+			"toNode": "g-9f8ca76fda0499",
+			"toSide": "right",
+			"toEnd": "arrow",
+			"label": "recorded at"
+		},
+		{
+			"id": "g-6100e76a937577",
+			"fromNode": "g-a672491fc8eec0",
+			"fromSide": "bottom",
+			"toNode": "g-a0cc27560c3992",
+			"toSide": "top",
+			"toEnd": "arrow",
+			"label": "identified by"
+		},
+		{
+			"id": "g-8725a3de725295",
+			"fromNode": "g-772ff2b9e8ebf9",
+			"fromSide": "top",
+			"toNode": "g-a672491fc8eec0",
+			"toSide": "bottom",
+			"toEnd": "arrow",
+			"label": "a set of"
+		},
+		{
+			"id": "g-263986af4b1c7f",
+			"fromNode": "g-a672491fc8eec0",
+			"fromSide": "right",
+			"toNode": "g-d3eca79dfaf8e4",
+			"toSide": "left",
+			"toEnd": "arrow",
+			"label": "carries"
+		},
+		{
+			"id": "g-63e1c45a61baf8",
+			"fromNode": "g-d3eca79dfaf8e4",
+			"fromSide": "right",
+			"toNode": "g-68c846b5539955",
+			"toSide": "left",
+			"toEnd": "arrow",
+			"label": "each is"
+		},
+		{
+			"id": "g-841cdd9e54fb37",
+			"fromNode": "g-68c846b5539955",
+			"fromSide": "left",
+			"toNode": "g-75f24120240691",
+			"toSide": "right",
+			"toEnd": "arrow",
+			"label": "is about"
+		},
+		{
+			"id": "g-2e83f47c95030d",
+			"fromNode": "g-68c846b5539955",
+			"fromSide": "top",
+			"toNode": "g-e6a595708eb197",
+			"toSide": "bottom",
+			"toEnd": "arrow",
+			"label": "says"
+		},
+		{
+			"id": "g-ed2e673e045c5e",
+			"fromNode": "g-68c846b5539955",
+			"fromSide": "right",
+			"toNode": "g-82882999890d27",
+			"toSide": "left",
+			"toEnd": "arrow",
+			"label": "has"
+		},
+		{
+			"id": "g-c901b5a6dce53c",
+			"fromNode": "g-3a4eb8bc8248f3",
+			"fromSide": "top",
+			"toNode": "g-68c846b5539955",
+			"toSide": "bottom",
+			"toEnd": "arrow",
+			"label": "refers to"
+		},
+		{
+			"id": "g-1476ba8e2e7d2f",
 			"fromNode": "g-23d7731727cd53",
 			"fromSide": "right",
 			"toNode": "g-a4f27dbad2bc3e",
 			"toSide": "left",
 			"toEnd": "arrow",
-			"label": "accepted"
+			"label": "accepted as"
 		},
 		{
-			"id": "g-fec2ba84139c36",
-			"fromNode": "g-a4f27dbad2bc3e",
-			"fromSide": "right",
-			"toNode": "g-944907db7c41da",
-			"toSide": "left",
-			"toEnd": "arrow"
-		},
-		{
-			"id": "g-ad5570e345dd5c",
-			"fromNode": "g-944907db7c41da",
-			"fromSide": "right",
-			"toNode": "g-70174dfa2514f5",
-			"toSide": "left",
+			"id": "g-cc49c15947cffe",
+			"fromNode": "g-70174dfa2514f5",
+			"fromSide": "left",
+			"toNode": "g-a4f27dbad2bc3e",
+			"toSide": "right",
 			"toEnd": "arrow",
-			"label": "later"
+			"label": "caused by"
 		},
 		{
-			"id": "g-486f11e3a8e27e",
+			"id": "g-d10f9eb2932558",
 			"fromNode": "g-70174dfa2514f5",
 			"fromSide": "right",
 			"toNode": "g-1f50d02c7a90be",
 			"toSide": "left",
-			"toEnd": "arrow"
+			"toEnd": "arrow",
+			"label": "read at {f}"
+		},
+		{
+			"id": "g-b618d20e4fd2ed",
+			"fromNode": "g-f0aeb192e4a56a",
+			"fromSide": "left",
+			"toNode": "g-48a534e676a8fb",
+			"toSide": "right",
+			"toEnd": "arrow",
+			"label": "caused by"
+		},
+		{
+			"id": "g-b5f995948e5690",
+			"fromNode": "g-28b8719800bbe1",
+			"fromSide": "left",
+			"toNode": "g-f0aeb192e4a56a",
+			"toSide": "right",
+			"toEnd": "arrow",
+			"label": "conflicts with",
+			"color": "1"
+		},
+		{
+			"id": "g-5491be8a495e9e",
+			"fromNode": "g-44aa073b3e6afd",
+			"fromSide": "left",
+			"toNode": "g-28b8719800bbe1",
+			"toSide": "right",
+			"toEnd": "arrow",
+			"label": "g changes none of this"
 		}
 	]
 }
