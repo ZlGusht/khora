@@ -12,7 +12,7 @@ import java.util.Optional;
  * @param principal who acted
  * @param onBehalfOf for whom, if not for themselves
  * @param grant the grant the action ran under
- * @param via the surface or adapter the action went through
+ * @param via the authority that accepted the action
  */
 public record By(String principal, Optional<String> onBehalfOf, String grant, String via) {
     public By {

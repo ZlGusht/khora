@@ -5,6 +5,7 @@ import java.util.Set;
 import khora.kernel.event.About;
 import khora.kernel.event.AcceptedAction;
 import khora.kernel.event.Event;
+import khora.kernel.event.EventSource;
 import khora.kernel.event.Identity;
 
 /**
@@ -34,8 +35,8 @@ public record Interest(Set<Identity> definitions, Set<Identity> about) {
         return new Interest(Set.of(), Set.of(thing));
     }
 
-    /** Whether {@code event} is one this interest wants. */
-    public boolean matches(Event event) {
+    /** Whether {@code event} is one this interest wants, given the events of {@code source}. */
+    public boolean matches(Event event, EventSource source) {
         if (!(event.body() instanceof AcceptedAction accepted)) {
             return false;
         }
@@ -45,6 +46,6 @@ public record Interest(Set<Identity> definitions, Set<Identity> about) {
         if (about.isEmpty()) {
             return true;
         }
-        return About.of(event).stream().anyMatch(about::contains);
+        return About.of(event, source).stream().anyMatch(about::contains);
     }
 }

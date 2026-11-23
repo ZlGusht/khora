@@ -12,7 +12,7 @@ relationships__originates_in:
 relationships__decided_by:
   - "[[Hristiyan Ganchov]]"
 properties__decided_on: 2026-11-18
-properties__status: active
+properties__status: superseded
 properties__kind: design
 properties__author: agent:claude-opus-5-5
 ---

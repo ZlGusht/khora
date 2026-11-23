@@ -14,12 +14,12 @@ import khora.kernel.surface.Authority;
 
 /**
  * A stub authority for projects. It takes reads and asserts. A write linked {@code based_on} a read
- * is rejected when an event it did not know of asserts on the same identity and attribute; a write
- * without one is blind and accepted ([[Reads return statements and writes follow a read]]).
+ * is rejected when an event it did not know of asserts on the same identity and attribute
+ * ([[Reads return statements and writes follow a read]]); a write without one is blind and accepted.
  *
  * <p>Provisional: no attribute definitions or merge rules; a conflict check walks the whole log.
  */
-public final class InMemoryProjects implements Authority {
+public final class Projects implements Authority {
 
     @Override
     public String name() {

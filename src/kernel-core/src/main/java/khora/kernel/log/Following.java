@@ -1,8 +1,8 @@
 package khora.kernel.log;
 
 /**
- * A handler following a log. Closing it stops delivery: no event is handed over once
- * {@link #close()} returns, though one already being delivered may still arrive.
+ * A handler following a log. Closing it stops delivery: once {@link #close()} returns, no further
+ * event is handed over; one whose delivery had already begun may still complete.
  */
 public interface Following extends AutoCloseable {
     @Override

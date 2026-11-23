@@ -18,7 +18,7 @@ class FrontierTest {
 
     static final By BY = new By("anna", Optional.empty(), "g3", "projects");
 
-    InMemoryEventLog graph;
+    InMemoryEventLog log;
     Event e1;
     Event e2;
     Event e3;
@@ -37,14 +37,14 @@ class FrontierTest {
     }
 
     @BeforeEach
-    void graph() {
-        graph = new InMemoryEventLog();
+    void log() {
+        log = new InMemoryEventLog();
         e1 = event(1000);
         e2 = event(1001, e1);
         e3 = event(1002, e2);
         e4 = event(1003, e1);
         for (var e : List.of(e1, e2, e3, e4)) {
-            graph.append(List.of(e));
+            log.append(List.of(e));
         }
     }
 
@@ -58,41 +58,41 @@ class FrontierTest {
     @Test
     void unknownHeadIsInvalid() {
         var stranger = event(5000);
-        assertEquals(new FrontierCheck.Invalid(stranger.id()), FrontierCheck.validate(heads(stranger), graph));
+        assertEquals(new FrontierCheck.Invalid(stranger.id()), FrontierCheck.validate(heads(stranger), log));
     }
 
     @Test
     void validFrontierIsValid() {
-        assertEquals(new FrontierCheck.Valid(), FrontierCheck.validate(heads(e3, e4), graph));
-        assertEquals(new FrontierCheck.Valid(), FrontierCheck.validate(Frontier.empty(), graph));
+        assertEquals(new FrontierCheck.Valid(), FrontierCheck.validate(heads(e3, e4), log));
+        assertEquals(new FrontierCheck.Valid(), FrontierCheck.validate(Frontier.empty(), log));
     }
 
     @Test
     void ofReducesToHeads() {
-        assertEquals(heads(e3), Frontier.of(List.of(e1.id(), e2.id(), e3.id()), graph));
-        assertEquals(heads(e3, e4), Frontier.of(List.of(e4.id(), e1.id(), e3.id()), graph));
+        assertEquals(heads(e3), Frontier.of(List.of(e1.id(), e2.id(), e3.id()), log));
+        assertEquals(heads(e3, e4), Frontier.of(List.of(e4.id(), e1.id(), e3.id()), log));
     }
 
     @Test
     void ofRefusesUnknownIds() {
-        assertThrows(IllegalArgumentException.class, () -> Frontier.of(List.of(event(5000).id()), graph));
+        assertThrows(IllegalArgumentException.class, () -> Frontier.of(List.of(event(5000).id()), log));
     }
 
     @Test
     void comparesByCausalOrder() {
-        assertEquals(Order.BEFORE, FrontierCheck.compare(heads(e2), heads(e3), graph));
-        assertEquals(Order.AFTER, FrontierCheck.compare(heads(e3), heads(e2), graph));
-        assertEquals(Order.EQUAL, FrontierCheck.compare(heads(e3), heads(e3), graph));
-        assertEquals(Order.CONCURRENT, FrontierCheck.compare(heads(e3), heads(e4), graph));
-        assertEquals(Order.BEFORE, FrontierCheck.compare(Frontier.empty(), heads(e1), graph));
-        assertEquals(Order.EQUAL, FrontierCheck.compare(Frontier.empty(), Frontier.empty(), graph));
+        assertEquals(Order.BEFORE, FrontierCheck.compare(heads(e2), heads(e3), log));
+        assertEquals(Order.AFTER, FrontierCheck.compare(heads(e3), heads(e2), log));
+        assertEquals(Order.EQUAL, FrontierCheck.compare(heads(e3), heads(e3), log));
+        assertEquals(Order.CONCURRENT, FrontierCheck.compare(heads(e3), heads(e4), log));
+        assertEquals(Order.BEFORE, FrontierCheck.compare(Frontier.empty(), heads(e1), log));
+        assertEquals(Order.EQUAL, FrontierCheck.compare(Frontier.empty(), Frontier.empty(), log));
     }
 
     @Test
     void combineKeepsHeads() {
-        assertEquals(heads(e3, e4), FrontierCheck.combine(heads(e3), heads(e4), graph));
-        assertEquals(heads(e3), FrontierCheck.combine(heads(e2), heads(e3), graph));
-        assertEquals(heads(e1), FrontierCheck.combine(Frontier.empty(), heads(e1), graph));
+        assertEquals(heads(e3, e4), FrontierCheck.combine(heads(e3), heads(e4), log));
+        assertEquals(heads(e3), FrontierCheck.combine(heads(e2), heads(e3), log));
+        assertEquals(heads(e1), FrontierCheck.combine(Frontier.empty(), heads(e1), log));
     }
 
     @Test

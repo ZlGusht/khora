@@ -21,3 +21,5 @@ Flagged in the Observe of [[Issue #18 Event types ids and clock]], from the revi
 Checking, comparing and combining frontiers walk every event a frontier holds, on every call, with no index. Once conditional writes check frontiers, each write costs time in proportion to the history.
 
 When: An index of ancestry or a summary per frontier (K7, K9).
+
+Update: each submit now walks the history three or four times (the caller's frontier, the authority's conflict check, `Causality`, and for a read the statements), each delivery combines frontiers (so catching up is quadratic), and on NATS every step of a walk is a round trip.

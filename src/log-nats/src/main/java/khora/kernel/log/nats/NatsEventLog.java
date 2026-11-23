@@ -44,6 +44,7 @@ import khora.kernel.event.About;
 import khora.kernel.event.Event;
 import khora.kernel.event.EventId;
 import khora.kernel.event.EventJson;
+import khora.kernel.event.EventSource;
 import khora.kernel.event.Identity;
 import khora.kernel.log.EventLog;
 import khora.kernel.log.EventLogException;
@@ -116,9 +117,9 @@ public final class NatsEventLog implements EventLog {
             throw new EventLogException("interrupted while connecting to NATS at " + natsUrl, e);
         }
         try {
-            NatsEventLog store = new NatsEventLog(connection);
-            store.ensureStream();
-            return store;
+            NatsEventLog log = new NatsEventLog(connection);
+            log.ensureStream();
+            return log;
         } catch (IOException | JetStreamApiException | RuntimeException e) {
             closeQuietly(connection);
             if (e instanceof EventLogException l) {
@@ -249,32 +250,40 @@ public final class NatsEventLog implements EventLog {
     }
 
     /**
-     * Appends {@code records} as one atomic batch. A repeated event id inside {@code records} is sent
+     * Appends {@code events} as one atomic batch. A repeated event id inside {@code events} is sent
      * once (the first wins) and every copy gets its position. If the server refuses the batch because
-     * an event id is already stored, each record is probed with a plain publish that expects a last
-     * message id no record has: for a stored event id the server answers with a duplicate ack that
-     * carries the original sequence, and for a new one it refuses and stores nothing. The new records
+     * an event id is already stored, each event is probed with a plain publish that expects a last
+     * message id no event has: for a stored event id the server answers with a duplicate ack that
+     * carries the original sequence, and for a new one it refuses and stores nothing. The new events
      * are then sent again as one batch.
      */
     @Override
-    public List<Long> append(List<Event> records) {
+    public List<Long> append(List<Event> events) {
         if (connection.getStatus() == Connection.Status.CLOSED) {
             throw new EventLogException("append to a closed log");
         }
-        if (records.size() > MAX_APPEND) {
-            throw new EventLogException("append of " + records.size() + " events exceeds " + MAX_APPEND);
+        if (events.size() > MAX_APPEND) {
+            throw new EventLogException("append of " + events.size() + " events exceeds " + MAX_APPEND);
         }
-        if (records.isEmpty()) {
+        if (events.isEmpty()) {
             return List.of();
         }
         Map<String, Outgoing> unique = new LinkedHashMap<>();
-        for (Event record : records) {
-            if (!unique.containsKey(record.id().value())) {
-                unique.put(record.id().value(), outgoing(record, records));
+        for (Event event : events) {
+            if (!unique.containsKey(event.id().value())) {
+                unique.put(event.id().value(), outgoing(event, events));
             }
         }
         Map<String, Long> positions = new HashMap<>();
-        List<Outgoing> pending = new ArrayList<>(unique.values());
+        List<Outgoing> pending = new ArrayList<>();
+        for (Outgoing out : unique.values()) {
+            long stored = storedAt(out.subject);
+            if (stored > 0) {
+                positions.put(out.eventId, stored);
+            } else {
+                pending.add(out);
+            }
+        }
         for (int attempt = 1; !pending.isEmpty(); attempt++) {
             try {
                 List<Long> sent = publishBatch(pending);
@@ -284,33 +293,33 @@ public final class NatsEventLog implements EventLog {
                 pending = List.of();
             } catch (BatchPublishException e) {
                 if (e.getApiErrorCode() != DUPLICATE_MESSAGE_ID || attempt == APPEND_ATTEMPTS) {
-                    throw new EventLogException(describe(records) + " failed: " + e.getMessage(), e);
+                    throw new EventLogException(describe(events) + " failed: " + e.getMessage(), e);
                 }
-                List<Outgoing> notStored = probe(pending, positions, records);
+                List<Outgoing> notStored = probe(pending, positions, events);
                 if (notStored.size() == pending.size()) {
                     throw new EventLogException(
-                            describe(records) + " was refused for a duplicate event id, but none is stored", e);
+                            describe(events) + " was refused for a duplicate event id, but none is stored", e);
                 }
                 pending = notStored;
             } catch (RuntimeException e) {
                 if (e instanceof EventLogException) {
                     throw e;
                 }
-                throw new EventLogException(describe(records) + " failed: " + e.getMessage(), e);
+                throw new EventLogException(describe(events) + " failed: " + e.getMessage(), e);
             }
         }
-        return records.stream().map(r -> positions.get(r.id().value())).toList();
+        return events.stream().map(r -> positions.get(r.id().value())).toList();
     }
 
     private record Outgoing(String eventId, String subject, Headers headers, byte[] body) {
     }
 
-    private Outgoing outgoing(Event record, List<Event> records) {
+    private Outgoing outgoing(Event event, List<Event> events) {
         try {
-            String id = record.id().value();
+            String id = event.id().value();
             Headers headers = new Headers().put(MSG_ID, id);
-            byte[] body = EventJson.write(record).getBytes(StandardCharsets.UTF_8);
-            Outgoing out = new Outgoing(id, Subjects.forEvent(record.id()), headers, body);
+            byte[] body = EventJson.write(event).getBytes(StandardCharsets.UTF_8);
+            Outgoing out = new Outgoing(id, Subjects.forEvent(event.id()), headers, body);
             long size = (long) headers.serializedLength() + body.length + BATCH_HEADER_RESERVE;
             if (size > connection.getMaxPayload()) {
                 throw new IllegalArgumentException("event of " + body.length
@@ -319,7 +328,7 @@ public final class NatsEventLog implements EventLog {
             return out;
         } catch (IllegalArgumentException e) {
             throw new EventLogException(
-                    describe(records) + " refused, event " + record.id().value() + ": " + e.getMessage(), e);
+                    describe(events) + " refused, event " + event.id().value() + ": " + e.getMessage(), e);
         }
     }
 
@@ -351,13 +360,13 @@ public final class NatsEventLog implements EventLog {
     }
 
     /**
-     * Puts the position of each already stored record of {@code batch} into {@code positions} and
-     * returns the others. A probe publish expects a last message id that no record has, so the server
+     * Puts the position of each already stored event of {@code batch} into {@code positions} and
+     * returns the others. A probe publish expects a last message id that no event has, so the server
      * stores nothing for a new event id; for a stored event id its duplicate check runs first and the
-     * ack carries the original sequence. Should the expected id ever match, the record is stored by
+     * ack carries the original sequence. Should the expected id ever match, the event is stored by
      * the probe itself, and its ack still gives its position.
      */
-    private List<Outgoing> probe(List<Outgoing> batch, Map<String, Long> positions, List<Event> records) {
+    private List<Outgoing> probe(List<Outgoing> batch, Map<String, Long> positions, List<Event> events) {
         PublishOptions options = PublishOptions.builder()
                 .expectedLastMsgId("khora-probe-" + UUID.randomUUID())
                 .build();
@@ -368,11 +377,11 @@ public final class NatsEventLog implements EventLog {
                 positions.put(out.eventId, ack.getSeqno());
             } catch (JetStreamApiException e) {
                 if (e.getApiErrorCode() != WRONG_LAST_MSG_ID) {
-                    throw new EventLogException(describe(records) + " failed probing event " + out.eventId, e);
+                    throw new EventLogException(describe(events) + " failed probing event " + out.eventId, e);
                 }
                 notStored.add(out);
             } catch (IOException e) {
-                throw new EventLogException(describe(records) + " failed probing event " + out.eventId, e);
+                throw new EventLogException(describe(events) + " failed probing event " + out.eventId, e);
             }
         }
         return notStored;
@@ -387,7 +396,11 @@ public final class NatsEventLog implements EventLog {
     public Optional<Event> get(EventId id) {
         try {
             var message = management.getLastMessage(STREAM, Subjects.forEvent(id));
-            return Optional.of(decode(message.getSeq(), message.getHeaders(), message.getData()).event());
+            Event found = decode(message.getSeq(), message.getHeaders(), message.getData()).event();
+            if (!found.id().equals(id)) {
+                throw new EventLogException("message " + message.getSeq() + " under " + id.value() + " holds event " + found.id().value());
+            }
+            return Optional.of(found);
         } catch (JetStreamApiException e) {
             if (e.getApiErrorCode() == NO_MESSAGE_FOUND) {
                 return Optional.empty();
@@ -401,15 +414,16 @@ public final class NatsEventLog implements EventLog {
     /** Reads the whole log and keeps the events about {@code thing}: no index yet. */
     @Override
     public List<Event> about(Identity thing) {
-        return scan(1, Integer.MAX_VALUE, Subjects.ALL).stream()
-                .map(Logged::event)
-                .filter(e -> About.of(e).contains(thing))
-                .toList();
+        var events = scan(1, Integer.MAX_VALUE, Subjects.ALL).stream().map(Logged::event).toList();
+        var byId = new HashMap<EventId, Event>();
+        events.forEach(e -> byId.put(e.id(), e));
+        EventSource source = id -> Optional.ofNullable(byId.get(id));
+        return events.stream().filter(e -> About.of(e, source).contains(thing)).toList();
     }
 
     /**
-     * Reads with an ordered consumer on {@code filter} from {@code from}, up to {@code max} records.
-     * It stops at the last sequence matching {@code filter} when the call started, so records
+     * Reads with an ordered consumer on {@code filter} from {@code from}, up to {@code max} events.
+     * It stops at the last sequence matching {@code filter} when the call started, so events
      * appended during the read are not waited for.
      */
     private List<Logged> scan(long from, int max, String filter) {
@@ -436,7 +450,7 @@ public final class NatsEventLog implements EventLog {
                     Message message = subscription.nextMessage(READ_TIMEOUT);
                     if (message == null) {
                         throw new EventLogException("reading " + filter + " from position " + from
-                                + " timed out after " + found.size() + " records");
+                                + " timed out after " + found.size() + " events");
                     }
                     NatsJetStreamMetaData meta = message.metaData();
                     if (meta.streamSequence() > last) {
@@ -456,6 +470,15 @@ public final class NatsEventLog implements EventLog {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new EventLogException("interrupted reading " + filter + " from position " + from, e);
+        }
+    }
+
+    /** Where the event filed under {@code subject} is stored, or 0: the log keeps each event once, beyond the duplicate window too. */
+    private long storedAt(String subject) {
+        try {
+            return lastSequence(subject);
+        } catch (IOException | JetStreamApiException | RuntimeException e) {
+            throw new EventLogException("looking up " + subject + " failed: " + e.getMessage(), e);
         }
     }
 
@@ -480,7 +503,12 @@ public final class NatsEventLog implements EventLog {
         if (eventId == null) {
             throw new EventLogException("message " + seq + " has no " + MSG_ID);
         }
-        Event event = EventJson.read(new String(data == null ? new byte[0] : data, StandardCharsets.UTF_8));
+        Event event;
+        try {
+            event = EventJson.read(new String(data == null ? new byte[0] : data, StandardCharsets.UTF_8));
+        } catch (IllegalArgumentException e) {
+            throw new EventLogException("message " + seq + " does not hold a valid event: " + e.getMessage(), e);
+        }
         if (!event.id().value().equals(eventId)) {
             throw new EventLogException("message " + seq + " holds event " + event.id().value() + ", not " + eventId);
         }
@@ -511,7 +539,7 @@ public final class NatsEventLog implements EventLog {
         }
         followings.add(subscription);
         if (subscription.closed) {
-            subscription.close(); // a record failed to decode before the consumer was assigned
+            subscription.close(); // an event failed to decode before the consumer was assigned
         }
         return subscription;
     }
@@ -530,11 +558,11 @@ public final class NatsEventLog implements EventLog {
                 return;
             }
             long position = message.metaData().streamSequence();
-            Logged record;
+            Logged logged;
             try {
-                record = decode(position, message.getHeaders(), message.getData());
+                logged = decode(position, message.getHeaders(), message.getData());
             } catch (RuntimeException e) {
-                LOG.log(System.Logger.Level.ERROR, "subscription stopped: the record at position " + position
+                LOG.log(System.Logger.Level.ERROR, "following stopped: the event at position " + position
                         + " cannot be decoded: " + e.getMessage(), e);
                 closed = true;
                 // The consumer is closed off the dispatcher thread that is running this method.
@@ -542,14 +570,14 @@ public final class NatsEventLog implements EventLog {
                 return;
             }
             try {
-                handler.accept(record);
+                handler.accept(logged);
             } catch (RuntimeException e) {
                 LOG.log(System.Logger.Level.WARNING, "subscription handler failed on position " + position
-                        + ", event " + record.event().id().value() + "; delivery goes on", e);
+                        + ", event " + logged.event().id().value() + "; delivery goes on", e);
             }
         }
 
-        /** Stops delivery: no record reaches the handler once this returns, except one already in it. */
+        /** Stops delivery: no event reaches the handler once this returns, except one already in it. */
         @Override
         public void close() {
             closed = true;
@@ -579,10 +607,10 @@ public final class NatsEventLog implements EventLog {
         }
     }
 
-    private static String describe(List<Event> records) {
-        List<String> ids = records.stream().map(r -> r.id().value()).distinct().toList();
+    private static String describe(List<Event> events) {
+        List<String> ids = events.stream().map(r -> r.id().value()).distinct().toList();
         String shown = ids.size() <= 5 ? String.join(", ", ids)
                 : String.join(", ", ids.subList(0, 5)) + ", ... (" + (ids.size() - 5) + " more)";
-        return "append of " + records.size() + " events [" + shown + "]";
+        return "append of " + events.size() + " events [" + shown + "]";
     }
 }

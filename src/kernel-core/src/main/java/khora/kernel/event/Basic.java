@@ -48,6 +48,10 @@ public final class Basic {
         if (!args.members().keySet().equals(Set.of("of"))) {
             throw new IllegalArgumentException("a read names one thing: {\"of\": identity}");
         }
-        return new Identity(args.str("of"));
+        var thing = new Identity(args.str("of"));
+        if (thing.event().isEmpty() && thing.value().startsWith("/")) {
+            throw new IllegalArgumentException("a read names a thing, not a tuple of its own event: " + thing.value());
+        }
+        return thing;
     }
 }

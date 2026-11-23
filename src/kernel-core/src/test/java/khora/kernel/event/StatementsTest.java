@@ -33,30 +33,30 @@ class StatementsTest {
 
     @Test
     void aRenameShowsByFrontier() {
-        var graph = new InMemoryEventLog();
+        var log = new InMemoryEventLog();
         var e = event(1000, List.of(), Assertion.entity(), named(Identity.local(0), "Kitchen"));
         var project = Identity.of(e.id(), 0);
         var kitchen = Identity.of(e.id(), 1);
         var f = event(1001, List.of(e.id()), Assertion.retraction(kitchen), named(project, "Studio"));
-        graph.append(List.of(e));
-        graph.append(List.of(f));
+        log.append(List.of(e));
+        log.append(List.of(f));
 
         assertEquals(List.of(new Statement(project, Assertion.entity()), new Statement(kitchen, named(project, "Kitchen"))),
-                Statements.about(project, at(e), graph));
+                Statements.about(project, at(e), log));
         assertEquals(List.of(new Statement(project, Assertion.entity()),
                 new Statement(Identity.of(f.id(), 1), named(project, "Studio"))),
-                Statements.about(project, at(f), graph));
+                Statements.about(project, at(f), log));
     }
 
     @Test
     void unrelatedEventsDoNotShow() {
-        var graph = new InMemoryEventLog();
+        var log = new InMemoryEventLog();
         var e = event(1000, List.of(), Assertion.entity());
         var g = event(1001, List.of(), named(Identity.named("invoice"), "INV-1"));
-        graph.append(List.of(e));
-        graph.append(List.of(g));
+        log.append(List.of(e));
+        log.append(List.of(g));
         assertEquals(List.of(new Statement(Identity.of(e.id(), 0), Assertion.entity())),
-                Statements.about(Identity.of(e.id(), 0), at(e, g), graph));
+                Statements.about(Identity.of(e.id(), 0), at(e, g), log));
     }
 
     @Test
@@ -72,12 +72,12 @@ class StatementsTest {
 
     @Test
     void statementsAreInRecordedOrder() {
-        var graph = new InMemoryEventLog();
+        var log = new InMemoryEventLog();
         var a = event(1000, List.of(), named(NAME, "first"));
         var b = event(1001, List.of(a.id()), named(NAME, "second"));
-        graph.append(List.of(a));
-        graph.append(List.of(b));
-        assertEquals(List.of("first", "second"), Statements.about(NAME, at(b), graph).stream()
+        log.append(List.of(a));
+        log.append(List.of(b));
+        assertEquals(List.of("first", "second"), Statements.about(NAME, at(b), log).stream()
                 .map(s -> ((Json.Str) ((Assertion.Literal) s.assertion().value().orElseThrow()).value()).value())
                 .toList());
     }

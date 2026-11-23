@@ -58,13 +58,17 @@ public final class InMemoryEventLog implements EventLog {
 
     @Override
     public synchronized Optional<Event> get(EventId id) {
+        return lookup(id);
+    }
+
+    private Optional<Event> lookup(EventId id) {
         var position = positions.get(id);
         return position == null ? Optional.empty() : Optional.of(events.get((int) (position - 1)));
     }
 
     @Override
     public synchronized List<Event> about(Identity thing) {
-        return events.stream().filter(e -> About.of(e).contains(thing)).toList();
+        return events.stream().filter(e -> About.of(e, this::lookup).contains(thing)).toList();
     }
 
     @Override

@@ -5,16 +5,18 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * What an event is about. An assert is about the identities its tuples name, the identities they
- * refer to, and the tuples themselves; a read is about the thing it reads.
+ * What an event is about. An assert is about each of its tuples and the identity each one is about;
+ * a statement about a statement, such as a retraction, is also about what that statement was about.
+ * A read is about the thing it reads. A value that refers to something is a mention, not what the
+ * statement is about.
  *
  * <p>Provisional: only accepted actions are about anything.
  */
 public final class About {
     private About() {}
 
-    /** The things {@code event} is about, in the order its action names them. */
-    public static Set<Identity> of(Event event) {
+    /** The things {@code event} is about, in the order its action names them, given the events of {@code source}. */
+    public static Set<Identity> of(Event event, EventSource source) {
         var things = new LinkedHashSet<Identity>();
         if (!(event.body() instanceof AcceptedAction accepted)) {
             return things;
@@ -22,15 +24,29 @@ public final class About {
         Basic.readOf(accepted.action()).ifPresent(things::add);
         var tuples = Assertion.in(accepted.action()).orElse(List.of());
         for (int i = 0; i < tuples.size(); i++) {
-            var tuple = tuples.get(i).in(event.id());
-            tuple.identity().ifPresent(things::add);
             things.add(Identity.of(event.id(), i));
-            tuple.value().ifPresent(v -> {
-                if (v instanceof Assertion.Ref ref) {
-                    things.add(ref.id());
-                }
-            });
+            var subject = tuples.get(i).in(event.id()).identity();
+            while (subject.isPresent() && things.add(subject.get())) {
+                subject = subjectOf(subject.get(), event, tuples, source);
+            }
         }
         return things;
+    }
+
+    /** What the statement {@code id} is about, if {@code id} is a statement {@code source} or this event holds. */
+    private static java.util.Optional<Identity> subjectOf(Identity id, Event event, List<Assertion> own, EventSource source) {
+        var holder = id.event();
+        if (holder.isEmpty()) {
+            return java.util.Optional.empty();
+        }
+        int index = Integer.parseInt(id.value().substring(id.value().indexOf('/') + 1));
+        if (holder.get().equals(event.id())) {
+            return index < own.size() ? own.get(index).in(event.id()).identity() : java.util.Optional.empty();
+        }
+        return source.get(holder.get())
+                .filter(e -> e.body() instanceof AcceptedAction)
+                .flatMap(e -> Assertion.in(((AcceptedAction) e.body()).action())
+                        .filter(tuples -> index < tuples.size())
+                        .flatMap(tuples -> tuples.get(index).in(e.id()).identity()));
     }
 }

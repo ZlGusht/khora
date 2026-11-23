@@ -13,7 +13,7 @@ relationships__in_context_of:
   - "[[Runtime]]"
 properties__status: open
 properties__started_at: 2026-11-19
-properties__current_phase: Operate
+properties__current_phase: Observe
 properties__issue: 18
 properties__author: agent:claude-opus-5-5
 properties__pull_requests:
@@ -266,3 +266,13 @@ After #35 (K4) and #37 (K2) merged, the kernel was made one coherent thing in th
 - **NATS** files each event under its id, with its canonical JSON as data.
 
 All 126 tests pass, including the NATS ones against NATS 2.12.15 in Docker. Flagged: [[Reading what a thing is about scans the whole log]].
+
+## Observe: surfaces by emission and one kernel
+
+**Done.** Surfaces speak only in events: a surface receives the events its interests match and emits actions in response; an authority accepts or rejects; only accepted actions become events in the event log. Delivery is in log order, so each surface receives each event once, after its causes, and never its own; catching up reads the log to its end before live delivery resumes; a failing surface loses one event and delivery goes on; chains of emissions stop after 64 steps. A kernel over a filled log rebuilds its heads. "About" follows statements about statements (a retraction is about the thing it changes) and does not count references. The NATS log looks each event up by id before publishing, so it never stores one twice; corrupt data is a log error. The log's filing is decided in [[The log stores events themselves, each filed under its id]].
+
+**Not done.** Asynchronous delivery; access checks at delivery; an index for what events are about; attribute definitions; named links per kind of action; behaviors and their triggers. That a re-append after NATS's two-minute window stores nothing is guarded by the duplicate tests, which cannot wait out the window.
+
+**Checked.** 135 tests pass with no `-Xlint` warnings, the 32 NATS ones against NATS 2.12.15 in Docker. Every entity written validates. A fresh review found two Critical issues (delivery before causes; catch-up mixing with live delivery) and six Important ones (a throwing surface, unbounded loops, retractions not about their thing, NATS duplicates beyond the window, the log Decision, heads on a filled log); all were fixed, the code ones with a test that failed first. `khora-stale` shows ADR-0YA, ADR-0YB and ADR-0XY older than this run's Decisions, which Update View settles after the merge. No deciding sentence was added to `docs/`.
+
+**Flagged** in Letters on this run: delivery checks no access; any caller may retract any assertion; anyone who can publish to the stream can add events; delivery is synchronous under one lock; link names are free text; retraction needs attribute definitions; one authority per kernel; the old log stream is left behind; every checked write reads the whole log; attached surfaces remember every event; frontier operations walk whole histories (updated); reading what a thing is about scans the whole log.
