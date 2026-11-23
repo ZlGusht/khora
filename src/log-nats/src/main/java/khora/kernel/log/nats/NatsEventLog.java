@@ -30,7 +30,6 @@ import io.synadia.bp.BatchPublisher;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -39,26 +38,32 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
-import khora.kernel.log.LogRecord;
-import khora.kernel.log.LogStore;
-import khora.kernel.log.LogStoreException;
-import khora.kernel.log.Subscription;
+import java.nio.charset.StandardCharsets;
+import java.util.Optional;
+import khora.kernel.event.About;
+import khora.kernel.event.Event;
+import khora.kernel.event.EventId;
+import khora.kernel.event.EventJson;
+import khora.kernel.event.Identity;
+import khora.kernel.log.EventLog;
+import khora.kernel.log.EventLogException;
+import khora.kernel.log.Following;
+import khora.kernel.log.Logged;
 
 /**
- * A {@link LogStore} on the NATS JetStream stream {@value #STREAM}. A record is one message: the
- * subject is {@link Subjects#forRecord}, {@code Nats-Msg-Id} is the event id, the header
- * {@value #ENTITY_IDS} holds the entity ids (base64url, comma separated) and the data is the body.
- * Positions are stream sequences. An append is one atomic batch.
+ * An {@link EventLog} on the NATS JetStream stream {@value #STREAM}. An event is one message: the
+ * subject is {@link Subjects#forEvent}, so an event is found by its id, {@code Nats-Msg-Id} is the
+ * event id, and the data is the event's canonical JSON. Positions are stream sequences. An append
+ * is one atomic batch.
  *
  * <p>Connecting, every JetStream request and every publish ack wait at most {@link #TIMEOUT}.
  * Publishes are not buffered while the connection is down, so an append against an unreachable
  * server fails at once instead of being sent later. The client keeps reconnecting.
  */
-public final class NatsLogStore implements LogStore {
+public final class NatsEventLog implements EventLog {
 
-    static final String STREAM = "KHORA_LOG";
+    static final String STREAM = "KHORA_EVENTS";
     static final String MSG_ID = "Nats-Msg-Id";
-    static final String ENTITY_IDS = "Khora-Entity-Ids";
 
     /** Room left in a message for the headers batch publish adds (batch id and sequence). */
     private static final int BATCH_HEADER_RESERVE = 256;
@@ -81,15 +86,15 @@ public final class NatsLogStore implements LogStore {
      */
     private static final ConsumeOptions CONSUME_OPTIONS =
             ConsumeOptions.builder().expiresIn(Duration.ofSeconds(5).toMillis()).build();
-    private static final System.Logger LOG = System.getLogger(NatsLogStore.class.getName());
+    private static final System.Logger LOG = System.getLogger(NatsEventLog.class.getName());
 
     private final Connection connection;
     private final JetStream jetStream;
     private final JetStreamManagement management;
     private final JetStreamOptions jetStreamOptions;
-    private final Set<NatsSubscription> subscriptions = ConcurrentHashMap.newKeySet();
+    private final Set<NatsFollowing> followings = ConcurrentHashMap.newKeySet();
 
-    private NatsLogStore(Connection connection) throws IOException {
+    private NatsEventLog(Connection connection) throws IOException {
         this.connection = connection;
         this.jetStreamOptions = JetStreamOptions.builder().requestTimeout(TIMEOUT).build();
         this.jetStream = connection.jetStream(jetStreamOptions);
@@ -100,26 +105,26 @@ public final class NatsLogStore implements LogStore {
      * Connects to {@code natsUrl} and creates the stream, or checks that the existing stream has the
      * log's settings.
      */
-    public static NatsLogStore open(String natsUrl) {
+    public static NatsEventLog open(String natsUrl) {
         Connection connection;
         try {
             connection = Nats.connect(options(natsUrl));
         } catch (IOException e) {
-            throw new LogStoreException("cannot connect to NATS at " + natsUrl, e);
+            throw new EventLogException("cannot connect to NATS at " + natsUrl, e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new LogStoreException("interrupted while connecting to NATS at " + natsUrl, e);
+            throw new EventLogException("interrupted while connecting to NATS at " + natsUrl, e);
         }
         try {
-            NatsLogStore store = new NatsLogStore(connection);
+            NatsEventLog store = new NatsEventLog(connection);
             store.ensureStream();
             return store;
         } catch (IOException | JetStreamApiException | RuntimeException e) {
             closeQuietly(connection);
-            if (e instanceof LogStoreException l) {
+            if (e instanceof EventLogException l) {
                 throw l;
             }
-            throw new LogStoreException("cannot open stream " + STREAM, e);
+            throw new EventLogException("cannot open stream " + STREAM, e);
         }
     }
 
@@ -195,7 +200,7 @@ public final class NatsLogStore implements LogStore {
         }
         List<String> differences = differences(existing);
         if (!differences.isEmpty()) {
-            throw new LogStoreException("stream " + STREAM + " exists with other settings: " + differences);
+            throw new EventLogException("stream " + STREAM + " exists with other settings: " + differences);
         }
     }
 
@@ -252,20 +257,20 @@ public final class NatsLogStore implements LogStore {
      * are then sent again as one batch.
      */
     @Override
-    public List<Long> append(List<LogRecord> records) {
+    public List<Long> append(List<Event> records) {
         if (connection.getStatus() == Connection.Status.CLOSED) {
-            throw new LogStoreException("append to a closed log store");
+            throw new EventLogException("append to a closed log");
         }
         if (records.size() > MAX_APPEND) {
-            throw new LogStoreException("append of " + records.size() + " records exceeds " + MAX_APPEND);
+            throw new EventLogException("append of " + records.size() + " events exceeds " + MAX_APPEND);
         }
         if (records.isEmpty()) {
             return List.of();
         }
         Map<String, Outgoing> unique = new LinkedHashMap<>();
-        for (LogRecord record : records) {
-            if (!unique.containsKey(record.eventId())) {
-                unique.put(record.eventId(), outgoing(record, records));
+        for (Event record : records) {
+            if (!unique.containsKey(record.id().value())) {
+                unique.put(record.id().value(), outgoing(record, records));
             }
         }
         Map<String, Long> positions = new HashMap<>();
@@ -279,43 +284,42 @@ public final class NatsLogStore implements LogStore {
                 pending = List.of();
             } catch (BatchPublishException e) {
                 if (e.getApiErrorCode() != DUPLICATE_MESSAGE_ID || attempt == APPEND_ATTEMPTS) {
-                    throw new LogStoreException(describe(records) + " failed: " + e.getMessage(), e);
+                    throw new EventLogException(describe(records) + " failed: " + e.getMessage(), e);
                 }
                 List<Outgoing> notStored = probe(pending, positions, records);
                 if (notStored.size() == pending.size()) {
-                    throw new LogStoreException(
+                    throw new EventLogException(
                             describe(records) + " was refused for a duplicate event id, but none is stored", e);
                 }
                 pending = notStored;
             } catch (RuntimeException e) {
-                if (e instanceof LogStoreException) {
+                if (e instanceof EventLogException) {
                     throw e;
                 }
-                throw new LogStoreException(describe(records) + " failed: " + e.getMessage(), e);
+                throw new EventLogException(describe(records) + " failed: " + e.getMessage(), e);
             }
         }
-        return records.stream().map(r -> positions.get(r.eventId())).toList();
+        return records.stream().map(r -> positions.get(r.id().value())).toList();
     }
 
     private record Outgoing(String eventId, String subject, Headers headers, byte[] body) {
     }
 
-    private Outgoing outgoing(LogRecord record, List<LogRecord> records) {
+    private Outgoing outgoing(Event record, List<Event> records) {
         try {
-            Headers headers = new Headers().put(MSG_ID, record.eventId());
-            if (!record.entityIds().isEmpty()) {
-                headers.put(ENTITY_IDS, String.join(",", record.entityIds().stream().map(Subjects::token).toList()));
-            }
-            Outgoing out = new Outgoing(record.eventId(), Subjects.forRecord(record), headers, record.body());
-            long size = (long) headers.serializedLength() + record.body().length + BATCH_HEADER_RESERVE;
+            String id = record.id().value();
+            Headers headers = new Headers().put(MSG_ID, id);
+            byte[] body = EventJson.write(record).getBytes(StandardCharsets.UTF_8);
+            Outgoing out = new Outgoing(id, Subjects.forEvent(record.id()), headers, body);
+            long size = (long) headers.serializedLength() + body.length + BATCH_HEADER_RESERVE;
             if (size > connection.getMaxPayload()) {
-                throw new IllegalArgumentException("record of " + record.body().length
+                throw new IllegalArgumentException("event of " + body.length
                         + " bytes exceeds the server's max payload of " + connection.getMaxPayload() + " bytes");
             }
             return out;
         } catch (IllegalArgumentException e) {
-            throw new LogStoreException(
-                    describe(records) + " refused, event " + record.eventId() + ": " + e.getMessage(), e);
+            throw new EventLogException(
+                    describe(records) + " refused, event " + record.id().value() + ": " + e.getMessage(), e);
         }
     }
 
@@ -353,7 +357,7 @@ public final class NatsLogStore implements LogStore {
      * ack carries the original sequence. Should the expected id ever match, the record is stored by
      * the probe itself, and its ack still gives its position.
      */
-    private List<Outgoing> probe(List<Outgoing> batch, Map<String, Long> positions, List<LogRecord> records) {
+    private List<Outgoing> probe(List<Outgoing> batch, Map<String, Long> positions, List<Event> records) {
         PublishOptions options = PublishOptions.builder()
                 .expectedLastMsgId("khora-probe-" + UUID.randomUUID())
                 .build();
@@ -364,27 +368,43 @@ public final class NatsLogStore implements LogStore {
                 positions.put(out.eventId, ack.getSeqno());
             } catch (JetStreamApiException e) {
                 if (e.getApiErrorCode() != WRONG_LAST_MSG_ID) {
-                    throw new LogStoreException(describe(records) + " failed probing event " + out.eventId, e);
+                    throw new EventLogException(describe(records) + " failed probing event " + out.eventId, e);
                 }
                 notStored.add(out);
             } catch (IOException e) {
-                throw new LogStoreException(describe(records) + " failed probing event " + out.eventId, e);
+                throw new EventLogException(describe(records) + " failed probing event " + out.eventId, e);
             }
         }
         return notStored;
     }
 
     @Override
-    public List<LogRecord> read(long fromPosition, int max) {
-        return scan(Math.max(fromPosition, 1), max, Subjects.ALL);
+    public List<Logged> read(long from, int max) {
+        return scan(Math.max(from, 1), max, Subjects.ALL);
     }
 
     @Override
-    public List<LogRecord> history(String entityId) {
-        if (entityId == null || entityId.isBlank()) {
-            throw new IllegalArgumentException("entity id must not be null or blank");
+    public Optional<Event> get(EventId id) {
+        try {
+            var message = management.getLastMessage(STREAM, Subjects.forEvent(id));
+            return Optional.of(decode(message.getSeq(), message.getHeaders(), message.getData()).event());
+        } catch (JetStreamApiException e) {
+            if (e.getApiErrorCode() == NO_MESSAGE_FOUND) {
+                return Optional.empty();
+            }
+            throw new EventLogException("getting event " + id.value() + " failed", e);
+        } catch (IOException e) {
+            throw new EventLogException("getting event " + id.value() + " failed", e);
         }
-        return scan(1, Integer.MAX_VALUE, Subjects.historyFilter(entityId));
+    }
+
+    /** Reads the whole log and keeps the events about {@code thing}: no index yet. */
+    @Override
+    public List<Event> about(Identity thing) {
+        return scan(1, Integer.MAX_VALUE, Subjects.ALL).stream()
+                .map(Logged::event)
+                .filter(e -> About.of(e).contains(thing))
+                .toList();
     }
 
     /**
@@ -392,7 +412,7 @@ public final class NatsLogStore implements LogStore {
      * It stops at the last sequence matching {@code filter} when the call started, so records
      * appended during the read are not waited for.
      */
-    private List<LogRecord> scan(long from, int max, String filter) {
+    private List<Logged> scan(long from, int max, String filter) {
         if (max <= 0) {
             return List.of();
         }
@@ -411,19 +431,18 @@ public final class NatsLogStore implements LogStore {
                     .build();
             JetStreamSubscription subscription = jetStream.subscribe(filter, options);
             try {
-                List<LogRecord> found = new ArrayList<>();
+                List<Logged> found = new ArrayList<>();
                 while (found.size() < max) {
                     Message message = subscription.nextMessage(READ_TIMEOUT);
                     if (message == null) {
-                        throw new LogStoreException("reading " + filter + " from position " + from
+                        throw new EventLogException("reading " + filter + " from position " + from
                                 + " timed out after " + found.size() + " records");
                     }
                     NatsJetStreamMetaData meta = message.metaData();
                     if (meta.streamSequence() > last) {
                         break;
                     }
-                    found.add(decode(meta.streamSequence(), message.getSubject(), message.getHeaders(),
-                            message.getData()));
+                    found.add(decode(meta.streamSequence(), message.getHeaders(), message.getData()));
                     if (meta.streamSequence() == last) {
                         break;
                     }
@@ -433,10 +452,10 @@ public final class NatsLogStore implements LogStore {
                 subscription.unsubscribe();
             }
         } catch (IOException | JetStreamApiException e) {
-            throw new LogStoreException("reading " + filter + " from position " + from + " failed", e);
+            throw new EventLogException("reading " + filter + " from position " + from + " failed", e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new LogStoreException("interrupted reading " + filter + " from position " + from, e);
+            throw new EventLogException("interrupted reading " + filter + " from position " + from, e);
         }
     }
 
@@ -455,17 +474,17 @@ public final class NatsLogStore implements LogStore {
         }
     }
 
-    private static LogRecord decode(long seq, String subject, Headers headers, byte[] data) {
+    /** The event a message holds; refuses one whose id does not match its content or its header. */
+    private static Logged decode(long seq, Headers headers, byte[] data) {
         String eventId = headers == null ? null : headers.getFirst(MSG_ID);
         if (eventId == null) {
-            throw new LogStoreException("message " + seq + " has no " + MSG_ID);
+            throw new EventLogException("message " + seq + " has no " + MSG_ID);
         }
-        String entities = headers.getFirst(ENTITY_IDS);
-        List<String> entityIds = entities == null || entities.isEmpty()
-                ? List.of()
-                : Arrays.stream(entities.split(",")).map(Subjects::decode).toList();
-        byte[] body = data == null ? new byte[0] : data;
-        return new LogRecord(seq, eventId, Subjects.eventType(subject), entityIds, body);
+        Event event = EventJson.read(new String(data == null ? new byte[0] : data, StandardCharsets.UTF_8));
+        if (!event.id().value().equals(eventId)) {
+            throw new EventLogException("message " + seq + " holds event " + event.id().value() + ", not " + eventId);
+        }
+        return new Logged(seq, event);
     }
 
     /**
@@ -477,9 +496,9 @@ public final class NatsLogStore implements LogStore {
      * {@link #read} fails on it too.
      */
     @Override
-    public Subscription subscribe(long fromPosition, Consumer<LogRecord> handler) {
+    public Following follow(long fromPosition, Consumer<Logged> handler) {
         long from = Math.max(fromPosition, 1);
-        NatsSubscription subscription = new NatsSubscription(handler);
+        NatsFollowing subscription = new NatsFollowing(handler);
         try {
             subscription.consumer = connection.getStreamContext(STREAM, jetStreamOptions)
                     .createOrderedConsumer(new OrderedConsumerConfiguration()
@@ -488,21 +507,21 @@ public final class NatsLogStore implements LogStore {
                             .startSequence(from))
                     .consume(CONSUME_OPTIONS, subscription::deliver);
         } catch (IOException | JetStreamApiException | RuntimeException e) {
-            throw new LogStoreException("subscribing from position " + from + " failed", e);
+            throw new EventLogException("following from position " + from + " failed", e);
         }
-        subscriptions.add(subscription);
+        followings.add(subscription);
         if (subscription.closed) {
             subscription.close(); // a record failed to decode before the consumer was assigned
         }
         return subscription;
     }
 
-    private final class NatsSubscription implements Subscription {
-        private final Consumer<LogRecord> handler;
+    private final class NatsFollowing implements Following {
+        private final Consumer<Logged> handler;
         private volatile MessageConsumer consumer;
         private volatile boolean closed;
 
-        NatsSubscription(Consumer<LogRecord> handler) {
+        NatsFollowing(Consumer<Logged> handler) {
             this.handler = handler;
         }
 
@@ -511,9 +530,9 @@ public final class NatsLogStore implements LogStore {
                 return;
             }
             long position = message.metaData().streamSequence();
-            LogRecord record;
+            Logged record;
             try {
-                record = decode(position, message.getSubject(), message.getHeaders(), message.getData());
+                record = decode(position, message.getHeaders(), message.getData());
             } catch (RuntimeException e) {
                 LOG.log(System.Logger.Level.ERROR, "subscription stopped: the record at position " + position
                         + " cannot be decoded: " + e.getMessage(), e);
@@ -526,7 +545,7 @@ public final class NatsLogStore implements LogStore {
                 handler.accept(record);
             } catch (RuntimeException e) {
                 LOG.log(System.Logger.Level.WARNING, "subscription handler failed on position " + position
-                        + ", event " + record.eventId() + "; delivery goes on", e);
+                        + ", event " + record.event().id().value() + "; delivery goes on", e);
             }
         }
 
@@ -534,7 +553,7 @@ public final class NatsLogStore implements LogStore {
         @Override
         public void close() {
             closed = true;
-            subscriptions.remove(this);
+            followings.remove(this);
             MessageConsumer c = consumer;
             if (c != null) {
                 try {
@@ -548,7 +567,7 @@ public final class NatsLogStore implements LogStore {
 
     @Override
     public void close() {
-        List.copyOf(subscriptions).forEach(NatsSubscription::close);
+        List.copyOf(followings).forEach(NatsFollowing::close);
         closeQuietly(connection);
     }
 
@@ -560,10 +579,10 @@ public final class NatsLogStore implements LogStore {
         }
     }
 
-    private static String describe(List<LogRecord> records) {
-        List<String> ids = records.stream().map(LogRecord::eventId).distinct().toList();
+    private static String describe(List<Event> records) {
+        List<String> ids = records.stream().map(r -> r.id().value()).distinct().toList();
         String shown = ids.size() <= 5 ? String.join(", ", ids)
                 : String.join(", ", ids.subList(0, 5)) + ", ... (" + (ids.size() - 5) + " more)";
-        return "append of " + records.size() + " records [" + shown + "]";
+        return "append of " + records.size() + " events [" + shown + "]";
     }
 }

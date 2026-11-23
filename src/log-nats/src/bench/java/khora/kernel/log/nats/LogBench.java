@@ -20,21 +20,26 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
-import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import khora.kernel.log.LogRecord;
+import java.util.Optional;
+import khora.kernel.event.AcceptedAction;
+import khora.kernel.event.Assertion;
+import khora.kernel.event.By;
+import khora.kernel.event.Event;
+import khora.kernel.event.Hlc;
+import khora.kernel.event.Identity;
+import khora.kernel.json.Json;
 
 /**
- * Measures {@link NatsLogStore} on one NATS server and prints one Markdown table, also written to
+ * Measures {@link NatsEventLog} on one NATS server and prints one Markdown table, also written to
  * {@code build/bench/results-<host>-<port>.md}.
  *
- * <p>Every scenario starts from an empty stream: the bench deletes the whole {@value NatsLogStore#STREAM}
+ * <p>Every scenario starts from an empty stream: the bench deletes the whole {@value NatsEventLog#STREAM}
  * stream through the JetStream management API (the stream denies deleting messages, not deleting the
- * stream) and {@link NatsLogStore#open} creates it again. So run it only against a server whose log
+ * stream) and {@link NatsEventLog#open} creates it again. So run it only against a server whose log
  * may be thrown away, such as the {@code nats-default-sync} service of {@code docker-compose.yml}
  * (port 4223). It refuses to start without {@code --wipe}, which says so.
  *
@@ -51,14 +56,16 @@ public final class LogBench {
     private static final int SMALL_ENTITY = 1_000;
     private static final int LARGE_ENTITY = 100_000;
     private static final int ENTITIES = 1000;
-    private static final String[] FOLLOW_TYPES = {"outcome", "effect", "observation"};
+    private static final By BY = new By("bench", Optional.empty(), "bench", "bench");
+    private static final Identity VALUE = Identity.named("bench/value");
     private static final String WIPE = "--wipe";
 
     private final String url;
     private final int appends;
     private final int warmup;
     private final int historyLog;
-    private final byte[] body = new byte[BODY_BYTES];
+    private final String body = "x".repeat(BODY_BYTES);
+    private final Hlc clock = Hlc.system();
     private final Map<String, String> rows = new LinkedHashMap<>();
 
     private LogBench(String url, int appends, int warmup, int historyLog) {
@@ -66,7 +73,6 @@ public final class LogBench {
         this.appends = appends;
         this.warmup = warmup;
         this.historyLog = historyLog;
-        new Random(19).nextBytes(body);
     }
 
     public static void main(String[] args) throws Exception {
@@ -77,7 +83,7 @@ public final class LogBench {
                     + " [--appends N] [--warmup N] [--history-log N]");
         }
         if (!options.containsKey(WIPE)) {
-            System.err.println("[bench] refused: the bench deletes the stream " + NatsLogStore.STREAM + " on " + url
+            System.err.println("[bench] refused: the bench deletes the stream " + NatsEventLog.STREAM + " on " + url
                     + " and every record in it. Pass --wipe to agree, and only against a server whose log may be"
                     + " thrown away, e.g. --url nats://localhost:4223 --monitor http://localhost:8223 --wipe.");
             System.exit(2);
@@ -137,11 +143,11 @@ public final class LogBench {
     private void latency(String scenario, int extra, int appenders) throws Exception {
         progress(scenario + " ...");
         freshStream();
-        List<NatsLogStore> stores = new ArrayList<>();
+        List<NatsEventLog> stores = new ArrayList<>();
         ExecutorService pool = Executors.newFixedThreadPool(appenders);
         try {
             for (int i = 0; i < appenders; i++) {
-                stores.add(NatsLogStore.open(url));
+                stores.add(NatsEventLog.open(url));
             }
             runAppenders(pool, stores, extra, warmup / appenders, new CountDownLatch(appenders));
             CountDownLatch ready = new CountDownLatch(appenders);
@@ -153,29 +159,29 @@ public final class LogBench {
             String suffix = appenders > 1 ? " (" + group(appends / appenders) + " per appender)" : "";
             rows.put(scenario + ", " + group(all.length) + " appends" + suffix,
                     "p50 " + millis(percentile(all, 50)) + ", p99 " + millis(percentile(all, 99))
-                            + "; " + group(Math.round(records / (elapsed / 1e9))) + " records/s");
+                            + "; " + group(Math.round(records / (elapsed / 1e9))) + " events/s");
             if (extra == 50 && appenders == 1) {
                 rows.put("Throughput, batches of 1 + 50, one appender",
-                        group(Math.round(records / (elapsed / 1e9))) + " records/s");
+                        group(Math.round(records / (elapsed / 1e9))) + " events/s");
             }
         } finally {
             pool.shutdownNow();
-            stores.forEach(NatsLogStore::close);
+            stores.forEach(NatsEventLog::close);
         }
     }
 
-    private List<long[]> runAppenders(ExecutorService pool, List<NatsLogStore> stores, int extra, int count,
+    private List<long[]> runAppenders(ExecutorService pool, List<NatsEventLog> stores, int extra, int count,
                                       CountDownLatch ready) throws Exception {
         List<Future<long[]>> futures = new ArrayList<>();
         for (int a = 0; a < stores.size(); a++) {
-            NatsLogStore store = stores.get(a);
+            NatsEventLog store = stores.get(a);
             int appender = a;
             futures.add(pool.submit(() -> {
                 long[] latencies = new long[count];
                 ready.countDown();
                 ready.await();
                 for (int i = 0; i < count; i++) {
-                    List<LogRecord> batch = batch("e-" + appender + "-" + (i % ENTITIES), extra);
+                    List<Event> batch = batch("e-" + appender + "-" + (i % ENTITIES), extra);
                     long t0 = System.nanoTime();
                     List<Long> positions = store.append(batch);
                     latencies[i] = System.nanoTime() - t0;
@@ -193,59 +199,62 @@ public final class LogBench {
         return results;
     }
 
-    private List<LogRecord> batch(String entity, int extra) {
-        List<LogRecord> batch = new ArrayList<>(1 + extra);
-        batch.add(record("action", entity));
-        for (int i = 0; i < extra; i++) {
-            batch.add(record(FOLLOW_TYPES[i % FOLLOW_TYPES.length], entity));
+    /** {@code 1 + extra} events about {@code entity}, appended as one atomic batch. */
+    private List<Event> batch(String entity, int extra) {
+        List<Event> batch = new ArrayList<>(1 + extra);
+        for (int i = 0; i <= extra; i++) {
+            batch.add(event(entity));
         }
         return batch;
     }
 
-    private LogRecord record(String type, String entity) {
-        return LogRecord.unappended(UUID.randomUUID().toString(), type, List.of(entity), body);
+    /** An accepted assert of one value, about {@code entity}, with a body of about {@value #BODY_BYTES} bytes. */
+    private Event event(String entity) {
+        return Event.create(List.of(), clock.next(), Optional.empty(), new AcceptedAction(BY, Assertion.action(
+                Assertion.of(Identity.named(entity), VALUE, new Assertion.Literal(new Json.Str(body))))));
     }
 
     /**
-     * Fills a log of {@code historyLog} records in batches of 1 000, with entity {@code small} on 1 000
-     * and {@code large} on 100 000 records spread evenly through it, then reads both histories.
+     * Fills a log of {@code historyLog} events in batches of 1 000, with entity {@code small} on 1 000
+     * and {@code large} on 100 000 events spread evenly through it, then reads the events about both.
+     * {@link NatsEventLog#about} has no index yet, so this measures a scan of the whole log.
      */
     private void history() {
-        progress("Filling a log of " + group(historyLog) + " records ...");
+        progress("Filling a log of " + group(historyLog) + " events ...");
         freshStream();
         int smallEvery = historyLog / SMALL_ENTITY;
         int largeEvery = historyLog / LARGE_ENTITY;
-        try (NatsLogStore store = NatsLogStore.open(url)) {
+        try (NatsEventLog store = NatsEventLog.open(url)) {
             long start = System.nanoTime();
             for (int b = 0; b < historyLog / FILL_BATCH; b++) {
-                List<LogRecord> batch = new ArrayList<>(FILL_BATCH);
+                List<Event> batch = new ArrayList<>(FILL_BATCH);
                 for (int j = 0; j < FILL_BATCH; j++) {
                     int g = b * FILL_BATCH + j;
                     String entity = g % smallEvery == 0 ? "small"
                             : g % largeEvery == 1 ? "large"
                             : "other-" + (g % 10_000);
-                    batch.add(record("action", entity));
+                    batch.add(event(entity));
                 }
                 store.append(batch);
                 if ((b + 1) % 100 == 0) {
-                    progress("  " + group((long) (b + 1) * FILL_BATCH) + " records, "
+                    progress("  " + group((long) (b + 1) * FILL_BATCH) + " events, "
                             + format(Duration.ofNanos(System.nanoTime() - start)));
                 }
             }
             long elapsed = System.nanoTime() - start;
-            rows.put("Fill of the " + group(historyLog) + "-record log, batches of " + group(FILL_BATCH) + ", one appender",
-                    format(Duration.ofNanos(elapsed)) + " (" + group(Math.round(historyLog / (elapsed / 1e9))) + " records/s)");
+            rows.put("Fill of the " + group(historyLog) + "-event log, batches of " + group(FILL_BATCH) + ", one appender",
+                    format(Duration.ofNanos(elapsed)) + " (" + group(Math.round(historyLog / (elapsed / 1e9))) + " events/s)");
             readHistory(store, "small", SMALL_ENTITY);
             readHistory(store, "large", LARGE_ENTITY);
         }
     }
 
-    private void readHistory(NatsLogStore store, String entity, int expected) {
-        progress("History of " + group(expected) + " records ...");
+    private void readHistory(NatsEventLog store, String entity, int expected) {
+        progress("History of " + group(expected) + " events ...");
         long[] times = new long[HISTORY_READS];
         for (int i = 0; i < HISTORY_READS; i++) {
             long t0 = System.nanoTime();
-            List<LogRecord> found = store.history(entity);
+            List<Event> found = store.about(Identity.named(entity));
             times[i] = System.nanoTime() - t0;
             if (found.size() != expected) {
                 throw new IllegalStateException("history of " + entity + " has " + found.size() + " records, not " + expected);
@@ -258,25 +267,25 @@ public final class LogBench {
                         + millis(times[0]) + ", max " + millis(times[HISTORY_READS - 1]) + ", first " + millis(first) + ")");
     }
 
-    /** Deletes the whole log stream, if there is one; the next {@link NatsLogStore#open} creates it empty. */
+    /** Deletes the whole log stream, if there is one; the next {@link NatsEventLog#open} creates it empty. */
     private void freshStream() {
         try (Connection connection = Nats.connect(url)) {
             JetStreamManagement management = connection.jetStreamManagement();
             try {
-                management.deleteStream(NatsLogStore.STREAM);
+                management.deleteStream(NatsEventLog.STREAM);
             } catch (JetStreamApiException e) {
                 if (e.getErrorCode() != 404) {
                     throw e;
                 }
             }
-            try (NatsLogStore store = NatsLogStore.open(url)) {
-                long messages = management.getStreamInfo(NatsLogStore.STREAM).getStreamState().getMsgCount();
+            try (NatsEventLog store = NatsEventLog.open(url)) {
+                long messages = management.getStreamInfo(NatsEventLog.STREAM).getStreamState().getMsgCount();
                 if (messages != 0) {
                     throw new IllegalStateException("fresh stream has " + messages + " messages");
                 }
             }
         } catch (IOException | JetStreamApiException e) {
-            throw new IllegalStateException("cannot recreate stream " + NatsLogStore.STREAM, e);
+            throw new IllegalStateException("cannot recreate stream " + NatsEventLog.STREAM, e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException(e);

@@ -33,7 +33,7 @@ import org.junit.jupiter.api.Test;
  * against {@value NatsTestServer#IMAGE}? Each test creates a fresh stream with the log's settings.
  * The tests print what NATS did, prefixed with "SPIKE", so the run can record it.
  *
- * <p>They also pin the server behaviour {@link NatsLogStore}'s duplicate handling depends on, observed
+ * <p>They also pin the server behaviour {@link NatsEventLog}'s duplicate handling depends on, observed
  * on 2.12.15: a batch holding a stored message id is refused with error 10201, and the duplicate check
  * runs before the expected-last-msg-id check. Run them again before changing the image.
  */

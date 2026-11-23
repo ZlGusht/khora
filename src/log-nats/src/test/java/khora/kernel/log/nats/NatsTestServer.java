@@ -28,7 +28,7 @@ import org.testcontainers.utility.MountableFile;
 public final class NatsTestServer implements AutoCloseable {
 
     /**
-     * Pinned, as in {@code docker-compose.yml}: {@link NatsLogStore}'s duplicate handling depends on
+     * Pinned, as in {@code docker-compose.yml}: {@link NatsEventLog}'s duplicate handling depends on
      * server behaviour observed on 2.12.15 (error 10201 for a batch holding a stored event id; the
      * duplicate check runs before the expected-last-msg-id check). {@code AtomicBatchSpikeTest} pins it.
      */
@@ -57,6 +57,7 @@ public final class NatsTestServer implements AutoCloseable {
                 .withCommand("-c", "/etc/nats/nats-server.conf")
                 .withExposedPorts(CLIENT_PORT, MONITOR_PORT)
                 .waitingFor(Wait.forLogMessage(".*Server is ready.*", 1));
+        hostUser().ifPresent(user -> c.withCreateContainerCmdModifier(cmd -> cmd.withUser(user)));
         c.start();
         container = c;
         requireSyncAlways();
@@ -148,6 +149,19 @@ public final class NatsTestServer implements AutoCloseable {
             paths.sorted(Comparator.reverseOrder()).forEach(p -> p.toFile().delete());
         } catch (IOException e) {
             throw new UncheckedIOException(e);
+        }
+    }
+
+    /**
+     * The host's {@code uid:gid}, on systems with Unix file owners. The server then writes the data
+     * directory as the host user, so {@link #close} can delete it; under a root daemon (Docker on
+     * Linux) it would otherwise be owned by root.
+     */
+    private java.util.Optional<String> hostUser() {
+        try {
+            return java.util.Optional.of(Files.getAttribute(dataDir, "unix:uid") + ":" + Files.getAttribute(dataDir, "unix:gid"));
+        } catch (UnsupportedOperationException | IOException e) {
+            return java.util.Optional.empty();
         }
     }
 
