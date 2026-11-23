@@ -2,7 +2,7 @@ package khora.kernel.surface;
 
 import java.util.Objects;
 import khora.kernel.event.Event;
-import khora.kernel.event.EventGraph;
+import khora.kernel.log.EventLog;
 
 /**
  * The surface that decides whether an action on its things is accepted
@@ -17,7 +17,7 @@ public interface Authority {
     String name();
 
     /** Whether {@code candidate} is accepted, given what {@code log} holds. */
-    Verdict decide(Event candidate, EventGraph log);
+    Verdict decide(Event candidate, EventLog log);
 
     sealed interface Verdict permits Accept, Reject {}
 

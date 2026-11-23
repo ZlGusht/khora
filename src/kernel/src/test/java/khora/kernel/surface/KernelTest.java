@@ -20,6 +20,7 @@ import khora.kernel.event.Hlc;
 import khora.kernel.event.Identity;
 import khora.kernel.event.Statement;
 import khora.kernel.json.Json;
+import khora.kernel.log.InMemoryEventLog;
 import khora.kernel.stub.InMemoryProjects;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -60,7 +61,7 @@ class KernelTest {
 
     @BeforeEach
     void createAProject() {
-        kernel = new Kernel(new InMemoryProjects(), new Hlc(() -> 1000));
+        kernel = new Kernel(new InMemoryProjects(), new InMemoryEventLog(), new Hlc(() -> 1000));
         created = accepted(kernel.submit(Assertion.action(Assertion.entity(), named(Identity.local(0), "Kitchen")),
                 ANNA, Frontier.empty(), Map.of()));
         project = Identity.of(created.id(), 0);

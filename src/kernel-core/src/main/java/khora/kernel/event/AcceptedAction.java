@@ -12,7 +12,7 @@ import java.util.TreeSet;
  *
  * <p>Links name how this event relates to others beyond knowing of them: what a write was based on,
  * what a read read at, what a translation came from. Every linked event is in the event's causal
- * past ([[An event's causes are what it knew]]); {@link EventGraph} refuses one that is not.
+ * past ([[An event's causes are what it knew]]); {@link Causality} finds one that is not.
  *
  * <p>Provisional: link names are free text until each kind of action defines its own.
  *

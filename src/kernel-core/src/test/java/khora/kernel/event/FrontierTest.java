@@ -11,13 +11,14 @@ import java.util.Set;
 import java.util.TreeSet;
 import org.junit.jupiter.api.BeforeEach;
 import java.util.Comparator;
+import khora.kernel.log.InMemoryEventLog;
 import org.junit.jupiter.api.Test;
 
 class FrontierTest {
 
     static final By BY = new By("anna", Optional.empty(), "g3", "projects");
 
-    EventGraph graph;
+    InMemoryEventLog graph;
     Event e1;
     Event e2;
     Event e3;
@@ -37,13 +38,13 @@ class FrontierTest {
 
     @BeforeEach
     void graph() {
-        graph = new EventGraph();
+        graph = new InMemoryEventLog();
         e1 = event(1000);
         e2 = event(1001, e1);
         e3 = event(1002, e2);
         e4 = event(1003, e1);
         for (var e : List.of(e1, e2, e3, e4)) {
-            graph.append(e);
+            graph.append(List.of(e));
         }
     }
 
@@ -96,12 +97,12 @@ class FrontierTest {
 
     @Test
     void longChainDoesNotOverflow() {
-        var chain = new EventGraph();
+        var chain = new InMemoryEventLog();
         var last = event(1);
-        chain.append(last);
+        chain.append(List.of(last));
         for (int i = 2; i <= 10_000; i++) {
             last = event(i, last);
-            chain.append(last);
+            chain.append(List.of(last));
         }
         assertEquals(new FrontierCheck.Valid(), FrontierCheck.validate(heads(last), chain));
         assertEquals(Order.BEFORE, FrontierCheck.compare(Frontier.empty(), heads(last), chain));

@@ -10,10 +10,9 @@ import java.util.Set;
 import java.util.TreeSet;
 import khora.kernel.event.AcceptedAction;
 import khora.kernel.event.Action;
-import khora.kernel.event.AppendResult;
 import khora.kernel.event.Basic;
+import khora.kernel.event.Causality;
 import khora.kernel.event.Event;
-import khora.kernel.event.EventGraph;
 import khora.kernel.event.EventId;
 import khora.kernel.event.Frontier;
 import khora.kernel.event.FrontierCheck;
@@ -21,9 +20,10 @@ import khora.kernel.event.Hlc;
 import khora.kernel.event.Identity;
 import khora.kernel.event.Statement;
 import khora.kernel.event.Statements;
+import khora.kernel.log.EventLog;
 
 /**
- * The log, the clock and the authority: where actions are submitted, become events, and are
+ * An event log, a clock and the authority: where actions are submitted, become events, and are
  * delivered ([[Surfaces receive and emit events by interest]]).
  *
  * <p>An action's causes are what the caller knew, a frontier, and the events it links to. A read
@@ -33,13 +33,14 @@ import khora.kernel.event.Statements;
  * its causes. What a surface emits in response is submitted as an action by that surface, knowing
  * what it had taken in, linked to its {@code source}.
  *
- * <p>Provisional: one authority, one in-memory log, synchronous delivery, no access checks at
- * delivery.
+ * <p>Provisional: one authority, synchronous delivery, no access checks at delivery; the kernel
+ * keeps the log's heads only while it runs, so it starts from an empty log.
  */
 public final class Kernel {
     private final Authority authority;
     private final Hlc clock;
-    private final EventGraph log = new EventGraph();
+    private final EventLog log;
+    private Frontier heads = Frontier.empty();
     private final List<Attachment> attached = new ArrayList<>();
 
     /** An attached surface and the frontier of what it has taken in. */
@@ -53,8 +54,9 @@ public final class Kernel {
         }
     }
 
-    public Kernel(Authority authority, Hlc clock) {
+    public Kernel(Authority authority, EventLog log, Hlc clock) {
         this.authority = Objects.requireNonNull(authority, "authority");
+        this.log = Objects.requireNonNull(log, "log");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -76,9 +78,15 @@ public final class Kernel {
         var known = FrontierCheck.closure(from.heads(), log);
         var attachment = new Attachment(Objects.requireNonNull(surface, "surface"), from);
         attached.add(attachment);
-        for (var event : log.events()) {
-            if (!known.contains(event.id()) && wants(surface, event)) {
-                deliver(attachment, event);
+        for (long position = 1; ; position += EventLog.MAX_APPEND) {
+            var page = log.read(position, EventLog.MAX_APPEND);
+            for (var logged : page) {
+                if (!known.contains(logged.event().id()) && wants(surface, logged.event())) {
+                    deliver(attachment, logged.event());
+                }
+            }
+            if (page.size() < EventLog.MAX_APPEND) {
+                return;
             }
         }
     }
@@ -108,9 +116,15 @@ public final class Kernel {
         if (authority.decide(event, log) instanceof Authority.Reject reject) {
             return new Answer.Rejected(reject.reason());
         }
-        if (log.append(event) instanceof AppendResult.Refused refused) {
-            return new Answer.Rejected(refused.reason().name());
+        var flaw = Causality.check(event, log);
+        if (flaw.isPresent()) {
+            return new Answer.Rejected(flaw.get().name());
         }
+        log.append(List.of(event));
+        var newHeads = new TreeSet<EventId>(heads.heads());
+        newHeads.removeAll(event.causes());
+        newHeads.add(event.id());
+        heads = new Frontier(newHeads);
         var answer = new Answer.Accepted(event, read.map(thing -> Statements.about(thing, knew, log)).orElse(List.of()));
         for (var attachment : List.copyOf(attached)) {
             if (attachment != origin && wants(attachment.surface, event)) {
@@ -134,7 +148,7 @@ public final class Kernel {
 
     /** Every event so far. */
     public synchronized Frontier frontier() {
-        return log.heads();
+        return heads;
     }
 
     /** The event a tuple, or an event's own identity, belongs to. */

@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.TreeSet;
 import khora.kernel.json.Json;
+import khora.kernel.log.InMemoryEventLog;
 import org.junit.jupiter.api.Test;
 
 class StatementsTest {
@@ -32,13 +33,13 @@ class StatementsTest {
 
     @Test
     void aRenameShowsByFrontier() {
-        var graph = new EventGraph();
+        var graph = new InMemoryEventLog();
         var e = event(1000, List.of(), Assertion.entity(), named(Identity.local(0), "Kitchen"));
         var project = Identity.of(e.id(), 0);
         var kitchen = Identity.of(e.id(), 1);
         var f = event(1001, List.of(e.id()), Assertion.retraction(kitchen), named(project, "Studio"));
-        graph.append(e);
-        graph.append(f);
+        graph.append(List.of(e));
+        graph.append(List.of(f));
 
         assertEquals(List.of(new Statement(project, Assertion.entity()), new Statement(kitchen, named(project, "Kitchen"))),
                 Statements.about(project, at(e), graph));
@@ -49,11 +50,11 @@ class StatementsTest {
 
     @Test
     void unrelatedEventsDoNotShow() {
-        var graph = new EventGraph();
+        var graph = new InMemoryEventLog();
         var e = event(1000, List.of(), Assertion.entity());
         var g = event(1001, List.of(), named(Identity.named("invoice"), "INV-1"));
-        graph.append(e);
-        graph.append(g);
+        graph.append(List.of(e));
+        graph.append(List.of(g));
         assertEquals(List.of(new Statement(Identity.of(e.id(), 0), Assertion.entity())),
                 Statements.about(Identity.of(e.id(), 0), at(e, g), graph));
     }
@@ -61,21 +62,21 @@ class StatementsTest {
     @Test
     void anUnknownFrontierIsRefused() {
         assertThrows(IllegalArgumentException.class,
-                () -> Statements.about(NAME, at(event(1, List.of())), new EventGraph()));
+                () -> Statements.about(NAME, at(event(1, List.of())), new InMemoryEventLog()));
     }
 
     @Test
     void theEmptyFrontierHoldsNothing() {
-        assertEquals(List.of(), Statements.about(NAME, Frontier.empty(), new EventGraph()));
+        assertEquals(List.of(), Statements.about(NAME, Frontier.empty(), new InMemoryEventLog()));
     }
 
     @Test
     void statementsAreInRecordedOrder() {
-        var graph = new EventGraph();
+        var graph = new InMemoryEventLog();
         var a = event(1000, List.of(), named(NAME, "first"));
         var b = event(1001, List.of(a.id()), named(NAME, "second"));
-        graph.append(a);
-        graph.append(b);
+        graph.append(List.of(a));
+        graph.append(List.of(b));
         assertEquals(List.of("first", "second"), Statements.about(NAME, at(b), graph).stream()
                 .map(s -> ((Json.Str) ((Assertion.Literal) s.assertion().value().orElseThrow()).value()).value())
                 .toList());

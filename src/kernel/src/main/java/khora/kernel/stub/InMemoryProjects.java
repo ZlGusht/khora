@@ -7,9 +7,9 @@ import khora.kernel.event.AcceptedAction;
 import khora.kernel.event.Assertion;
 import khora.kernel.event.Basic;
 import khora.kernel.event.Event;
-import khora.kernel.event.EventGraph;
 import khora.kernel.event.FrontierCheck;
 import khora.kernel.event.Identity;
+import khora.kernel.log.EventLog;
 import khora.kernel.surface.Authority;
 
 /**
@@ -27,7 +27,7 @@ public final class InMemoryProjects implements Authority {
     }
 
     @Override
-    public Verdict decide(Event candidate, EventGraph log) {
+    public Verdict decide(Event candidate, EventLog log) {
         var accepted = (AcceptedAction) candidate.body();
         if (Basic.readOf(accepted.action()).isPresent()) {
             return new Accept();
@@ -40,17 +40,23 @@ public final class InMemoryProjects implements Authority {
         }
         var known = FrontierCheck.closure(candidate.causes(), log);
         var touched = touched(candidate);
-        for (var event : log.events()) {
-            if (known.contains(event.id())) {
-                continue;
+        for (long from = 1; ; from += EventLog.MAX_APPEND) {
+            var page = log.read(from, EventLog.MAX_APPEND);
+            for (var logged : page) {
+                var event = logged.event();
+                if (known.contains(event.id())) {
+                    continue;
+                }
+                var overlap = touched(event);
+                overlap.retainAll(touched);
+                if (!overlap.isEmpty()) {
+                    return new Reject("conflicts with " + event.id().value() + ", which the write did not know of");
+                }
             }
-            var overlap = touched(event);
-            overlap.retainAll(touched);
-            if (!overlap.isEmpty()) {
-                return new Reject("conflicts with " + event.id().value() + ", which the write did not know of");
+            if (page.size() < EventLog.MAX_APPEND) {
+                return new Accept();
             }
         }
-        return new Accept();
     }
 
     /** The (identity, attribute) pairs an event asserts on. */
