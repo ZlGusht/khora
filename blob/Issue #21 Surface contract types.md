@@ -39,7 +39,7 @@ Issue #21 (plan task K4) of [[Milestone Stage 1 kernel core]]: the surface contr
 
 - [[The kernel is implemented in Java]]
 - [[EventId starts as a minimal placeholder record]]
-- [[The kernel builds with Maven on Java 25]]
+- [[The kernel builds with Maven on Java 25]]: reversed in review of PR #35, for [[The kernel is written in Java 25 and built with Gradle]] from #37. The kernel is the Gradle module `:kernel`; the Maven steps in the plan below are history.
 - [[Contract unions are sealed interfaces with records]]
 - [[Optional surface capabilities are separate interfaces]]
 - [[Surface changes are read through a blocking ChangeFeed]]
