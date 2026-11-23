@@ -3,11 +3,11 @@ plugins {
 }
 
 dependencies {
-    api(project(":kernel-core"))
+    api(project(":events"))
     implementation(libs.jnats)
     implementation(libs.batch.publish)
 
-    testImplementation(testFixtures(project(":kernel-core")))
+    testImplementation(testFixtures(project(":events")))
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.testcontainers)
     testRuntimeOnly(libs.junit.platform.launcher)
@@ -37,7 +37,7 @@ tasks.register<JavaExec>("bench") {
     group = "verification"
     description = "Measures the NATS log store on the server given by --url."
     classpath = bench.runtimeClasspath
-    mainClass.set("khora.kernel.log.nats.LogBench")
+    mainClass.set("khora.events.log.nats.LogBench")
     workingDir = rootProject.projectDir
     maxHeapSize = "2g"
 }
