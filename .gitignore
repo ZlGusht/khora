@@ -9,3 +9,6 @@ transcripts/
 
 # Ignore Smart Environment folder
 .smart-env
+
+.gradle/
+build/
