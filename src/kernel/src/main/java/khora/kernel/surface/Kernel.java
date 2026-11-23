@@ -1,5 +1,6 @@
 package khora.kernel.surface;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,12 +29,29 @@ import khora.kernel.event.Statements;
  * <p>An action's causes are what the caller knew, a frontier, and the events it links to. A read
  * links the frontier it reads at as {@code at}, and answers with the statements that hold there.
  *
- * <p>Provisional: one authority, one in-memory log, synchronous delivery.
+ * <p>Every accepted event is delivered to each attached surface whose interests it matches, after
+ * its causes. What a surface emits in response is submitted as an action by that surface, knowing
+ * what it had taken in, linked to its {@code source}.
+ *
+ * <p>Provisional: one authority, one in-memory log, synchronous delivery, no access checks at
+ * delivery.
  */
 public final class Kernel {
     private final Authority authority;
     private final Hlc clock;
     private final EventGraph log = new EventGraph();
+    private final List<Attachment> attached = new ArrayList<>();
+
+    /** An attached surface and the frontier of what it has taken in. */
+    private static final class Attachment {
+        final Surface surface;
+        Frontier taken;
+
+        Attachment(Surface surface, Frontier taken) {
+            this.surface = surface;
+            this.taken = taken;
+        }
+    }
 
     public Kernel(Authority authority, Hlc clock) {
         this.authority = Objects.requireNonNull(authority, "authority");
@@ -45,6 +63,28 @@ public final class Kernel {
      * {@code links}. If the authority accepts it, it is appended as an event.
      */
     public synchronized Answer submit(Action action, Context context, Frontier knew, Map<String, Set<EventId>> links) {
+        return accept(action, context, knew, links, null);
+    }
+
+    /**
+     * Attaches {@code surface}, which has taken in {@code from}: it is sent every matching event not in
+     * {@code from}, in order, then each new one that matches.
+     *
+     * @throws IllegalArgumentException if the log lacks an event of {@code from}
+     */
+    public synchronized void attach(Surface surface, Frontier from) {
+        var known = FrontierCheck.closure(from.heads(), log);
+        var attachment = new Attachment(Objects.requireNonNull(surface, "surface"), from);
+        attached.add(attachment);
+        for (var event : log.events()) {
+            if (!known.contains(event.id()) && wants(surface, event)) {
+                deliver(attachment, event);
+            }
+        }
+    }
+
+    private Answer accept(Action action, Context context, Frontier knew, Map<String, Set<EventId>> links,
+            Attachment origin) {
         if (FrontierCheck.validate(knew, log) instanceof FrontierCheck.Invalid invalid) {
             return new Answer.Rejected("unknown event " + invalid.missing().value());
         }
@@ -71,12 +111,35 @@ public final class Kernel {
         if (log.append(event) instanceof AppendResult.Refused refused) {
             return new Answer.Rejected(refused.reason().name());
         }
-        return new Answer.Accepted(event, read.map(thing -> Statements.about(thing, knew, log)).orElse(List.of()));
+        var answer = new Answer.Accepted(event, read.map(thing -> Statements.about(thing, knew, log)).orElse(List.of()));
+        for (var attachment : List.copyOf(attached)) {
+            if (attachment != origin && wants(attachment.surface, event)) {
+                deliver(attachment, event);
+            }
+        }
+        return answer;
+    }
+
+    private void deliver(Attachment attachment, Event event) {
+        attachment.taken = FrontierCheck.combine(attachment.taken, new Frontier(new TreeSet<>(Set.of(event.id()))), log);
+        var by = new Context(attachment.surface.name(), Optional.empty(), "surface", 0);
+        for (var action : attachment.surface.receive(event)) {
+            accept(action, by, attachment.taken, Map.of("source", Set.of(event.id())), attachment);
+        }
+    }
+
+    private static boolean wants(Surface surface, Event event) {
+        return surface.interests().stream().anyMatch(interest -> interest.matches(event));
     }
 
     /** Every event so far. */
     public synchronized Frontier frontier() {
         return log.heads();
+    }
+
+    /** The event a tuple, or an event's own identity, belongs to. */
+    public synchronized Optional<Event> event(Identity tuple) {
+        return tuple.event().flatMap(log::get);
     }
 
     /** What holds about {@code thing} at {@code at}, without recording a read. */

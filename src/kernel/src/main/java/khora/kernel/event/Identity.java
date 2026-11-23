@@ -1,6 +1,7 @@
 package khora.kernel.event;
 
 import java.util.Objects;
+import java.util.Optional;
 import java.util.regex.Pattern;
 
 /**
@@ -40,6 +41,12 @@ public record Identity(String value) {
     /** This identity as written in {@code event}: a local one becomes that event's tuple. */
     public Identity in(EventId event) {
         return value.startsWith("/") ? new Identity(event.value() + value) : this;
+    }
+
+    /** The event whose tuple this is, if it is a tuple of an event. */
+    public Optional<EventId> event() {
+        int slash = value.indexOf('/');
+        return slash > 0 ? Optional.of(new EventId(value.substring(0, slash))) : Optional.empty();
     }
 
     /** The identity of a well-known name, such as a basic attribute. */
