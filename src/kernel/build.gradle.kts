@@ -3,6 +3,8 @@ plugins {
 }
 
 dependencies {
+    api(project(":kernel-core"))
+    testImplementation(testFixtures(project(":kernel-core")))
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly(libs.junit.platform.launcher)
 }
