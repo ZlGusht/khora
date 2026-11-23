@@ -12,9 +12,9 @@ relationships__originates_in:
 relationships__decided_by:
   - "[[Simeon Petkov]]"
 properties__decided_on: 2026-11-19
-properties__status: "active"
-properties__kind: "design"
-properties__quote: "Accept all"
+properties__status: reversed
+properties__kind: design
+properties__quote: Accept all
 properties__author: agent:claude-opus-5-5
 ---
 ## Statement
