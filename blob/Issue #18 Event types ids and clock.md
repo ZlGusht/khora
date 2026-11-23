@@ -11,12 +11,13 @@ relationships__in_process:
 relationships__in_context_of:
   - "[[Log]]"
   - "[[Runtime]]"
-properties__status: closed
+properties__status: open
 properties__started_at: 2026-11-19
-properties__current_phase: Process(v)
+properties__current_phase: Operate
 properties__issue: 18
 properties__author: agent:claude-opus-5-5
-properties__ended_at: 2026-11-22
+properties__pull_requests:
+  - "36"
 ---
 Issue #18 (plan task K1) of [[Milestone Stage 1 kernel core]]: the four event types, their content-hash ids and the hybrid logical clock, in Java. Opened with [[Simeon Petkov]]. It runs in parallel with [[Issue #21 Surface contract types]].
 
@@ -241,3 +242,16 @@ Start only after the Issue #21 run has closed; rebase onto its final branch firs
 **Checked.** 80 tests pass with no `-Xlint` warnings. Every entity this run wrote validates. Two whole-branch reviews: the first found four Important issues (lone surrogates, deep nesting, clock overflow, foreign comparators), the second four more (unknown JSON members dropped, asserts not validated on construction, the canvas stating causes as what was read, two conflicting Decisions); all were fixed, the code ones with a test that failed first. `khora-stale` reports documents older than this run's Decisions, which is expected until Update View runs after the merge. No deciding sentence was added to `docs/`.
 
 **Flagged** as Letters on this run: security (who acted is claimed, not proven; salts not shredded; no size limits on parsed JSON; named identities and event ids share one form), change later (large integers versus RFC 8785; named links; the stub's frontiers; the clock serves one writer; documents lag the Decisions), performance (frontier walks; double hashing and copying; reads multiply the log).
+
+## Plan: surfaces by emission
+
+Decided in [[Surfaces receive and emit events by interest]], [[Effects are not a notion of their own]] and [[Reads return statements and writes follow a read]]. Tests first for each task; `./mvnw -q test` green after each.
+
+1. **Named links.** `AcceptedAction` gains `links`, a map from a name to event ids, written in its JSON and covered by the id. `EventGraph` refuses an event with a link outside its causal past, and gives its events in append order and its heads.
+2. **Who acts and what interests.** `Context(principal, onBehalfOf, grant, budget)` makes the `By` of a call through a surface. `Interest(definitions, about)` matches an accepted action by its definition and by the identities its tuples, or the read, are about.
+3. **Statements.** The statements that hold about a thing at a frontier: its tuples in the frontier, without retracted ones.
+4. **Submitting to the authority.** `Kernel.submit(action, context, knew, links)` makes the candidate event and hands it to the `Authority`, which accepts or rejects it. An accepted event is appended. `Answer` is `Accepted(event, statements)` or `Rejected(reason)`. The stub `InMemoryProjects` answers reads with statements, refuses a write linked `based_on` a read when an event it did not know of asserts on the same identity and attribute, and accepts blind writes.
+5. **Receiving.** `Kernel.attach(surface, from)` sends a `Surface` the matching events not in `from`, then each new accepted event that matches, synchronously. What a surface emits in response becomes an event caused by what it had taken in, linked to its `source`.
+6. **Cut** the request-and-response contract: `Actions`, `Annotation`, `Budget`, `Change`, `ChangeFeed`, `ChangingSurface`, `Completeness`, `Condition`, `Declaration`, `Effects`, `Grant`, `History`, `Operation`, `Principal`, `ReadRequest`, `ReadTime`, `Reads`, `Result`, `WritableSurface`, `WriteAnswer`, `Writes`, and the old stub.
+
+Agent calls: one authority per kernel for now; delivery is synchronous; a read is `Action(read, {"of": identity})` with the frontier it reads at as its `at` link.

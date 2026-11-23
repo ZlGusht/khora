@@ -17,8 +17,8 @@ relationships__supersedes:
   - "[[Surface changes take no context for now]]"
   - "[[Optional surface capabilities are separate interfaces]]"
 properties__decided_on: 2026-11-22
-properties__status: "active"
-properties__kind: "design"
+properties__status: superseded
+properties__kind: design
 properties__author: agent:claude-opus-5-5
 ---
 ## Statement
