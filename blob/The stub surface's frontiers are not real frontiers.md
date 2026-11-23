@@ -9,7 +9,7 @@ relationships__in_context_of:
   - "[[Issue #18 Event types ids and clock]]"
 properties__type: change-later
 properties__priority: 3
-properties__resolved: false
+properties__resolved: true
 properties__author: agent:claude-opus-5-5
 ---
 ## Context
@@ -21,3 +21,5 @@ Flagged in the Observe of [[Issue #18 Event types ids and clock]], from the revi
 The stub's frontier after a write is that write's action alone, with no causes, and none of its actions are in an event graph. It relies on its actions having unique ids, and recognises frontiers only by equality.
 
 When: Replace when surfaces emit events and read at real frontiers (K6, K7).
+
+Resolved when surfaces moved to emission by interest: the stub surface is gone; the kernel keeps an event log, its frontiers are sets of the log's events, and the projects authority checks conflicts against them.

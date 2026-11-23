@@ -6,11 +6,11 @@ Java 25 everywhere: the code is compiled and tested with Java 25, and the Gradle
 
 | Module | Package | What it holds |
 | --- | --- | --- |
-| `kernel` | `khora.kernel.surface`, `khora.kernel.event`, `khora.kernel.stub` | The surface contract: the call context, frontiers, reads and writes, and an in-memory stub surface. No dependencies. |
-| `kernel-core` | `khora.kernel.log` | `LogStore`, `LogRecord`, `Subscription`, `LogStoreException`. Test fixtures: `InMemoryLogStore` and `LogStoreContract`, the tests every store must pass. No NATS dependency. |
-| `log-nats` | `khora.kernel.log.nats` | `NatsLogStore`: the log on NATS JetStream. Tests run against real NATS in Docker. `bench` source set: `LogBench`. |
+| `kernel-core` | `khora.kernel.event`, `khora.kernel.json`, `khora.kernel.log` | Events and the log. An `Event` is something that happened, kept with what it knew of; an accepted action, whose asserts are tuples `(identity, attribute, value)`, is its one kind so far. Ids are salted hashes of canonical JSON; recorded time is a hybrid logical clock; frontiers are sets of events closed under causes; `Causality` checks an event against what it knew. `EventLog` stores events. Test fixtures: `InMemoryEventLog` and `EventLogContract`, the tests every log must pass. No dependencies. |
+| `kernel` | `khora.kernel.surface`, `khora.kernel.stub` | Surfaces, in the language of events: a `Surface` receives the events its interests match and emits actions in response; an `Authority` accepts or rejects actions on its things; the `Kernel` turns accepted actions into events in an `EventLog` and delivers them. `InMemoryProjects` is a stub authority. |
+| `log-nats` | `khora.kernel.log.nats` | `NatsEventLog`: the event log on NATS JetStream. Tests run against real NATS in Docker. `bench` source set: `LogBench`. |
 
-Design, decisions and measurements: the runs `blob/Issue #21 Surface contract types.md` (`kernel`) and `blob/Issue #19 Log store on NATS.md` (`kernel-core`, `log-nats`).
+Design, decisions and measurements: the runs `blob/Issue #18 Event types ids and clock.md` (`kernel-core`'s events, `kernel`), `blob/Issue #21 Surface contract types.md` and `blob/Issue #19 Log store on NATS.md` (`log-nats`).
 
 ## Prerequisites
 
@@ -40,28 +40,31 @@ On macOS, keep the machine awake for long runs (`caffeinate -i ./gradlew test`):
 ## Using the log from code
 
 ```java
-try (LogStore log = NatsLogStore.open("nats://localhost:4222")) {
-    List<Long> positions = log.append(List.of(
-        LogRecord.unappended("a1", "action",  List.of(),               actionJson),
-        LogRecord.unappended("o1", "outcome", List.of(),               outcomeJson),
-        LogRecord.unappended("e1", "effect",  List.of("p:kitchen-1"),  effectJson)));
+try (EventLog log = NatsEventLog.open("nats://localhost:4222")) {
+    var anna = new By("anna", Optional.empty(), "g3", "projects");
+    var created = Event.create(List.of(), Hlc.system().next(), Optional.empty(), new AcceptedAction(anna,
+        Assertion.action(Assertion.entity(),          // /0: a new thing
+            Assertion.of(Identity.local(0), Identity.named("name"), new Assertion.Literal(new Json.Str("Kitchen"))))));
+    List<Long> positions = log.append(List.of(created));
 
-    List<LogRecord> history = log.history("p:kitchen-1");
+    Identity project = Identity.of(created.id(), 0);
+    List<Event> about = log.about(project);              // the events about the project
 
-    try (Subscription s = log.subscribe(1, record -> apply(record))) {
-        // records from position 1 on, then new ones as they arrive
+    try (Following f = log.follow(1, logged -> apply(logged.event()))) {
+        // events from position 1 on, then new ones as they arrive
     }
 }
 ```
 
-What the store promises is in the Javadoc of `LogStore`. In short:
+Most code goes through the `Kernel` instead, which checks `Causality`, asks the `Authority`, appends and delivers. What the log promises is in the Javadoc of `EventLog`. In short:
 
-- `append` stores all records or none. An exception does not always mean "not stored": after a timeout the batch may be stored whole. Retrying with the same event ids within 2 minutes is safe and returns the original positions.
-- A duplicate event id is caught within the deduplication window (2 minutes on NATS). Beyond it, uniqueness comes from content-hash event ids (K1).
-- More than 1000 records in one append are refused. Event ids are printable ASCII, with no space at either end.
-- A subscription may stop on a record it cannot read; the store logs the position.
+- `append` stores all events or none. An exception does not always mean "not stored": after a timeout the batch may be stored whole. Appending the same events again is safe.
+- An event is stored once: within NATS's deduplication window (2 minutes) by its id; beyond it, ids are salted content hashes, so different events never share one.
+- More than 1000 events in one append are refused.
+- `about` reads the whole log: there is no index yet.
+- Following may stop on an event it cannot read; the log logs the position.
 
-For tests of code that uses the log, depend on `kernel-core`'s test fixtures and use `InMemoryLogStore`. To check a new `LogStore` implementation, extend `LogStoreContract`.
+For tests of code that uses the log, depend on `kernel-core`'s test fixtures and use `InMemoryEventLog`. To check a new `EventLog`, extend `EventLogContract`.
 
 ## Run NATS locally
 
@@ -94,9 +97,9 @@ Results are printed and written to `src/log-nats/build/bench/`. A full run takes
 
 ## For agents (Claude Code)
 
-- Start every session with `docker info`. If Docker is not running, ask the person to start Docker Desktop; do not work around it.
+- Start every session with `docker info`. If Docker is not running, ask the person to start Docker Desktop; do not work around it. On Linux the user must be in the `docker` group; a Gradle daemon started before that cannot reach Docker (`./gradlew --stop`).
 - Verify with `./gradlew test`. Pass `--rerun-tasks` when you need the tests to run again although nothing changed.
 - Keep test output quiet: no `System.out`, and no logging below WARNING in tests.
 - Never run the benchmark against port 4222 or without the person's go-ahead: it deletes the stream.
-- Do not change the Java version, the NATS image tag (`nats:2.12.15-alpine`) or the stream settings without a Decision: the duplicate handling in `NatsLogStore` depends on NATS 2.12.15 behaviour that `AtomicBatchSpikeTest` pins.
+- Do not change the Java version, the NATS image tag (`nats:2.12.15-alpine`) or the stream settings without a Decision: the duplicate handling in `NatsEventLog` depends on NATS 2.12.15 behaviour that `AtomicBatchSpikeTest` pins.
 - Repository rules (Decisions, `blob/`, loop runs) are in `CLAUDE.md` at the root.

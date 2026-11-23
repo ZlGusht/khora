@@ -10,7 +10,7 @@
 # `nats-default-sync` (client port 4223, monitor 8223) runs the default-sync config next to `nats`,
 # with its own volume, so the benchmark (./gradlew :log-nats:bench) can measure both side by side.
 #
-# The image is pinned: NatsLogStore's duplicate handling depends on server behaviour observed on
+# The image is pinned: NatsEventLog's duplicate handling depends on server behaviour observed on
 # 2.12.15 (error 10201 for a batch that holds a stored event id; the duplicate check runs before
 # the expected-last-msg-id check). AtomicBatchSpikeTest pins that behaviour; NatsTestServer uses
 # the same image. Upgrade all three together.

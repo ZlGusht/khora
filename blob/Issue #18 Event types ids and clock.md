@@ -255,3 +255,14 @@ Decided in [[Surfaces receive and emit events by interest]], [[Effects are not a
 6. **Cut** the request-and-response contract: `Actions`, `Annotation`, `Budget`, `Change`, `ChangeFeed`, `ChangingSurface`, `Completeness`, `Condition`, `Declaration`, `Effects`, `Grant`, `History`, `Operation`, `Principal`, `ReadRequest`, `ReadTime`, `Reads`, `Result`, `WritableSurface`, `WriteAnswer`, `Writes`, and the old stub.
 
 Agent calls: one authority per kernel for now; delivery is synchronous; a read is `Action(read, {"of": identity})` with the frontier it reads at as its `at` link.
+
+## One kernel with K2 and K4
+
+After #35 (K4) and #37 (K2) merged, the kernel was made one coherent thing in the language of events:
+- **Build:** Gradle only, as decided in the Issue #19 run; Maven is gone.
+- **Modules by meaning:** `kernel-core` holds events and the log, `kernel` holds surfaces and the stub, `log-nats` stores events on NATS.
+- **The log stores events.** `LogStore` and `LogRecord`, with their four ADR types (action, outcome, effect, observation), became `EventLog`, which appends, reads, gets by id, finds events about a thing and follows; K2's contract tests carry over to events.
+- **No event graph.** Its rules became `Causality`, checked against the log before an event is appended; the log is the only store.
+- **NATS** files each event under its id, with its canonical JSON as data.
+
+All 126 tests pass, including the NATS ones against NATS 2.12.15 in Docker. Flagged: [[Reading what a thing is about scans the whole log]].
