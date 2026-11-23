@@ -10,5 +10,6 @@ transcripts/
 # Ignore Smart Environment folder
 .smart-env
 
+# Java build output
 .gradle/
 build/

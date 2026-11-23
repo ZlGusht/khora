@@ -6,10 +6,11 @@ Java 25 everywhere: the code is compiled and tested with Java 25, and the Gradle
 
 | Module | Package | What it holds |
 | --- | --- | --- |
+| `kernel` | `khora.kernel.surface`, `khora.kernel.event`, `khora.kernel.stub` | The surface contract: the call context, frontiers, reads and writes, and an in-memory stub surface. No dependencies. |
 | `kernel-core` | `khora.kernel.log` | `LogStore`, `LogRecord`, `Subscription`, `LogStoreException`. Test fixtures: `InMemoryLogStore` and `LogStoreContract`, the tests every store must pass. No NATS dependency. |
 | `log-nats` | `khora.kernel.log.nats` | `NatsLogStore`: the log on NATS JetStream. Tests run against real NATS in Docker. `bench` source set: `LogBench`. |
 
-Design, decisions and measurements: the run `blob/Issue #19 Log store on NATS.md`.
+Design, decisions and measurements: the runs `blob/Issue #21 Surface contract types.md` (`kernel`) and `blob/Issue #19 Log store on NATS.md` (`kernel-core`, `log-nats`).
 
 ## Prerequisites
 

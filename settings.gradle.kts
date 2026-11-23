@@ -5,6 +5,9 @@ plugins {
 
 rootProject.name = "khora"
 
+include(":kernel")
+project(":kernel").projectDir = file("src/kernel")
+
 include(":kernel-core")
 project(":kernel-core").projectDir = file("src/kernel-core")
 
