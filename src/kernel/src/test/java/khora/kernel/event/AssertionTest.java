@@ -47,9 +47,10 @@ class AssertionTest {
     }
 
     @Test
-    void tuplesOfOneEventAreIdentifiedByIndex() {
+    void localIdentitiesResolveInTheirEvent() {
         var e = EventId.hashOf("e");
-        assertEquals(Identity.of(e, 0), Assertion.identityIn(e, 0));
+        assertEquals(Assertion.of(Identity.of(e, 0), NAME, new Assertion.Ref(Identity.of(e, 1))),
+                Assertion.of(Identity.local(0), NAME, new Assertion.Ref(Identity.local(1))).in(e));
     }
 
     @Test

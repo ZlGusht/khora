@@ -27,4 +27,13 @@ class IdentityTest {
         }
         assertThrows(IllegalArgumentException.class, () -> Identity.of(EventId.hashOf("e"), -1));
     }
+
+    @Test
+    void aLocalIdentityNamesATupleOfTheSameEvent() {
+        var e = EventId.hashOf("e");
+        assertEquals("/1", Identity.local(1).value());
+        assertEquals(Identity.of(e, 1), Identity.local(1).in(e));
+        assertEquals(Identity.named("x"), Identity.named("x").in(e));
+        assertThrows(IllegalArgumentException.class, () -> new Identity("/-1"));
+    }
 }

@@ -66,9 +66,10 @@ public record Assertion(Optional<Identity> identity, Optional<Identity> attribut
         return of(assertion, Basic.RETRACTED, new Literal(new Json.Str("true")));
     }
 
-    /** The identity of the {@code index}-th assertion of the event {@code event}. */
-    public static Identity identityIn(EventId event, int index) {
-        return Identity.of(event, index);
+    /** This tuple as written in {@code event}: its local identities resolved. */
+    public Assertion in(EventId event) {
+        return new Assertion(identity.map(i -> i.in(event)), attribute.map(a -> a.in(event)),
+                value.map(v -> v instanceof Ref r ? new Ref(r.id().in(event)) : v));
     }
 
     /** The assert action carrying {@code tuples}, in order. */

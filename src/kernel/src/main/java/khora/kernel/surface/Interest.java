@@ -60,6 +60,7 @@ public record Interest(Set<Identity> definitions, Set<Identity> about) {
             for (int i = 0; i < tuples.size(); i++) {
                 var tuple = tuples.get(i);
                 things.add(Identity.of(event.id(), i));
+                tuple = tuple.in(event.id());
                 tuple.identity().ifPresent(things::add);
                 tuple.value().ifPresent(v -> {
                     if (v instanceof Assertion.Ref ref) {
