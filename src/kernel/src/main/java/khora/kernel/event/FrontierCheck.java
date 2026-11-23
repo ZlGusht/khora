@@ -79,8 +79,12 @@ public final class FrontierCheck {
         return Frontier.of(ids, source);
     }
 
-    /** {@code ids} and all their causes. */
-    static Set<EventId> closure(Collection<EventId> ids, EventSource source) {
+    /**
+     * {@code ids} and all their causes: everything they knew of.
+     *
+     * @throws IllegalArgumentException if {@code source} lacks one of them
+     */
+    public static Set<EventId> closure(Collection<EventId> ids, EventSource source) {
         var seen = new HashSet<EventId>();
         var work = new ArrayDeque<EventId>(ids);
         while (!work.isEmpty()) {
