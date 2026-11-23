@@ -38,6 +38,11 @@ public record AcceptedAction(By by, Action action, Map<String, Set<EventId>> lin
         links = Collections.unmodifiableSortedMap(copy);
     }
 
+    @Override
+    public String kind() {
+        return "accepted_action";
+    }
+
     /** An accepted action without links. */
     public AcceptedAction(By by, Action action) {
         this(by, action, Map.of());
