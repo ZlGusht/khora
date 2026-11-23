@@ -14,7 +14,7 @@ import khora.kernel.json.Json;
  *
  * <p>Provisional: the layout follows the Issue #18 design:
  * {@code {"body":{"accepted_action":{"action":{"args":…,"definition":…},
- * "by":{"grant","on_behalf_of"?,"principal","via"}}},"causes":[…],"id"?,"occurred"?,"recorded","salt"}}.
+ * "by":{"grant","on_behalf_of"?,"principal","via"},"links"?:{name:[…]}}},"causes":[…],"id"?,"occurred"?,"recorded","salt"}}.
  * A body is an object with one member, named after its kind. Unknown members are refused at every
  * level, because the id covers only what is read.
  */
@@ -35,13 +35,7 @@ public final class EventJson {
     /** The event read from JSON; refuses an id that does not match the content. */
     public static Event fromJson(Json.Obj o) {
         only(o, Set.of("body", "causes", "id", "occurred", "recorded", "salt"));
-        var causes = new TreeSet<EventId>();
-        for (var cause : o.arr("causes").items()) {
-            if (!(cause instanceof Json.Str s)) {
-                throw new IllegalArgumentException("a cause is not a string");
-            }
-            causes.add(new EventId(s.value()));
-        }
+        var causes = eventIds(o.arr("causes"));
         Optional<Long> occurred = o.get("occurred").isPresent() ? Optional.of(o.integer("occurred")) : Optional.empty();
         return new Event(new EventId(o.str("id")), causes, o.integer("recorded"), occurred, o.str("salt"),
                 body(o.obj("body")));
@@ -62,12 +56,9 @@ public final class EventJson {
 
     static Json.Obj content(SortedSet<EventId> causes, long recorded, Optional<Long> occurred, String salt,
             Body body) {
-        var causeItems = new ArrayList<Json>();
-        causes.forEach(c -> causeItems.add(new Json.Str(c.value())));
-
         var members = new HashMap<String, Json>();
         members.put("body", body(body));
-        members.put("causes", new Json.Arr(causeItems));
+        members.put("causes", ids(causes));
         occurred.ifPresent(t -> members.put("occurred", new Json.Int(t)));
         members.put("recorded", new Json.Int(recorded));
         members.put("salt", new Json.Str(salt));
@@ -76,11 +67,19 @@ public final class EventJson {
 
     private static Json.Obj body(Body body) {
         return switch (body) {
-            case AcceptedAction a -> Json.Obj.of(Map.of("accepted_action", Json.Obj.of(Map.of(
-                    "by", by(a.by()),
-                    "action", Json.Obj.of(Map.of(
-                            "definition", new Json.Str(a.action().definition().value()),
-                            "args", a.action().args()))))));
+            case AcceptedAction a -> {
+                var members = new HashMap<String, Json>();
+                members.put("by", by(a.by()));
+                members.put("action", Json.Obj.of(Map.of(
+                        "definition", new Json.Str(a.action().definition().value()),
+                        "args", a.action().args())));
+                if (!a.links().isEmpty()) {
+                    var links = new HashMap<String, Json>();
+                    a.links().forEach((name, ids) -> links.put(name, ids(ids)));
+                    members.put("links", Json.Obj.of(links));
+                }
+                yield Json.Obj.of(Map.of("accepted_action", Json.Obj.of(members)));
+            }
         };
     }
 
@@ -91,11 +90,20 @@ public final class EventJson {
         var kind = o.members().firstKey();
         if (kind.equals("accepted_action")) {
             var a = o.obj(kind);
-            only(a, Set.of("action", "by"));
+            only(a, Set.of("action", "by", "links"));
             var action = a.obj("action");
             only(action, Set.of("args", "definition"));
+            var links = new HashMap<String, Set<EventId>>();
+            if (a.get("links").isPresent()) {
+                a.obj("links").members().forEach((name, value) -> {
+                    if (!(value instanceof Json.Arr arr)) {
+                        throw new IllegalArgumentException("link " + name + " is not a list");
+                    }
+                    links.put(name, eventIds(arr));
+                });
+            }
             return new AcceptedAction(by(a.obj("by")),
-                    new Action(new Identity(action.str("definition")), action.obj("args")));
+                    new Action(new Identity(action.str("definition")), action.obj("args")), links);
         }
         throw new IllegalArgumentException("unknown kind of body: " + kind);
     }
@@ -114,6 +122,23 @@ public final class EventJson {
         Optional<String> onBehalfOf = o.get("on_behalf_of").isPresent()
                 ? Optional.of(o.str("on_behalf_of")) : Optional.empty();
         return new By(o.str("principal"), onBehalfOf, o.str("grant"), o.str("via"));
+    }
+
+    private static Json.Arr ids(Set<EventId> ids) {
+        var items = new ArrayList<Json>();
+        new TreeSet<>(ids).forEach(id -> items.add(new Json.Str(id.value())));
+        return new Json.Arr(items);
+    }
+
+    private static TreeSet<EventId> eventIds(Json.Arr arr) {
+        var ids = new TreeSet<EventId>();
+        for (var item : arr.items()) {
+            if (!(item instanceof Json.Str s)) {
+                throw new IllegalArgumentException("an event id is not a string");
+            }
+            ids.add(new EventId(s.value()));
+        }
+        return ids;
     }
 
     /** Refuses members outside {@code allowed}: the id covers only what is read, so nothing else may be in the text. */

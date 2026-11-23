@@ -10,6 +10,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Comparator;
 import java.util.TreeSet;
+import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class EventTest {
@@ -114,5 +116,21 @@ class EventTest {
             org.junit.jupiter.api.Assertions.assertNotEquals(text, tampered);
             assertThrows(IllegalArgumentException.class, () -> EventJson.read(tampered), tampered);
         }
+    }
+
+    @Test
+    void linksRoundTripAndAreCoveredByTheId() {
+        var links = Map.of("based_on", Set.of(A));
+        var linked = Event.create(List.of(A), 1000, Optional.empty(),
+                new AcceptedAction(BY, Assertion.action(Assertion.entity()), links), SALT);
+        assertEquals(linked, EventJson.read(EventJson.write(linked)));
+        assertTrue(EventJson.write(linked).contains("\"links\":{\"based_on\":[\"" + A.value() + "\"]}"));
+        assertNotEquals(event(List.of(A), SALT).id(), linked.id());
+    }
+
+    @Test
+    void emptyLinksAreRefused() {
+        assertThrows(IllegalArgumentException.class,
+                () -> new AcceptedAction(BY, Assertion.action(Assertion.entity()), Map.of("based_on", Set.of())));
     }
 }

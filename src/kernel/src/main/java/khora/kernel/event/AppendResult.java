@@ -31,6 +31,8 @@ public sealed interface AppendResult permits AppendResult.Appended, AppendResult
         /** The recorded time is not later than every cause's. */
         NOT_AFTER_CAUSES,
         /** The event is already in the graph. */
-        DUPLICATE
+        DUPLICATE,
+        /** A named link points to an event outside the event's causal past. */
+        LINK_OUTSIDE_PAST
     }
 }
