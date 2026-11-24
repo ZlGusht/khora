@@ -13,3 +13,6 @@ project(":surfaces").projectDir = file("src/surfaces")
 
 include(":log-nats")
 project(":log-nats").projectDir = file("src/log-nats")
+
+include(":query")
+project(":query").projectDir = file("src/query")

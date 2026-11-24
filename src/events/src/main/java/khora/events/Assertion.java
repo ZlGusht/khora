@@ -121,10 +121,7 @@ public record Assertion(Optional<Identity> identity, Optional<Identity> attribut
         var members = new HashMap<String, Json>();
         identity.ifPresent(i -> members.put("identity", new Json.Str(i.value())));
         attribute.ifPresent(a -> members.put("attribute", new Json.Str(a.value())));
-        value.ifPresent(v -> members.put("value", switch (v) {
-            case Literal l -> Json.Obj.of(Map.of("literal", l.value()));
-            case Ref r -> Json.Obj.of(Map.of("ref", new Json.Str(r.id().value())));
-        }));
+        value.ifPresent(v -> members.put("value", valueJson(v)));
         return Json.Obj.of(members);
     }
 
@@ -135,14 +132,27 @@ public record Assertion(Optional<Identity> identity, Optional<Identity> attribut
             }
         }
         return new Assertion(id(o, "identity"), id(o, "attribute"),
-                o.get("value").isPresent() ? Optional.of(value(o.obj("value"))) : Optional.empty());
+                o.get("value").isPresent() ? Optional.of(valueOf(o.obj("value"))) : Optional.empty());
     }
 
     private static Optional<Identity> id(Json.Obj o, String key) {
         return o.get(key).isPresent() ? Optional.of(new Identity(o.str(key))) : Optional.empty();
     }
 
-    private static Value value(Json.Obj v) {
+    /** A value as JSON: {@code {"literal": ...}} or {@code {"ref": identity}}. */
+    public static Json.Obj valueJson(Value v) {
+        return switch (v) {
+            case Literal l -> Json.Obj.of(Map.of("literal", l.value()));
+            case Ref r -> Json.Obj.of(Map.of("ref", new Json.Str(r.id().value())));
+        };
+    }
+
+    /**
+     * The value {@code v} writes, as {@link #valueJson} writes it.
+     *
+     * @throws IllegalArgumentException if {@code v} is not one literal or one reference
+     */
+    public static Value valueOf(Json.Obj v) {
         var keys = v.members().keySet();
         if (keys.equals(Set.of("literal"))) {
             return new Literal(v.members().get("literal"));
