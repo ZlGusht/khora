@@ -21,7 +21,7 @@ Stage 1 of [[Roadmap khora v1]], reflected by the GitHub Milestone "Stage 1: ker
 ## Loop Config
 
 - **Goal:** the kernel core from the implementation plan, and the designer's generic entity view and history view.
-- **Gate:** an action through the API yields an outcome and effects. State is read at a frontier. The history view shows who did what. The contract tests pass.
+- **Gate:** an accepted action is an event. Statements are read at a frontier. The history view shows who did what. The contract tests pass ([[Stage 1's tasks and gate are stated in events]]).
 
 ## Vector
 
@@ -34,15 +34,15 @@ Stage 1 of [[Roadmap khora v1]], reflected by the GitHub Milestone "Stage 1: ker
 | --- | --- | --- |
 | #18 | K1 | Event types, ids and clock |
 | #19 | K2 | Log store prototype on the candidates |
-| #20 | K3 | Append path: action, then outcome and effects together |
+| #20 | K3 | Append path; done by #36, closed ([[Stage 1 keeps only what its base systems use]]) |
 | #21 | K4 | Surface contract, declaration and context as types |
-| #22 | K5 | Contract test suite |
+| #22 | K5 | Contract tests for surfaces and authorities |
 | #23 | K6 | State datastore materialized from effects |
-| #24 | K7 | Frontiers and past reads |
-| #25 | K8 | Query as a data structure, with the basic operators |
-| #26 | K9 | Conditional writes |
-| #27 | K13 | Definitions in their own files |
+| #24 | K7 | Frontiers and past reads; left the milestone, *Not staged* |
+| #25 | K8 | Query as a data structure, answered by datastores |
+| #26 | K9 | Conflict checks in the authority |
+| #27 | K13 | Definitions in their own files; left the milestone, for stage 2 |
 | #28 | B1 | Base system: history view of the log |
 | #29 | B2 | Base system: generic entity view |
 
-Not yet issues: K10 (reads as actions), K11 (authentication at the API boundary), K12 (API for people and outside agents). #11 (user experience initiation, designer work) has no milestone yet.
+Not yet issues: K10 (reads as actions; done by #36, `Reads are events`), K11 (authentication at the API boundary), K12 (API for people and outside agents). #11 (user experience initiation, designer work) has no milestone yet.
