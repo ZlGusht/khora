@@ -16,6 +16,8 @@ properties__current_phase: Process(v)
 properties__issue: 25
 properties__author: agent:claude-opus-5-5
 properties__ended_at: 2026-11-24
+properties__pull_requests:
+  - "39"
 ---
 Issue #25 (plan task K8) of [[Milestone Stage 1 kernel core]]: the `Query` as a stored, validated data structure, the search a planner hands to datastores ([[Stage 1's tasks and gate are stated in events]], item 2). Run by an agent in one go, on Simeon Petkov's request, built on the Issue #18 branch.
 
