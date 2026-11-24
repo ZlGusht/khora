@@ -22,6 +22,17 @@ public final class Statements {
      * @throws IllegalArgumentException if {@code source} lacks an event of the frontier
      */
     public static List<Statement> about(Identity thing, Frontier at, EventSource source) {
+        return at(at, source).stream()
+                .filter(s -> s.id().equals(thing) || s.assertion().identity().filter(thing::equals).isPresent())
+                .toList();
+    }
+
+    /**
+     * Every statement that holds at {@code at}, in recorded order.
+     *
+     * @throws IllegalArgumentException if {@code source} lacks an event of the frontier
+     */
+    public static List<Statement> at(Frontier at, EventSource source) {
         var events = new ArrayList<Event>();
         for (var id : FrontierCheck.closure(at.heads(), source)) {
             events.add(source.get(id).orElseThrow());
@@ -42,9 +53,6 @@ public final class Statements {
                 all.add(new Statement(Identity.of(event.id(), i), tuple));
             }
         }
-        return all.stream()
-                .filter(s -> !retracted.contains(s.id()))
-                .filter(s -> s.id().equals(thing) || s.assertion().identity().filter(thing::equals).isPresent())
-                .toList();
+        return all.stream().filter(s -> !retracted.contains(s.id())).toList();
     }
 }

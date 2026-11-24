@@ -49,6 +49,22 @@ class StatementsTest {
     }
 
     @Test
+    void atGivesEveryStatementThatHolds() {
+        var log = new InMemoryEventLog();
+        var e = event(1000, List.of(), Assertion.entity(), named(Identity.local(0), "Kitchen"));
+        var project = Identity.of(e.id(), 0);
+        var kitchen = Identity.of(e.id(), 1);
+        var f = event(1001, List.of(e.id()), Assertion.retraction(kitchen), named(project, "Studio"));
+        log.append(List.of(e));
+        log.append(List.of(f));
+        assertEquals(List.of(new Statement(project, Assertion.entity()),
+                new Statement(Identity.of(f.id(), 0), Assertion.retraction(kitchen)),
+                new Statement(Identity.of(f.id(), 1), named(project, "Studio"))),
+                Statements.at(at(f), log));
+        assertEquals(List.of(), Statements.at(Frontier.empty(), log));
+    }
+
+    @Test
     void unrelatedEventsDoNotShow() {
         var log = new InMemoryEventLog();
         var e = event(1000, List.of(), Assertion.entity());

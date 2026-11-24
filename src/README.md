@@ -9,8 +9,9 @@ Java 25 everywhere: the code is compiled and tested with Java 25, and the Gradle
 | `events` | `khora.events`, `khora.events.json`, `khora.events.log` | Events and the log. An `Event` is something that happened, kept with what it knew of; an accepted action, whose asserts are tuples `(identity, attribute, value)`, is its one kind so far. Ids are salted hashes of canonical JSON; recorded time is a hybrid logical clock; frontiers are sets of events closed under causes; `Causality` checks an event against what it knew. `EventLog` stores events. Test fixtures: `InMemoryEventLog` and `EventLogContract`, the tests every log must pass. No dependencies. |
 | `surfaces` | `khora.surfaces`, `khora.surfaces.stub` | Surfaces, in the language of events: a `Surface` receives the events its interests match and emits actions in response; an `Authority` accepts or rejects actions on its things; the `Kernel` turns accepted actions into events in an `EventLog` and delivers them. `Projects` is a stub authority. |
 | `log-nats` | `khora.events.log.nats` | `NatsEventLog`: the event log on NATS JetStream. Tests run against real NATS in Docker. `bench` source set: `LogBench`. |
+| `query` | `khora.query` | Searches as data: a `Query` is an envelope (frontier, set or multiset, returned columns, order, page) around a body of operators, `Scan`, `Filter`, `Not` and `Aggregate`, checked when it is built. Its canonical JSON is stored as the value of the `khora/query` attribute. A `Datastore` answers queries; `EventsDatastore` works answers out from a log's events, through `Evaluator` over a `Graph`. Test fixture: `DatastoreContract`, the tests every datastore must pass. Depends on `events`. |
 
-Design, decisions and measurements: the runs `blob/Issue #18 Event types ids and clock.md` (`events`, `surfaces`), `blob/Issue #21 Surface contract types.md` and `blob/Issue #19 Log store on NATS.md` (`log-nats`).
+Design, decisions and measurements: the runs `blob/Issue #18 Event types ids and clock.md` (`events`, `surfaces`), `blob/Issue #21 Surface contract types.md` `blob/Issue #19 Log store on NATS.md` (`log-nats`) and `blob/Issue #25 Query as a data structure.md` (`query`).
 
 ## Prerequisites
 
@@ -64,7 +65,7 @@ Most code goes through the `Kernel` instead, which checks `Causality`, asks the 
 - `about` reads the whole log: there is no index yet.
 - Following may stop on an event it cannot read; the log logs the position.
 
-For tests of code that uses the log, depend on the `events` module's test fixtures and use `InMemoryEventLog`. To check a new `EventLog`, extend `EventLogContract`.
+For tests of code that uses the log, depend on the `events` module's test fixtures and use `InMemoryEventLog`. To check a new `EventLog`, extend `EventLogContract`; to check a new `Datastore`, extend `DatastoreContract` from the `query` module's test fixtures.
 
 ## Run NATS locally
 
