@@ -13,6 +13,12 @@ import khora.surfaces.Context;
  */
 public record Step(String name, Context who, List<String> knew, Map<String, List<String>> links,
         ActionSpec action) {
+    /**
+     * A name for {@code knew} and links that stands for an event no log holds. No step may take it.
+     * It lets a scenario say "a frontier the kernel does not know" without writing an event id.
+     */
+    public static final String UNKNOWN = "?unknown";
+
     public Step {
         Check.name(name);
         Objects.requireNonNull(who, "who");
