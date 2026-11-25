@@ -16,6 +16,7 @@ import khora.events.Statement;
 import khora.events.json.Json;
 import khora.surfaces.Answer;
 import khora.surfaces.Authority;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DynamicContainer;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
@@ -33,7 +34,12 @@ import org.junit.jupiter.api.TestFactory;
  *   <li>{@value #READ}: see {@link #readIsNotRejected}.
  * </ul>
  *
+ * <p>The reason and read rules judge the verdict the authority answered with, the first; a second
+ * verdict that differs from it is caught by {@value #TWICE}.
+ *
  * <p>A scenario the runner cannot play fails every test of its container with the runner's message.
+ * A scenario in which the authority was never asked (the kernel rejected everything before it) aborts
+ * the four rule tests rather than pass them with nothing to judge.
  * Rules listed in {@link KnownGaps} are judged by it.
  */
 public abstract class AuthorityContract {
@@ -87,7 +93,7 @@ public abstract class AuthorityContract {
         synchronized Run get() {
             if (run == null && broken == null) {
                 try {
-                    run = ScenarioRunner.recorded(s, authority(), Optional.empty());
+                    run = ScenarioRunner.run(s, authority(), Optional.empty());
                 } catch (RuntimeException e) {
                     broken = e;
                 }
@@ -106,6 +112,9 @@ public abstract class AuthorityContract {
     private static DynamicTest rule(String name, Scenario s, Once once, Rule rule) {
         return DynamicTest.dynamicTest(name, () -> {
             var run = once.get();
+            if (run.decisions().isEmpty()) {
+                Assumptions.abort("the authority was not asked in this scenario");
+            }
             KnownGaps.judge(name, () -> {
                 var decisions = run.decisions();
                 for (int i = 0; i < decisions.size(); i++) {
@@ -131,7 +140,10 @@ public abstract class AuthorityContract {
         assertEquals(d.first(), d.second(), about(s, index, d) + ": deciding again on the same log");
     }
 
-    /** Judged on the verdict the authority answered with; a second verdict that differs is {@value #TWICE}. */
+    /**
+     * Judged on the first verdict, the one the authority answered with; a second verdict that differs
+     * from it is caught by {@value #TWICE}.
+     */
     static void rejectionHasReason(Scenario s, int index, Run.Decision d) {
         if (d.first() instanceof Authority.Reject r && r.reason().isBlank()) {
             fail(about(s, index, d) + ": rejected with a blank reason");
@@ -142,7 +154,8 @@ public abstract class AuthorityContract {
      * A submitted read is not rejected. Stage 1 has no access checks, so the only reason to reject a
      * read would be a conflict, which [[Reads return statements and writes follow a read]] forbids.
      * When access checks arrive, this must narrow to "not rejected for a conflict". Judged on the
-     * verdict the authority answered with.
+     * first verdict, the one the authority answered with; a second verdict that differs from it is
+     * caught by {@value #TWICE}.
      */
     static void readIsNotRejected(Scenario s, int index, Run.Decision d) {
         var action = ((AcceptedAction) d.candidate().body()).action();

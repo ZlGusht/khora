@@ -196,6 +196,30 @@ class AuthorityRulesTest {
     }
 
     @Test
+    void theRulesAbortWhenTheAuthorityWasNotAsked() {
+        var unknown = Scenario.named("unknown")
+                .when(new When.Submit(Step.named("read").by(IVAN).knew(Step.UNKNOWN)
+                        .does(new ActionSpec.Read(Ref.named("thing")))))
+                .then(new Then.Rejected(Optional.of("unknown event")));
+        assertTrue(ScenarioRunner.run(unknown, new Projects(), Optional.empty()).decisions().isEmpty());
+        var tests = results(contract(Projects::new, unknown)).get("unknown");
+        assertNull(tests.get("expectation"));
+        for (var rule : RULES) {
+            assertInstanceOf(TestAbortedException.class, tests.get(rule), rule);
+            assertTrue(tests.get(rule).getMessage().contains("the authority was not asked in this scenario"),
+                    tests.get(rule).getMessage());
+        }
+    }
+
+    @Test
+    void theRulesJudgeTheGivenStepsWhenTheKernelRejectsTheWhen() {
+        var run = ScenarioRunner.run(new ProjectsContractTest().scenarios().stream()
+                .filter(s -> s.name().equals("anUnknownFrontierIsRejected")).findFirst().orElseThrow(),
+                new Projects(), Optional.empty());
+        assertEquals(1, run.decisions().size(), "the given creation");
+    }
+
+    @Test
     void decisionsOnEmittedActionsAreRecorded() {
         var surface = new Surface() {
             @Override
@@ -214,7 +238,7 @@ class AuthorityRulesTest {
             }
         };
         var s = Scenario.named("emits").given(create()).when(new When.Attach(List.of())).then(new Then.Accepted());
-        var run = ScenarioRunner.recorded(s, new Projects(), Optional.of(surface));
+        var run = ScenarioRunner.run(s, new Projects(), Optional.of(surface));
         assertEquals(2, run.decisions().size());
         var emitted = run.decisions().get(1);
         assertTrue(isRead(emitted.candidate()));

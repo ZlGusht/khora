@@ -83,7 +83,8 @@ class ScenarioRunnerTest {
         var run = run(s);
         assertInstanceOf(Answer.Accepted.class, run.answer().orElseThrow());
         assertEquals(2, run.statements().size());
-        assertTrue(run.decisions().isEmpty());
+        assertEquals(2, run.decisions().size(), "one decision per submit the authority was asked about");
+        assertInstanceOf(Authority.Accept.class, run.decisions().get(1).first());
         assertTrue(run.deliveries().isEmpty());
     }
 
