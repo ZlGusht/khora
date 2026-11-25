@@ -69,7 +69,11 @@ public abstract class AuthorityContract {
             case Then.Statements expected -> {
                 switch (s.when()) {
                     case When.Read ignored -> { }
-                    case When.Submit ignored -> {
+                    case When.Submit submit -> {
+                        if (!(submit.step().action() instanceof ActionSpec.Read)) {
+                            fail(s.name() + ": broken scenario: expects statements, but submits "
+                                    + submit.step().name() + ", which is not a read");
+                        }
                         if (answer(s, run) instanceof Answer.Rejected r) {
                             fail(s.name() + ": expected the read's statements, but it was rejected: " + r.reason());
                         }

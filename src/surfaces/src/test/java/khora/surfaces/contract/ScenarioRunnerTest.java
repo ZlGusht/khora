@@ -110,4 +110,13 @@ class ScenarioRunnerTest {
         var e = assertThrows(IllegalArgumentException.class, () -> run(s));
         assertTrue(e.getMessage().contains("dangling") && e.getMessage().contains("nowhere"), e.getMessage());
     }
+
+    @Test
+    void statementsOfASubmittedNonReadAreABrokenScenario() {
+        var s = Scenario.named("noRead").when(new When.Submit(create()))
+                .then(new Then.Statements(List.of()));
+        var run = run(s);
+        var e = assertThrows(AssertionError.class, () -> AuthorityContract.expect(s, run));
+        assertTrue(e.getMessage().contains("noRead"), e.getMessage());
+    }
 }

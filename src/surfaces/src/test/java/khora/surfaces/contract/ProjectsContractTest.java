@@ -9,7 +9,11 @@ import khora.surfaces.Authority;
 import khora.surfaces.Context;
 import khora.surfaces.stub.Projects;
 
-/** {@link Projects} against the authority contract, with the scenarios of {@code KernelTest}. */
+/**
+ * {@link Projects} against the authority contract, with the scenarios of {@code KernelTest}. Who
+ * acted ({@code by}), an event's causes and a read's {@code at} link are kernel guarantees, and stay
+ * covered by {@code KernelTest}.
+ */
 class ProjectsContractTest extends AuthorityContract {
     static final Context ANNA = new Context("anna", Optional.empty(), "g3", 10);
     static final Context IVAN = new Context("ivan", Optional.empty(), "g3", 10);
@@ -59,6 +63,11 @@ class ProjectsContractTest extends AuthorityContract {
                         .given(create(), read("read", IVAN))
                         .when(new When.Submit(rename("rename", IVAN, "read", "Studio")))
                         .then(new Then.Accepted()),
+                Scenario.named("theRenamedNameHoldsAtTheRename")
+                        .given(create(), read("read", IVAN), rename("rename", IVAN, "read", "Studio"))
+                        .when(new When.Read(PROJECT, List.of("rename")))
+                        .then(new Then.Statements(List.of(TupleSpec.entity(),
+                                TupleSpec.of(PROJECT, NAME, ValueSpec.text("Studio"))))),
                 Scenario.named("aConcurrentRenameOfTheSameNameIsRejected")
                         .given(create(), read("ivanRead", IVAN), read("miaRead", MIA),
                                 rename("ivanRename", IVAN, "ivanRead", "Studio"))
