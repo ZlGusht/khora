@@ -123,3 +123,145 @@ The existing tests stay; the scenarios cover the same ground through the contrac
 - Package and class names inside `khora.surfaces.contract`, the builder's method names, how symbolic references are resolved.
 - How the read-only log view and the run-twice checks are implemented.
 - How a probe surface records deliveries for the surface rules.
+
+## Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** contract tests any surface or authority can run, as scenarios through the real kernel, each checked against general rules; `Projects` and a reference surface `Echo` pass them.
+
+**Architecture:** test fixtures of `src/surfaces`, package `khora.surfaces.contract`. Scenarios are records with symbolic references; `ScenarioRunner` plays one through a fresh `Kernel` and records what happened in a `Run`; `AuthorityContract` and `SurfaceContract` turn each `Run` into JUnit dynamic tests, one per expectation and one per rule.
+
+**Tech Stack:** Java 25, Gradle (`java-test-fixtures`), JUnit 6.1.3 (`@TestFactory`, `DynamicContainer`, `Assumptions.abort`), the `events` and `surfaces` modules of #36.
+
+**Spec:** the Design section above.
+
+### Global Constraints
+
+- Everything new lives in `src/surfaces/src/testFixtures/java/khora/surfaces/contract/`, and its tests in `src/surfaces/src/test/java/khora/surfaces/contract/`. No change to `src/surfaces/src/main`, `src/events`, `src/log-nats` or `src/query`.
+- Every scenario runs on a fresh `InMemoryEventLog` and `new Hlc(() -> 1000)`.
+- Scenarios never contain event ids, salts or recorded times; expectations compare symbolic forms.
+- The existing tests (`KernelTest`, `DeliveryTest`, `ReceivingTest`, `InterestTest`, `ContextTest`) stay unchanged and keep passing.
+- A rule listed in `KnownGaps` that fails is aborted with its reason; one that passes fails with "known gap appears fixed: remove it from KnownGaps".
+- Commits as Isiooo, local only; stage explicit paths; never `.obsidian/`, `.superpowers/`, `.DS_Store`, build output.
+
+### Review Focus
+
+1. A rule that can never fail asserts nothing: each authority rule and surface rule 4 has a test with a deliberately bad implementation that the rule catches (Tasks 3 and 4).
+2. A given step that is rejected must fail the scenario as broken, naming the step, not pass or blame the implementation (Task 2, `aRejectedGivenStepBreaksTheScenario`).
+3. A symbolic reference to an unknown step must fail with the step's name, not a `NullPointerException` (Task 1, `anUnknownStepIsNamed`).
+4. Two scenarios with the same name in one contract must be refused, since dynamic test names would collide (Task 2, `duplicateScenarioNamesAreRefused`).
+5. An emitted event that no step names must render as `emitted#k` in log order, so statement expectations stay readable (Task 1, `unnamedEventsRenderAsEmitted`).
+
+---
+
+### Task 1: The scenario format
+
+**Files:**
+- Modify: `src/surfaces/build.gradle.kts` (add `java-test-fixtures`; `testFixturesApi(testFixtures(project(":events")))`, `testFixturesApi(libs.junit.jupiter)`)
+- Create in `testFixtures/.../contract/`: `Ref.java`, `ValueSpec.java`, `TupleSpec.java`, `ActionSpec.java`, `Step.java`, `When.java`, `Then.java`, `Scenario.java`, `Bindings.java`
+- Test: `src/surfaces/src/test/java/khora/surfaces/contract/ScenarioFormatTest.java`
+
+**Interfaces:**
+- Produces:
+  - `sealed interface Ref`: `Step(String name)`, `Tuple(String step, int index)`, `Named(String name)`, `Local(int index)`, `Received(int index)` (a tuple of the event a surface responds to; used by `Echo`). Factories `Ref.step(..)`, `Ref.tuple(..)`, `Ref.named(..)`, `Ref.local(..)`, `Ref.received(..)`.
+  - `sealed interface ValueSpec`: `Literal(Json value)`, `RefValue(Ref ref)`; factories `ValueSpec.text(String)`, `ValueSpec.integer(long)`, `ValueSpec.ref(Ref)`.
+  - `record TupleSpec(Optional<Ref> identity, Optional<Ref> attribute, Optional<ValueSpec> value)`; `entity()`, `of(Ref, Ref, ValueSpec)`, `retraction(Ref)`.
+  - `sealed interface ActionSpec`: `Assert(List<TupleSpec>)`, `Read(Ref thing)`, `Raw(Identity definition, Json.Obj args)`; `Action resolve(Bindings b, Optional<Event> received)`.
+  - `record Step(String name, Context who, List<String> knew, Map<String, List<String>> links, ActionSpec action)`.
+  - `sealed interface When`: `Submit(Step step)`, `Attach(List<String> from)`, `Read(Ref thing, List<String> at)`.
+  - `sealed interface Then`: `Accepted()`, `Rejected(Optional<String> reasonContains)`, `Emits(List<ActionSpec> actions)`, `Statements(List<TupleSpec> tuples)`.
+  - `record Scenario(String name, List<Step> given, When when, Then then)` with a builder `Scenario.named(String).given(Step...).when(When).then(Then)` and `Step.named(String).by(Context).knew(String...).link(String name, String... steps).does(ActionSpec)`.
+  - `final class Bindings`: `void bind(String step, EventId id)`, `EventId event(String step)`, `Identity identity(Ref ref, Optional<Event> received)`, `Frontier frontier(List<String> steps)`, `void emitted(EventId id)`, `String render(Identity id)` (a named step's event as `name`, its tuple as `name/n`, an emitted event as `emitted#k`, k from 1 in the order `emitted` was called, anything else as its value).
+
+- [ ] **Step 1: Write the failing tests** in `ScenarioFormatTest`:
+  - `refsResolveAgainstBoundSteps`: bind `create` to an event id; `Ref.tuple("create", 0)` resolves to `Identity.of(id, 0)`; `Ref.named("name")` to `Identity.named("name")`; `Ref.local(1)` to `Identity.local(1)`.
+  - `anUnknownStepIsNamed`: `bindings.event("missing")` throws `IllegalArgumentException` whose message contains `missing`.
+  - `assertSpecResolvesToTheAssertAction`: `ActionSpec.Assert` of `entity()` and `of(local(0), named("name"), text("Kitchen"))` resolves to `Assertion.action(Assertion.entity(), Assertion.of(Identity.local(0), Identity.named("name"), new Assertion.Literal(new Json.Str("Kitchen"))))`.
+  - `readSpecResolvesToBasicRead`: `ActionSpec.Read(Ref.tuple("create", 0))` resolves to `Basic.read(Identity.of(id, 0))`.
+  - `receivedRefsNeedAReceivedEvent`: resolving `Ref.received(0)` with an empty `received` throws `IllegalArgumentException`.
+  - `unnamedEventsRenderAsEmitted`: with `create` bound and two ids passed to `emitted`, `render` gives `create`, `create/0`, `emitted#1/0`, `emitted#2`.
+  - `theBuilderMakesTheRecords`: a scenario built with the builder equals the one built from the records.
+- [ ] **Step 2:** Run `./gradlew :surfaces:test --tests '*ScenarioFormatTest'`. Expected: FAIL, the types do not exist.
+- [ ] **Step 3:** Implement the types and `Bindings`. Records validate in their constructors (non-blank names, non-negative indexes, `Assert` with at least one tuple).
+- [ ] **Step 4:** Run the same command. Expected: PASS. Then `./gradlew :surfaces:test`: all existing tests still pass.
+- [ ] **Step 5: Commit** `Add the contract scenario format`.
+
+### Task 2: The runner and the authority contract's expectations
+
+**Files:**
+- Create: `ScenarioRunner.java`, `Run.java`, `AuthorityContract.java`, `AcceptAll.java` (in `testFixtures/.../contract/`)
+- Test: `src/surfaces/src/test/java/khora/surfaces/contract/ProjectsContractTest.java`, `ScenarioRunnerTest.java`
+
+**Interfaces:**
+- Consumes: Task 1.
+- Produces:
+  - `record Run(Bindings bindings, Optional<Answer> answer, List<Statement> statements, List<Decision> decisions, List<Delivery> deliveries)`; `record Decision(Event candidate, Authority.Verdict first, Authority.Verdict second, boolean appendedDuringDecide)`; `record Delivery(Event event, List<Action> returned, Set<EventId> logBefore)`.
+  - `static Run ScenarioRunner.run(Scenario s, Authority authority, Optional<Surface> surface)`: fresh log, `new Hlc(() -> 1000)`, `new Kernel(recordingAuthority, log, clock)`; submits each given step (its `knew` as `bindings.frontier(knew)`, its links resolved to event ids, binding the step name to the accepted event); then the `When`: `Submit` → `answer`; `Attach` → `kernel.attach(recordingSurface, bindings.frontier(from))`; `Read` → `statements = kernel.statements(...)`. Events appended after the `When` are passed to `bindings.emitted` in log order.
+  - `class AcceptAll implements Authority`: accepts everything; name `accept-all`.
+  - `abstract class AuthorityContract`: `protected abstract Authority authority()`, `protected abstract List<Scenario> scenarios()`, `@TestFactory Stream<DynamicContainer> contract()`: one container per scenario, holding the test `expectation`.
+
+- [ ] **Step 1: Write the failing tests:**
+  - `ProjectsContractTest extends AuthorityContract` with `new Projects()` and eight scenarios carried over from `KernelTest`, same names: `anAcceptedActionIsAnEventByItsCaller` (then `Accepted`), `aReadIsAnEventAndAnswersWithStatements` (`When.Read` of the project at `create` → `Statements` of `entity()` and the name tuple), `aWriteFollowsTheReadItWasBasedOn`, `aConcurrentRenameOfTheSameNameIsRejected` (`Rejected` with reason containing `conflicts with`), `anUnrelatedWriteDoesNotConflict`, `aBlindWriteIsAccepted`, `anUnknownFrontierIsRejected`, `actionsTheAuthorityDoesNotTakeAreRejected` (a `Raw` definition → `Rejected` containing `projects takes only reads and asserts`). Use `KernelTest`'s contexts `anna`, `ivan`, `mia` with grant `g3` and budget 10.
+  - `ScenarioRunnerTest`: `aRejectedGivenStepBreaksTheScenario` (a given step rejected by `Projects` makes `run` throw `IllegalStateException` naming the step); `duplicateScenarioNamesAreRefused` (a contract whose `scenarios()` holds two with one name fails its `contract()` factory with `IllegalArgumentException`); `theSameScenarioRunsTheSameTwice` (two runs of one scenario give equal symbolic statements).
+- [ ] **Step 2:** Run `./gradlew :surfaces:test --tests '*contract*'`. Expected: FAIL, the runner does not exist.
+- [ ] **Step 3:** Implement `Run`, `ScenarioRunner`, `AcceptAll`, `AuthorityContract` (expectation only). Expectation checks: `Accepted` / `Rejected` against `answer`; `Statements` against `statements` mapped to symbolic tuples through `bindings.render` (compare identity, attribute, value; never statement ids).
+- [ ] **Step 4:** Run the same command, then `./gradlew :surfaces:test`. Expected: all PASS.
+- [ ] **Step 5: Commit** `Run contract scenarios through the kernel; Projects passes its scenarios`.
+
+### Task 3: The authority rules
+
+**Files:**
+- Create: `RecordingAuthority.java`, `ReadOnlyEventLog.java`, `KnownGaps.java`
+- Modify: `ScenarioRunner.java` (wrap the authority), `AuthorityContract.java` (four rule tests per scenario)
+- Test: `src/surfaces/src/test/java/khora/surfaces/contract/AuthorityRulesTest.java`
+
+**Interfaces:**
+- Consumes: Task 2.
+- Produces:
+  - `ReadOnlyEventLog(EventLog inner) implements EventLog`: reads delegate; `append`, `follow` and `close` throw `UnsupportedOperationException`.
+  - `RecordingAuthority(Authority inner)`: for each `decide`, calls `inner.decide` twice on a `ReadOnlyEventLog`, records a `Decision` (an `UnsupportedOperationException` from `append` sets `appendedDuringDecide` and counts as a reject), returns the first verdict.
+  - `final class KnownGaps`: `static final Map<String, String> RULES` (rule name → reason), and `static void judge(String rule, Executable check)`: runs `check`; if the rule is in `RULES` and the check fails, `Assumptions.abort(reason)`; if it is in `RULES` and passes, `fail("known gap appears fixed: remove it from KnownGaps: " + rule)`; otherwise the check's own result.
+  - Rule test names in each scenario container: `authority does not change the log`, `authority decides the same twice`, `a rejection has a reason`, `a read is not rejected for a conflict`.
+- [ ] **Step 1: Write the failing tests** in `AuthorityRulesTest`, each running one ordinary scenario (a creation, then a rename) through the contract machinery with a bad authority and asserting the named rule fails while the others pass: `anAuthorityThatAppendsBreaksTheLogRule`, `anAuthorityThatFlipsBreaksTheSameTwiceRule` (accepts on odd calls), `aBlankRejectionBreaksTheReasonRule` (rejects with `""`), `rejectingAReadBreaksTheReadRule`. Plus `projectsKeepsEveryAuthorityRule`.
+- [ ] **Step 2:** Run `./gradlew :surfaces:test --tests '*AuthorityRulesTest'`. Expected: FAIL.
+- [ ] **Step 3:** Implement as in the Interfaces. Rules are judged over every `Decision` in the `Run`, including decisions on emitted actions.
+- [ ] **Step 4:** Run `./gradlew :surfaces:test`. Expected: all PASS; `ProjectsContractTest` shows 5 tests per scenario.
+- [ ] **Step 5: Commit** `Hold every authority to the general rules`.
+
+### Task 4: The surface contract and `Echo`
+
+**Files:**
+- Create: `Echo.java`, `RecordingSurface.java`, `SurfaceContract.java`
+- Modify: `ScenarioRunner.java` (wrap the surface), `KnownGaps.java` (add surface rule 5)
+- Test: `src/surfaces/src/test/java/khora/surfaces/contract/EchoContractTest.java`, `SurfaceRulesTest.java`
+
+**Interfaces:**
+- Consumes: Tasks 1-3.
+- Produces:
+  - `record Echo(String name, Set<Interest> interests, List<Echo.Rule> rules) implements Surface`; `record Rule(Interest when, List<ActionSpec> emit)`; `receive` returns, for each rule whose `when` matches the event, its actions resolved with `Ref.received` bound to the event; `Ref.step` is refused inside `Echo`.
+  - `RecordingSurface(Surface inner, EventLog log)`: records a `Delivery` per `receive` (the event, the returned actions, the ids in the log at that moment).
+  - `abstract class SurfaceContract`: `protected abstract Surface surface()`, `protected abstract List<Scenario> scenarios()`, `protected Authority authority()` (default `new AcceptAll()`); `@TestFactory` like `AuthorityContract`, with `expectation` (for `Emits`: the actions returned by deliveries after the `When`, flattened in order, compared to the `ActionSpec`s resolved per delivery) and the five rules, named `receives only what its interests match, after its causes`, `never receives what it emitted`, `what it emits is caused by what it received`, `the same events give the same actions` (runs the scenario a second time from scratch), `its successive emissions are causally ordered`.
+  - `KnownGaps.RULES` gains `its successive emissions are causally ordered` → `"#36: a surface never receives its own emissions, so its frontier does not include them (review of #36, Kernel.java:219)"`.
+- [ ] **Step 1: Write the failing tests:**
+  - `EchoContractTest extends SurfaceContract` with an `Echo` labelling every project it hears about, and scenarios carried over from `ReceivingTest` (same names): `anAttachedSurfaceCatchesUpThenReceivesWhatMatches`, `attachingFromAFrontierSkipsWhatIsInIt`, `readsAreReceivedToo`, `whatASurfaceEmitsIsAnEventCausedByWhatItKnew`, and from `DeliveryTest`: `anEmissionReachesOthersAfterItsCause`, `catchingUpKeepsLogOrderAndSkipsOwnEmissions`.
+  - `SurfaceRulesTest`: `aSurfaceThatEmitsRandomlyBreaksTheSameEventsRule` (emits a label with a random value); `echoKeepsEverySurfaceRule` (all rules pass except `its successive emissions are causally ordered`, which is aborted with the #36 reason).
+- [ ] **Step 2:** Run `./gradlew :surfaces:test --tests '*Echo*' --tests '*SurfaceRulesTest'`. Expected: FAIL.
+- [ ] **Step 3:** Implement as in the Interfaces.
+- [ ] **Step 4:** Run `./gradlew :surfaces:test`. Expected: all PASS, with the known-gap rule shown as skipped.
+- [ ] **Step 5: Commit** `Add the surface contract and the reference surface Echo`.
+
+### Task 5: The kernel gap test and the security Letter
+
+**Files:**
+- Create: `src/surfaces/src/test/java/khora/surfaces/contract/KernelGapsTest.java`
+- Modify: `KnownGaps.java` (add the kernel scenario)
+- Entity (controller, through the Obsidian CLI): a Letter in_context_of this run, "Security tests wait for access checks"
+
+**Interfaces:**
+- Consumes: Tasks 1-4.
+
+- [ ] **Step 1: Write the test** `aSurfaceWhoseInterestsThrowDoesNotFailTheSubmit`: a kernel with `Projects`, an attached surface whose `interests()` throws, and an `Echo` with `Interest.any()`; a submitted creation must return `Accepted`, and the `Echo` must have received it. Judged through `KnownGaps.judge("a surface whose interests throw does not fail the submit", ...)`, with the reason `"#36: Kernel.wants calls interests() outside the guard around receive (review of #36, Kernel.java:178)"`.
+- [ ] **Step 2:** Run `./gradlew :surfaces:test --tests '*KernelGapsTest'`. Expected: the test is skipped with that reason (the gap exists today).
+- [ ] **Step 3:** Run `./gradlew test` (all modules; Docker running for `log-nats`). Expected: all PASS or skipped as above; output quiet.
+- [ ] **Step 4: Commit** `Pin the kernel gaps found in the review of #36`.
