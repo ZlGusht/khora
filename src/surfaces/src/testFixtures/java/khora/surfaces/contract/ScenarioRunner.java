@@ -31,7 +31,9 @@ public final class ScenarioRunner {
     private ScenarioRunner() {}
 
     /**
-     * Runs {@code s} with {@code authority}, and {@code surface} if the scenario attaches one.
+     * Runs {@code s} with {@code authority}, and {@code surface} if the scenario attaches one. The
+     * run's decisions are recorded only if {@code authority} is a {@link RecordingAuthority}; see
+     * {@link #recorded}.
      *
      * @throws IllegalArgumentException if the scenario repeats a step name, names a step that is not
      *     an earlier one, or attaches with no surface given
@@ -75,7 +77,17 @@ public final class ScenarioRunner {
                 bindings.emitted(event.id());
             }
         }
-        return new Run(bindings, answer, statements, List.of(), List.of());
+        var decisions = authority instanceof RecordingAuthority recording ? recording.decisions() : List.<Run.Decision>of();
+        return new Run(bindings, answer, statements, decisions, List.of());
+    }
+
+    /**
+     * Runs {@code s} as {@link #run} does, with {@code authority} wrapped in a fresh
+     * {@link RecordingAuthority}: the run holds every decision, including those on actions a surface
+     * emitted.
+     */
+    public static Run recorded(Scenario s, Authority authority, Optional<Surface> surface) {
+        return run(s, new RecordingAuthority(authority), surface);
     }
 
     private static Answer submit(Kernel kernel, EventLog log, Bindings bindings, Step step) {
