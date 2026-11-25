@@ -10,12 +10,13 @@ Java 25 everywhere: the code is compiled and tested with Java 25, and the Gradle
 | `surfaces` | `khora.surfaces`, `khora.surfaces.stub` | Surfaces, in the language of events: a `Surface` receives the events its interests match and emits actions in response; an `Authority` accepts or rejects actions on its things; the `Kernel` turns accepted actions into events in an `EventLog` and delivers them. `Projects` is a stub authority. |
 | `log-nats` | `khora.events.log.nats` | `NatsEventLog`: the event log on NATS JetStream. Tests run against real NATS in Docker. `bench` source set: `LogBench`. |
 | `query` | `khora.query` | Searches as data: a `Query` is an envelope (frontier, set or multiset, returned columns, order, page) around a body of operators, `Scan`, `Filter`, `Not` and `Aggregate`, checked when it is built. Its canonical JSON is stored as the value of the `khora/query` attribute. A `Datastore` answers queries; `EventsDatastore` works answers out from a log's events, through `Evaluator` over a `Graph`. Test fixture: `DatastoreContract`, the tests every datastore must pass. Depends on `events`. |
+| `datastore-neo4j` | `khora.query.neo4j` | The graph datastore on Neo4j: `Neo4jDatastore` takes in a log's events (`catchUp`, `follow`) and keeps things, statements, retractions and events as a graph. It answers queries at any frontier it holds, through `Evaluator`, with the answers of `EventsDatastore`. A `Snapshot` is its content at a position, as JSON lines; `rebuild` restores one and catches up with the log. Tests run against real Neo4j in Docker. Depends on `query`. |
 
-Design, decisions and measurements: the runs `blob/Issue #18 Event types ids and clock.md` (`events`, `surfaces`), `blob/Issue #21 Surface contract types.md` `blob/Issue #19 Log store on NATS.md` (`log-nats`) and `blob/Issue #25 Query as a data structure.md` (`query`).
+Design, decisions and measurements: the runs `blob/Issue #18 Event types ids and clock.md` (`events`, `surfaces`), `blob/Issue #21 Surface contract types.md` `blob/Issue #19 Log store on NATS.md` (`log-nats`) `blob/Issue #25 Query as a data structure.md` (`query`) and `blob/Issue #23 Graph datastore on Neo4j.md` (`datastore-neo4j`).
 
 ## Prerequisites
 
-- **Docker**, running. The `log-nats` tests start NATS 2.12.15 in containers.
+- **Docker**, running. The `log-nats` tests start NATS 2.12.15 in containers; the `datastore-neo4j` tests start Neo4j 2026.10.2 community in one container.
 - **Any Java 17 or later** to start Gradle's wrapper. Gradle then switches to Java 25 for its daemon and the build, and downloads JDK 25 into `~/.gradle/jdks` if it is missing. Installing JDK 25 yourself (e.g. Temurin 25) avoids the download.
 - Nothing else. Gradle 9.9.1 comes with the wrapper.
 
@@ -67,10 +68,24 @@ Most code goes through the `Kernel` instead, which checks `Causality`, asks the 
 
 For tests of code that uses the log, depend on the `events` module's test fixtures and use `InMemoryEventLog`. To check a new `EventLog`, extend `EventLogContract`; to check a new `Datastore`, extend `DatastoreContract` from the `query` module's test fixtures.
 
+## Using the graph datastore from code
+
+```java
+try (var store = Neo4jDatastore.open("bolt://localhost:7687", "neo4j", "khora-dev-password");
+        Following f = store.follow(log)) {         // takes in the log, then each new event
+    Answer open = store.answer(Query.of(Scan.things("t")));
+    store.snapshot().write(Path.of("graph.jsonl"));   // its content at a position
+}
+```
+
+- The datastore owns its database: `clear()` and `restore` delete what it holds.
+- A query at a frontier with an event the datastore has not taken in is refused; it does not wait.
+- `rebuild(Snapshot.read(file), log)` restores a snapshot and takes in the rest of the log. It refuses a snapshot of another log.
+
 ## Run NATS locally
 
 ```sh
-docker compose up -d        # NATS on localhost:4222, monitoring on localhost:8222
+docker compose up -d        # NATS on localhost:4222, monitoring on localhost:8222; Neo4j on localhost:7687
 docker compose down         # stop; add -v to delete the stored log
 ```
 
