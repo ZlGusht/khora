@@ -17,6 +17,8 @@ properties__current_phase: Process(v)
 properties__ended_at: 2026-11-25
 properties__issue: 23
 properties__author: agent:claude-opus-5-5
+properties__pull_requests:
+  - "40"
 ---
 Issue #23 (plan task K6) of [[Milestone Stage 1 kernel core]]: the graph datastore, materialized from the events of the log, on Neo4j. It answers K8's `Query` ([[Stage 1's tasks and gate are stated in events]], item 2). Run by an agent in one go, on Simeon Petkov's request, built on the Issue #25 branch (pull request #39).
 
