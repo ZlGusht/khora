@@ -185,7 +185,7 @@ class AuthorityRulesTest {
     @Test
     void projectsKeepsEveryAuthorityRule() {
         var results = results(new ProjectsContractTest());
-        assertEquals(10, results.size());
+        assertEquals(new ProjectsContractTest().scenarios().size(), results.size());
         results.forEach((scenario, tests) -> {
             assertEquals(5, tests.size(), scenario);
             tests.forEach((test, thrown) -> assertNull(thrown, scenario + ": " + test));
@@ -295,7 +295,9 @@ class AuthorityRulesTest {
         assertThrows(AssertionFailedError.class,
                 () -> KnownGaps.judge(gaps, "other rule", () -> { throw new AssertionFailedError("broken"); }));
         KnownGaps.judge(gaps, "other rule", () -> { });
-        assertEquals(Set.of(SurfaceContract.ORDERED, KernelGapsTest.INTERESTS_THROW), KnownGaps.RULES.keySet());
+        assertEquals(Set.of(SurfaceContract.ORDERED, KernelGapsTest.INTERESTS_THROW, KernelGapsTest.RETRACT_OUTSIDE_PAST,
+                KernelGapsTest.RETRACT_MISSING, KernelGapsTest.RETRACTED_FALSE, KernelGapsTest.DANGLING_LOCAL),
+                KnownGaps.RULES.keySet());
     }
 
     @Test

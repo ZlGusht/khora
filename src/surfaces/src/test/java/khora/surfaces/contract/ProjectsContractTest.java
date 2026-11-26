@@ -24,23 +24,19 @@ class ProjectsContractTest extends AuthorityContract {
     static final Ref PROJECT = Ref.tuple("create", 0);
 
     static Step create() {
-        return Step.named("create").by(ANNA).does(new ActionSpec.Assert(List.of(TupleSpec.entity(),
-                TupleSpec.of(Ref.local(0), NAME, ValueSpec.text("Kitchen")))));
+        return Step.named("create").by(ANNA).does(ActionSpec.asserts(TupleSpec.entity(),
+                TupleSpec.of(Ref.local(0), NAME, ValueSpec.text("Kitchen"))));
     }
 
     static Step read(String name, Context who) {
-        return Step.named(name).by(who).knew("create").does(new ActionSpec.Read(PROJECT));
+        return Step.named(name).by(who).knew("create").does(ActionSpec.read(PROJECT));
     }
 
     /** Renames the project from Kitchen, based on the read {@code basedOn}. */
     static Step rename(String name, Context who, String basedOn, String to) {
         return Step.named(name).by(who).knew(basedOn).link("based_on", basedOn)
-                .does(new ActionSpec.Assert(List.of(TupleSpec.retraction(Ref.tuple("create", 1)),
-                        TupleSpec.of(PROJECT, NAME, ValueSpec.text(to)))));
-    }
-
-    static Then rejected(String reason) {
-        return new Then.Rejected(Optional.of(reason));
+                .does(ActionSpec.asserts(TupleSpec.retraction(Ref.tuple("create", 1)),
+                        TupleSpec.of(PROJECT, NAME, ValueSpec.text(to))));
     }
 
     @Override
@@ -52,52 +48,59 @@ class ProjectsContractTest extends AuthorityContract {
     protected List<Scenario> scenarios() {
         return List.of(
                 Scenario.named("anAcceptedActionIsAnEventByItsCaller")
-                        .when(new When.Submit(create()))
-                        .then(new Then.Accepted()),
+                        .when(When.submit(create()))
+                        .then(Then.accepted()),
                 Scenario.named("aReadIsAnEventAndAnswersWithStatements")
                         .given(create())
-                        .when(new When.Submit(read("read", IVAN)))
-                        .then(new Then.Statements(List.of(TupleSpec.entity(),
-                                TupleSpec.of(PROJECT, NAME, ValueSpec.text("Kitchen"))))),
+                        .when(When.submit(read("read", IVAN)))
+                        .then(Then.statements(TupleSpec.entity(),
+                                TupleSpec.of(PROJECT, NAME, ValueSpec.text("Kitchen")))),
                 Scenario.named("aWriteFollowsTheReadItWasBasedOn")
                         .given(create(), read("read", IVAN))
-                        .when(new When.Submit(rename("rename", IVAN, "read", "Studio")))
-                        .then(new Then.Accepted()),
+                        .when(When.submit(rename("rename", IVAN, "read", "Studio")))
+                        .then(Then.accepted()),
                 Scenario.named("theRenamedNameHoldsAtTheRename")
                         .given(create(), read("read", IVAN), rename("rename", IVAN, "read", "Studio"))
-                        .when(new When.Read(PROJECT, List.of("rename")))
-                        .then(new Then.Statements(List.of(TupleSpec.entity(),
-                                TupleSpec.of(PROJECT, NAME, ValueSpec.text("Studio"))))),
+                        .when(When.read(PROJECT, "rename"))
+                        .then(Then.statements(TupleSpec.entity(),
+                                TupleSpec.of(PROJECT, NAME, ValueSpec.text("Studio")))),
                 Scenario.named("aReadAtAnEarlierFrontierIgnoresLaterWrites")
                         .given(create(), read("read", IVAN), rename("rename", IVAN, "read", "Studio"))
-                        .when(new When.Read(PROJECT, List.of("create")))
-                        .then(new Then.Statements(List.of(TupleSpec.entity(),
-                                TupleSpec.of(PROJECT, NAME, ValueSpec.text("Kitchen"))))),
+                        .when(When.read(PROJECT, "create"))
+                        .then(Then.statements(TupleSpec.entity(),
+                                TupleSpec.of(PROJECT, NAME, ValueSpec.text("Kitchen")))),
                 Scenario.named("aConcurrentRenameOfTheSameNameIsRejected")
                         .given(create(), read("ivanRead", IVAN), read("miaRead", MIA),
                                 rename("ivanRename", IVAN, "ivanRead", "Studio"))
-                        .when(new When.Submit(rename("miaRename", MIA, "miaRead", "Atelier")))
-                        .then(rejected("conflicts with")),
+                        .when(When.submit(rename("miaRename", MIA, "miaRead", "Atelier")))
+                        .then(Then.rejected("conflicts with")),
                 Scenario.named("anUnrelatedWriteDoesNotConflict")
                         .given(create(), read("read", IVAN),
-                                Step.named("invoice").by(BOB).does(new ActionSpec.Assert(List.of(
-                                        TupleSpec.of(Ref.named("invoice"), NAME, ValueSpec.text("INV-1"))))))
-                        .when(new When.Submit(rename("rename", IVAN, "read", "Studio")))
-                        .then(new Then.Accepted()),
+                                Step.named("invoice").by(BOB).does(ActionSpec.asserts(
+                                        TupleSpec.of(Ref.named("invoice"), NAME, ValueSpec.text("INV-1")))))
+                        .when(When.submit(rename("rename", IVAN, "read", "Studio")))
+                        .then(Then.accepted()),
                 Scenario.named("aBlindWriteIsAccepted")
                         .given(create(), read("read", IVAN), rename("rename", IVAN, "read", "Studio"))
-                        .when(new When.Submit(Step.named("blind").by(MIA).does(new ActionSpec.Assert(List.of(
-                                TupleSpec.of(PROJECT, NAME, ValueSpec.text("Atelier")))))))
-                        .then(new Then.Accepted()),
+                        .when(When.submit(Step.named("blind").by(MIA).does(ActionSpec.asserts(
+                                TupleSpec.of(PROJECT, NAME, ValueSpec.text("Atelier"))))))
+                        .then(Then.accepted()),
                 Scenario.named("anUnknownFrontierIsRejected")
                         .given(create())
-                        .when(new When.Submit(Step.named("read").by(IVAN).knew(Step.UNKNOWN)
-                                .does(new ActionSpec.Read(PROJECT))))
-                        .then(rejected("unknown event")),
+                        .when(When.submit(Step.named("read").by(IVAN).knew(Step.UNKNOWN)
+                                .does(ActionSpec.read(PROJECT))))
+                        .then(Then.rejected("unknown event")),
                 Scenario.named("actionsTheAuthorityDoesNotTakeAreRejected")
                         .given(create())
-                        .when(new When.Submit(Step.named("order").by(ANNA).knew("create")
+                        .when(When.submit(Step.named("order").by(ANNA).knew("create")
                                 .does(new ActionSpec.Raw(Identity.named("orders/place"), Json.Obj.of(Map.of())))))
-                        .then(rejected("projects takes only reads and asserts")));
+                        .then(Then.rejected("projects takes only reads and asserts")),
+                Scenario.named("retractingARetractionDoesNotRestoreTheStatement")
+                        .given(create(), read("read", IVAN), rename("rename", IVAN, "read", "Studio"),
+                                Step.named("unretract").by(IVAN).knew("rename")
+                                        .does(ActionSpec.asserts(TupleSpec.retraction(Ref.tuple("rename", 0)))))
+                        .when(When.read(PROJECT, "unretract"))
+                        .then(Then.statements(TupleSpec.entity(),
+                                TupleSpec.of(PROJECT, NAME, ValueSpec.text("Studio")))));
     }
 }

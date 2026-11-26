@@ -5,6 +5,21 @@ import java.util.Objects;
 
 /** What a scenario does after its given steps. */
 public sealed interface When {
+    /** Submits {@code step}. */
+    static When submit(Step step) {
+        return new Submit(step);
+    }
+
+    /** Attaches the surface under test, having seen the steps {@code from}. */
+    static When attach(String... from) {
+        return new Attach(List.of(from));
+    }
+
+    /** Reads {@code thing} at the frontier of the steps {@code at}. */
+    static When read(Ref thing, String... at) {
+        return new Read(thing, List.of(at));
+    }
+
     /** Submits a step through the surface. */
     record Submit(Step step) implements When {
         public Submit {

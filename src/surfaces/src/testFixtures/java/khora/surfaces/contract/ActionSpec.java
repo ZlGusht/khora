@@ -13,6 +13,16 @@ import khora.events.json.Json;
 
 /** An action as a scenario writes it. */
 public sealed interface ActionSpec {
+    /** An assert of {@code tuples}, in order. */
+    static ActionSpec asserts(TupleSpec... tuples) {
+        return new Assert(List.of(tuples));
+    }
+
+    /** A read of {@code thing}. */
+    static ActionSpec read(Ref thing) {
+        return new Read(thing);
+    }
+
     /** The action this spec stands for, its refs resolved. */
     Action resolve(Bindings bindings, Optional<Event> received);
 

@@ -32,18 +32,18 @@ class EchoContractTest extends SurfaceContract {
     static Echo labeller() {
         var aboutProject = Interest.about(Identity.named("project"));
         return new Echo("echo", Set.of(aboutProject), List.of(new Echo.Rule(aboutProject,
-                List.of(new ActionSpec.Assert(List.of(TupleSpec.of(PROJECT, LABEL, ValueSpec.ref(Ref.received(0)))))))));
+                List.of(ActionSpec.asserts(TupleSpec.of(PROJECT, LABEL, ValueSpec.ref(Ref.received(0))))))));
     }
 
     /** Asserts {@code (thing, attribute, value)}, knowing {@code knew}. */
     static Step tell(String step, Ref thing, Ref attribute, String value, String... knew) {
         return Step.named(step).by(ANNA).knew(knew)
-                .does(new ActionSpec.Assert(List.of(TupleSpec.of(thing, attribute, ValueSpec.text(value)))));
+                .does(ActionSpec.asserts(TupleSpec.of(thing, attribute, ValueSpec.text(value))));
     }
 
     /** Echo's label for the first tuple of {@code step}'s event. */
     static ActionSpec label(String step) {
-        return new ActionSpec.Assert(List.of(TupleSpec.of(PROJECT, LABEL, ValueSpec.ref(Ref.tuple(step, 0)))));
+        return ActionSpec.asserts(TupleSpec.of(PROJECT, LABEL, ValueSpec.ref(Ref.tuple(step, 0))));
     }
 
     /** Echo answers the event of each of {@code steps}, in order, with its label. */
@@ -62,30 +62,30 @@ class EchoContractTest extends SurfaceContract {
                 Scenario.named("anAttachedSurfaceCatchesUpThenReceivesWhatMatches")
                         .given(tell("create", PROJECT, NAME, "Kitchen"), Given.attach(),
                                 tell("invoice", Ref.named("invoice"), NAME, "INV-1", "create"))
-                        .when(new When.Submit(tell("rename", PROJECT, NAME, "Studio", "invoice")))
+                        .when(When.submit(tell("rename", PROJECT, NAME, "Studio", "invoice")))
                         .then(labels("create", "rename")),
                 Scenario.named("attachingFromAFrontierSkipsWhatIsInIt")
                         .given(tell("create", PROJECT, NAME, "Kitchen"),
                                 tell("rename", PROJECT, NAME, "Studio", "create"),
                                 tell("again", PROJECT, NAME, "Atelier", "rename"))
-                        .when(new When.Attach(List.of("rename")))
+                        .when(When.attach("rename"))
                         .then(labels("again")),
                 Scenario.named("readsAreReceivedToo")
                         .given(tell("create", PROJECT, NAME, "Kitchen"), Given.attach("create"))
-                        .when(new When.Submit(Step.named("read").by(ANNA).knew("create").does(new ActionSpec.Read(PROJECT))))
+                        .when(When.submit(Step.named("read").by(ANNA).knew("create").does(ActionSpec.read(PROJECT))))
                         .then(labels("read")),
                 Scenario.named("whatASurfaceEmitsIsAnEventCausedByWhatItKnew")
                         .given(tell("create", PROJECT, NAME, "Kitchen"), Given.attach("create"))
-                        .when(new When.Submit(tell("rename", PROJECT, NAME, "Studio", "create")))
+                        .when(When.submit(tell("rename", PROJECT, NAME, "Studio", "create")))
                         .then(labels("rename")),
                 Scenario.named("anEmissionComesAfterItsCause")
                         .given(Given.attach())
-                        .when(new When.Submit(tell("hello", PROJECT, NOTE, "hello")))
+                        .when(When.submit(tell("hello", PROJECT, NOTE, "hello")))
                         .then(labels("hello")),
                 Scenario.named("catchingUpKeepsLogOrderAndSkipsOwnEmissions")
                         .given(tell("v0", PROJECT, NOTE, "v0"), tell("v1", PROJECT, NOTE, "v1"),
                                 tell("v2", PROJECT, NOTE, "v2"))
-                        .when(new When.Attach(List.of()))
+                        .when(When.attach())
                         .then(labels("v0", "v1", "v2")));
     }
 }
