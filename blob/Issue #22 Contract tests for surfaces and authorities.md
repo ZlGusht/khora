@@ -127,11 +127,11 @@ The existing tests stay; the scenarios cover the same ground through the contrac
 
 ### Decided while building
 
-Rulings taken during Operate, with what they change in the design above. *Builder's calls*, for review in the pull request.
+Rulings taken during Operate, with what they change in the design above. *Builder's calls*, for review in the pull request. They are numbered as they were taken; R3 and R4 were about how the work ran, not the design, and are left out.
 
 - **Given can attach the surface (R12).** `Scenario.given` is a list of `Given`: a `Step` or an `AttachSurface(from)`. A scenario attaches the surface under test at most once, among its given steps or as the `When`, so both catch-up and live delivery are tested. Several surfaces stay out of the format (kernel-level, `DeliveryTest`).
 - **Statements of a submitted read (R1, R8).** `Then.Statements` checks a `When.Read` against `Kernel.statements`, and a `When.Submit` of a read against the statements its answer carries. With a submit of anything else it is a broken scenario.
-- **Reads at an earlier frontier.** `Projects` has ten scenarios: the eight of `KernelTest`, `theRenamedNameHoldsAtTheRename` (R7) and `aReadAtAnEarlierFrontierIgnoresLaterWrites` (final review). Who acted, an event's causes and a read's `at` link are kernel guarantees and stay in `KernelTest`.
+- **Reads at an earlier frontier.** `Projects` has twelve scenarios, among them the eight of `KernelTest`, `theRenamedNameHoldsAtTheRename` (R7) and `aReadAtAnEarlierFrontierIgnoresLaterWrites` (final review). Who acted, an event's causes and a read's `at` link are kernel guarantees and stay in `KernelTest`.
 - **An event no log holds (R6).** The reserved step name `?unknown` stands for it, for `anUnknownFrontierIsRejected`.
 - **Frontiers normalised (R5).** The runner reduces every frontier it builds with `Frontier.of`.
 - **One run per container (R9, Task 2).** `ScenarioRunner.run` always records; a scenario runs once and its run is shared by the expectation and the rule tests; a broken scenario fails all of them with the runner's message.
@@ -145,6 +145,7 @@ Rulings taken during Operate, with what they change in the design above. *Builde
 - **After the final review.** Static factories for scenarios; a scenario for retracting a retraction; the remaining findings of the review of #36 pinned as known gaps.
 - **On #36's fixes (6845d75).** Five gaps flipped to "appears fixed"; #36 added its own tests for them, so `KernelGapsTest` keeps only the open one. A blind write knows the thing it writes about (`aWriteAboutAThingItDoesNotKnowIsRejected` is the other half), and `Echo` labels with a literal, since a read has no tuple to name; the per-delivery comparison still shows which event each label answers.
 - **Kernel vocabulary in scenarios.** `Ref.known(identity)` names an identity the kernel defines, such as `Basic.RETRACTED`, so a retraction is the kernel's own. It is for vocabulary only, never an event id. Named identities render by their name in failure messages.
+- **Trimmed after two reviews.** The contracts were cut back to what the issue needs and what a real risk justifies. Removed: `KnownGaps` with its known-gap tests and `Ref.known` (the gaps were fixed in #36, which tests them itself; the last one is a kernel bug reported on #36), the rule "its successive emissions are causally ordered" (#36's `DeliveryTest` covers it), and the rule "authority decides the same twice", so an authority is asked once and may keep state. That supersedes the bullets above on known gaps, the first verdict, the causal-order abort and kernel vocabulary, and [[Contract tests skip known kernel gaps instead of leaving them out]] is reversed. Kept: the format, the runner and its checks, live delivery, `Echo`, three authority rules and four surface rules, each shown to fail with a bad implementation.
 
 ## Plan
 
@@ -165,7 +166,6 @@ Rulings taken during Operate, with what they change in the design above. *Builde
 - Scenarios never contain event ids, salts or recorded times; expectations compare symbolic forms.
 - The existing tests (`KernelTest`, `DeliveryTest`, `ReceivingTest`, `InterestTest`, `ContextTest`) stay unchanged and keep passing.
 - A rule listed in `KnownGaps` that fails is aborted with its reason; one that passes fails with "known gap appears fixed: remove it from KnownGaps".
-- Commits as Isiooo, local only; stage explicit paths; never `.obsidian/`, `.superpowers/`, `.DS_Store`, build output.
 
 ### Review Focus
 
@@ -196,7 +196,7 @@ Rulings taken during Operate, with what they change in the design above. *Builde
   - `record Scenario(String name, List<Step> given, When when, Then then)` with a builder `Scenario.named(String).given(Step...).when(When).then(Then)` and `Step.named(String).by(Context).knew(String...).link(String name, String... steps).does(ActionSpec)`.
   - `final class Bindings`: `void bind(String step, EventId id)`, `EventId event(String step)`, `Identity identity(Ref ref, Optional<Event> received)`, `Frontier frontier(List<String> steps)`, `void emitted(EventId id)`, `String render(Identity id)` (a named step's event as `name`, its tuple as `name/n`, an emitted event as `emitted#k`, k from 1 in the order `emitted` was called, anything else as its value).
 
-- [ ] **Step 1: Write the failing tests** in `ScenarioFormatTest`:
+- [x] **Step 1: Write the failing tests** in `ScenarioFormatTest`:
   - `refsResolveAgainstBoundSteps`: bind `create` to an event id; `Ref.tuple("create", 0)` resolves to `Identity.of(id, 0)`; `Ref.named("name")` to `Identity.named("name")`; `Ref.local(1)` to `Identity.local(1)`.
   - `anUnknownStepIsNamed`: `bindings.event("missing")` throws `IllegalArgumentException` whose message contains `missing`.
   - `assertSpecResolvesToTheAssertAction`: `ActionSpec.Assert` of `entity()` and `of(local(0), named("name"), text("Kitchen"))` resolves to `Assertion.action(Assertion.entity(), Assertion.of(Identity.local(0), Identity.named("name"), new Assertion.Literal(new Json.Str("Kitchen"))))`.
@@ -204,10 +204,10 @@ Rulings taken during Operate, with what they change in the design above. *Builde
   - `receivedRefsNeedAReceivedEvent`: resolving `Ref.received(0)` with an empty `received` throws `IllegalArgumentException`.
   - `unnamedEventsRenderAsEmitted`: with `create` bound and two ids passed to `emitted`, `render` gives `create`, `create/0`, `emitted#1/0`, `emitted#2`.
   - `theBuilderMakesTheRecords`: a scenario built with the builder equals the one built from the records.
-- [ ] **Step 2:** Run `./gradlew :surfaces:test --tests '*ScenarioFormatTest'`. Expected: FAIL, the types do not exist.
-- [ ] **Step 3:** Implement the types and `Bindings`. Records validate in their constructors (non-blank names, non-negative indexes, `Assert` with at least one tuple).
-- [ ] **Step 4:** Run the same command. Expected: PASS. Then `./gradlew :surfaces:test`: all existing tests still pass.
-- [ ] **Step 5: Commit** `Add the contract scenario format`.
+- [x] **Step 2:** Run `./gradlew :surfaces:test --tests '*ScenarioFormatTest'`. Expected: FAIL, the types do not exist.
+- [x] **Step 3:** Implement the types and `Bindings`. Records validate in their constructors (non-blank names, non-negative indexes, `Assert` with at least one tuple).
+- [x] **Step 4:** Run the same command. Expected: PASS. Then `./gradlew :surfaces:test`: all existing tests still pass.
+- [x] **Step 5: Commit** `Add the contract scenario format`.
 
 ### Task 2: The runner and the authority contract's expectations
 
@@ -223,13 +223,13 @@ Rulings taken during Operate, with what they change in the design above. *Builde
   - `class AcceptAll implements Authority`: accepts everything; name `accept-all`.
   - `abstract class AuthorityContract`: `protected abstract Authority authority()`, `protected abstract List<Scenario> scenarios()`, `@TestFactory Stream<DynamicContainer> contract()`: one container per scenario, holding the test `expectation`.
 
-- [ ] **Step 1: Write the failing tests:**
+- [x] **Step 1: Write the failing tests:**
   - `ProjectsContractTest extends AuthorityContract` with `new Projects()` and eight scenarios carried over from `KernelTest`, same names: `anAcceptedActionIsAnEventByItsCaller` (then `Accepted`), `aReadIsAnEventAndAnswersWithStatements` (`When.Read` of the project at `create` → `Statements` of `entity()` and the name tuple), `aWriteFollowsTheReadItWasBasedOn`, `aConcurrentRenameOfTheSameNameIsRejected` (`Rejected` with reason containing `conflicts with`), `anUnrelatedWriteDoesNotConflict`, `aBlindWriteIsAccepted`, `anUnknownFrontierIsRejected`, `actionsTheAuthorityDoesNotTakeAreRejected` (a `Raw` definition → `Rejected` containing `projects takes only reads and asserts`). Use `KernelTest`'s contexts `anna`, `ivan`, `mia` with grant `g3` and budget 10.
   - `ScenarioRunnerTest`: `aRejectedGivenStepBreaksTheScenario` (a given step rejected by `Projects` makes `run` throw `IllegalStateException` naming the step); `duplicateScenarioNamesAreRefused` (a contract whose `scenarios()` holds two with one name fails its `contract()` factory with `IllegalArgumentException`); `theSameScenarioRunsTheSameTwice` (two runs of one scenario give equal symbolic statements).
-- [ ] **Step 2:** Run `./gradlew :surfaces:test --tests '*contract*'`. Expected: FAIL, the runner does not exist.
-- [ ] **Step 3:** Implement `Run`, `ScenarioRunner`, `AcceptAll`, `AuthorityContract` (expectation only). Expectation checks: `Accepted` / `Rejected` against `answer`; `Statements` against `statements` mapped to symbolic tuples through `bindings.render` (compare identity, attribute, value; never statement ids).
-- [ ] **Step 4:** Run the same command, then `./gradlew :surfaces:test`. Expected: all PASS.
-- [ ] **Step 5: Commit** `Run contract scenarios through the kernel; Projects passes its scenarios`.
+- [x] **Step 2:** Run `./gradlew :surfaces:test --tests '*contract*'`. Expected: FAIL, the runner does not exist.
+- [x] **Step 3:** Implement `Run`, `ScenarioRunner`, `AcceptAll`, `AuthorityContract` (expectation only). Expectation checks: `Accepted` / `Rejected` against `answer`; `Statements` against `statements` mapped to symbolic tuples through `bindings.render` (compare identity, attribute, value; never statement ids).
+- [x] **Step 4:** Run the same command, then `./gradlew :surfaces:test`. Expected: all PASS.
+- [x] **Step 5: Commit** `Run contract scenarios through the kernel; Projects passes its scenarios`.
 
 ### Task 3: The authority rules
 
@@ -245,11 +245,11 @@ Rulings taken during Operate, with what they change in the design above. *Builde
   - `RecordingAuthority(Authority inner)`: for each `decide`, calls `inner.decide` twice on a `ReadOnlyEventLog`, records a `Decision` (an `UnsupportedOperationException` from `append` sets `appendedDuringDecide` and counts as a reject), returns the first verdict.
   - `final class KnownGaps`: `static final Map<String, String> RULES` (rule name → reason), and `static void judge(String rule, Executable check)`: runs `check`; if the rule is in `RULES` and the check fails, `Assumptions.abort(reason)`; if it is in `RULES` and passes, `fail("known gap appears fixed: remove it from KnownGaps: " + rule)`; otherwise the check's own result.
   - Rule test names in each scenario container: `authority does not change the log`, `authority decides the same twice`, `a rejection has a reason`, `a read is not rejected for a conflict`.
-- [ ] **Step 1: Write the failing tests** in `AuthorityRulesTest`, each running one ordinary scenario (a creation, then a rename) through the contract machinery with a bad authority and asserting the named rule fails while the others pass: `anAuthorityThatAppendsBreaksTheLogRule`, `anAuthorityThatFlipsBreaksTheSameTwiceRule` (accepts on odd calls), `aBlankRejectionBreaksTheReasonRule` (rejects with `""`), `rejectingAReadBreaksTheReadRule`. Plus `projectsKeepsEveryAuthorityRule`.
-- [ ] **Step 2:** Run `./gradlew :surfaces:test --tests '*AuthorityRulesTest'`. Expected: FAIL.
-- [ ] **Step 3:** Implement as in the Interfaces. Rules are judged over every `Decision` in the `Run`, including decisions on emitted actions.
-- [ ] **Step 4:** Run `./gradlew :surfaces:test`. Expected: all PASS; `ProjectsContractTest` shows 5 tests per scenario.
-- [ ] **Step 5: Commit** `Hold every authority to the general rules`.
+- [x] **Step 1: Write the failing tests** in `AuthorityRulesTest`, each running one ordinary scenario (a creation, then a rename) through the contract machinery with a bad authority and asserting the named rule fails while the others pass: `anAuthorityThatAppendsBreaksTheLogRule`, `anAuthorityThatFlipsBreaksTheSameTwiceRule` (accepts on odd calls), `aBlankRejectionBreaksTheReasonRule` (rejects with `""`), `rejectingAReadBreaksTheReadRule`. Plus `projectsKeepsEveryAuthorityRule`.
+- [x] **Step 2:** Run `./gradlew :surfaces:test --tests '*AuthorityRulesTest'`. Expected: FAIL.
+- [x] **Step 3:** Implement as in the Interfaces. Rules are judged over every `Decision` in the `Run`, including decisions on emitted actions.
+- [x] **Step 4:** Run `./gradlew :surfaces:test`. Expected: all PASS; `ProjectsContractTest` shows 5 tests per scenario.
+- [x] **Step 5: Commit** `Hold every authority to the general rules`.
 
 ### Task 4: The surface contract and `Echo`
 
@@ -265,13 +265,13 @@ Rulings taken during Operate, with what they change in the design above. *Builde
   - `RecordingSurface(Surface inner, EventLog log)`: records a `Delivery` per `receive` (the event, the returned actions, the ids in the log at that moment).
   - `abstract class SurfaceContract`: `protected abstract Surface surface()`, `protected abstract List<Scenario> scenarios()`, `protected Authority authority()` (default `new AcceptAll()`); `@TestFactory` like `AuthorityContract`, with `expectation` (for `Emits`: the actions returned by deliveries after the `When`, flattened in order, compared to the `ActionSpec`s resolved per delivery) and the five rules, named `receives only what its interests match, after its causes`, `never receives what it emitted`, `what it emits is caused by what it received`, `the same events give the same actions` (runs the scenario a second time from scratch), `its successive emissions are causally ordered`.
   - `KnownGaps.RULES` gains `its successive emissions are causally ordered` → `"#36: a surface never receives its own emissions, so its frontier does not include them (review of #36, Kernel.java:219)"`.
-- [ ] **Step 1: Write the failing tests:**
+- [x] **Step 1: Write the failing tests:**
   - `EchoContractTest extends SurfaceContract` with an `Echo` labelling every project it hears about, and scenarios carried over from `ReceivingTest` (same names): `anAttachedSurfaceCatchesUpThenReceivesWhatMatches`, `attachingFromAFrontierSkipsWhatIsInIt`, `readsAreReceivedToo`, `whatASurfaceEmitsIsAnEventCausedByWhatItKnew`, and from `DeliveryTest`: `anEmissionReachesOthersAfterItsCause`, `catchingUpKeepsLogOrderAndSkipsOwnEmissions`.
   - `SurfaceRulesTest`: `aSurfaceThatEmitsRandomlyBreaksTheSameEventsRule` (emits a label with a random value); `echoKeepsEverySurfaceRule` (all rules pass except `its successive emissions are causally ordered`, which is aborted with the #36 reason).
-- [ ] **Step 2:** Run `./gradlew :surfaces:test --tests '*Echo*' --tests '*SurfaceRulesTest'`. Expected: FAIL.
-- [ ] **Step 3:** Implement as in the Interfaces.
-- [ ] **Step 4:** Run `./gradlew :surfaces:test`. Expected: all PASS, with the known-gap rule shown as skipped.
-- [ ] **Step 5: Commit** `Add the surface contract and the reference surface Echo`.
+- [x] **Step 2:** Run `./gradlew :surfaces:test --tests '*Echo*' --tests '*SurfaceRulesTest'`. Expected: FAIL.
+- [x] **Step 3:** Implement as in the Interfaces.
+- [x] **Step 4:** Run `./gradlew :surfaces:test`. Expected: all PASS, with the known-gap rule shown as skipped.
+- [x] **Step 5: Commit** `Add the surface contract and the reference surface Echo`.
 
 ### Task 5: The kernel gap test and the security Letter
 
@@ -283,25 +283,25 @@ Rulings taken during Operate, with what they change in the design above. *Builde
 **Interfaces:**
 - Consumes: Tasks 1-4.
 
-- [ ] **Step 1: Write the test** `aSurfaceWhoseInterestsThrowDoesNotFailTheSubmit`: a kernel with `Projects`, an attached surface whose `interests()` throws, and an `Echo` with `Interest.any()`; a submitted creation must return `Accepted`, and the `Echo` must have received it. Judged through `KnownGaps.judge("a surface whose interests throw does not fail the submit", ...)`, with the reason `"#36: Kernel.wants calls interests() outside the guard around receive (review of #36, Kernel.java:178)"`.
-- [ ] **Step 2:** Run `./gradlew :surfaces:test --tests '*KernelGapsTest'`. Expected: the test is skipped with that reason (the gap exists today).
-- [ ] **Step 3:** Run `./gradlew test` (all modules; Docker running for `log-nats`). Expected: all PASS or skipped as above; output quiet.
-- [ ] **Step 4: Commit** `Pin the kernel gaps found in the review of #36`.
+- [x] **Step 1: Write the test** `aSurfaceWhoseInterestsThrowDoesNotFailTheSubmit`: a kernel with `Projects`, an attached surface whose `interests()` throws, and an `Echo` with `Interest.any()`; a submitted creation must return `Accepted`, and the `Echo` must have received it. Judged through `KnownGaps.judge("a surface whose interests throw does not fail the submit", ...)`, with the reason `"#36: Kernel.wants calls interests() outside the guard around receive (review of #36, Kernel.java:178)"`.
+- [x] **Step 2:** Run `./gradlew :surfaces:test --tests '*KernelGapsTest'`. Expected: the test is skipped with that reason (the gap exists today).
+- [x] **Step 3:** Run `./gradlew test` (all modules; Docker running for `log-nats`). Expected: all PASS or skipped as above; output quiet.
+- [x] **Step 4: Commit** `Pin the kernel gaps found in the review of #36`.
 
 ## Verified
 
 Done:
-- The scenario format, the runner through the real kernel, `AuthorityContract` with four rules and `SurfaceContract` with five, `Echo`, and `KnownGaps`, as test fixtures of `src/surfaces`.
-- `Projects` passes `AuthorityContract` with twelve scenarios (including that retracting a retraction does not restore the statement); `Echo` passes `SurfaceContract` with six. Scenarios are written with short factories (`When.submit`, `Then.rejected("…")`, `ActionSpec.asserts`). Issue #22's done-when: delivery by interest, emission in response, acceptance and rejection, reads at a frontier (including an earlier one), and `Projects` passes.
-- The findings of the review of #36 are tests. Simeon fixed five of them in #36 (6845d75): a surface whose `interests()` throws, a surface's own emissions not causally ordered, retractions outside the causal past or of a missing statement, a tuple about a missing local identity. They are covered by #36's own tests (`CausalityTest`, `AssertionTest`, `DeliveryTest`) and by the contracts. One stays a known gap, skipped with its reason: a retracted attribute with another value still retracts.
+- The scenario format, the runner through the real kernel, `AuthorityContract` with three rules (doesn't change the log, a rejection has a reason, a submitted read is not rejected) and `SurfaceContract` with four (receives only what its interests match, after its causes; never its own emissions; what it emits is caused by what it received; the same events give the same actions), and `Echo`, as test fixtures of `src/surfaces`.
+- `Projects` passes `AuthorityContract` with twelve scenarios; `Echo` passes `SurfaceContract` with six, on catch-up and live delivery. Issue #22's done-when: delivery by interest, emission in response, acceptance and rejection, reads at a frontier (including an earlier one), and `Projects` passes.
+- The findings of the review of #36 were tests here until #36 fixed five of them (6845d75) and tested them itself. The sixth, a retracted attribute with another value still retracts, is a kernel bug to report on #36.
+- `src/README.md` says how to use the contracts.
 
 Not done:
 - Security tests (Letter [[Security tests wait for access checks]]).
-- Several surfaces in one scenario, asynchronous delivery, JSON scenario files.
-- An authority's decisions on emitted actions are judged only through its own contract.
+- Several surfaces in one scenario, asynchronous delivery, JSON scenario files, checking what a view shows.
 
 Checked:
-- `./gradlew test`, all modules with Docker: 0 failures, rebased on #36's 6845d75; in `surfaces`, 5 skipped (one known gap, four "nothing to check" aborts).
-- Each task reviewed against its brief, fixed where asked and re-reviewed; one review of the whole branch, one fix wave, a re-review. Each rule is shown to fail with a deliberately bad implementation.
-- No change outside `src/surfaces`'s test fixtures and tests, apart from its `build.gradle.kts`; the tests that existed before K5 are unchanged and pass. `khora-validate` passes on every entity this run wrote. Nothing in `docs/` changed.
-- Open minor points: `Ref.known` accepts any identity and renders as a hash; a named identity equal to a step name renders like the step; a step that wasn't delivered shows as a list difference.
+- `./gradlew test`, all modules with Docker, rebased on #36's 6845d75: 0 failures, 0 skipped.
+- Each task reviewed against its brief, fixed where asked and re-reviewed; a review of the whole branch with one fix wave and its re-review; then two more reviews (scope, and fit for the team), after which the contracts were trimmed. Each rule kept is shown to fail with a deliberately bad implementation.
+- No change outside `src/surfaces`'s test fixtures and tests, its `build.gradle.kts` and `src/README.md`, besides this run's entities. `khora-validate` passes on every entity this run wrote. Nothing in `docs/` changed.
+- Open minor points: a named identity equal to a step name renders like the step; a step that wasn't delivered shows as a list difference; `TupleSpec.retraction` names `khora/basic/retracted` itself, pinned against `Assertion.retraction` by a test.

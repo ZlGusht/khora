@@ -12,7 +12,7 @@ relationships__originates_in:
 relationships__decided_by:
   - "[[Hristiyan Ganchov]]"
 properties__decided_on: 2026-11-25
-properties__status: "active"
+properties__status: "reversed"
 properties__kind: "design"
 properties__author: agent:claude-opus-5-5
 ---
@@ -23,3 +23,5 @@ Where the kernel of #36 breaks a contract rule today, the test is written, run a
 ## Rationale
 
 Leaving the rule out would hide the gap; failing the suite would block every implementation for a kernel fault. Today this covers a surface's own emissions not being causally ordered, and a surface whose interests throw failing the submit (found in the review of #36).
+
+Reversed before review: the gaps did their work (#36's fixes in 6845d75 turned five of them to "appears fixed"), #36 now tests those fixes itself, and the one left is a kernel bug to report on #36, not something K5 should carry. `KnownGaps` was removed.
