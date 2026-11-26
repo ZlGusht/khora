@@ -16,3 +16,6 @@ project(":log-nats").projectDir = file("src/log-nats")
 
 include(":query")
 project(":query").projectDir = file("src/query")
+
+include(":datastore-neo4j")
+project(":datastore-neo4j").projectDir = file("src/datastore-neo4j")
