@@ -43,7 +43,7 @@ The words the module build files use:
 
 To add a module: create `src/<module>/build.gradle.kts`, add two lines to `settings.gradle.kts` as for the others, and depend on `events` with `api` or `implementation`.
 
-Design, decisions and measurements: the runs `blob/Issue #18 Event types ids and clock.md` (`events`, `surfaces`), `blob/Issue #21 Surface contract types.md` `blob/Issue #19 Log store on NATS.md` (`log-nats`) and `blob/Issue #22 Contract tests for surfaces and authorities.md` (the contracts).
+Design, decisions and measurements: the runs `blob/Issue #18 Event types ids and clock.md` (`events`, `surfaces`), `blob/Issue #21 Surface contract types.md`, `blob/Issue #19 Log store on NATS.md` (`log-nats`) and `blob/Issue #22 Contract tests for surfaces and authorities.md` (the contracts).
 
 ## Prerequisites
 
@@ -99,7 +99,12 @@ Most code goes through the `Kernel` instead, which checks `Causality`, asks the 
 
 For tests of code that uses the log, depend on the `events` module's test fixtures and use `InMemoryEventLog`. To check a new `EventLog`, extend `EventLogContract`.
 
-To check a new `Authority` or `Surface`, depend on the `surfaces` module's test fixtures and extend `AuthorityContract` or `SurfaceContract` with your scenarios (`Scenario.named(...).given(...).when(...).then(...)`); each scenario is also held to the contract's general rules. `ProjectsContractTest` and `EchoContractTest` are examples.
+To check a new `Authority` or `Surface`, depend on the `surfaces` module's test fixtures and extend `AuthorityContract` or `SurfaceContract` with your scenarios (`Scenario.named(...).given(...).when(...).then(...)`); each scenario is also held to the contract's general rules. `ProjectsContractTest` and `EchoContractTest` are examples. Some things to know when writing scenarios:
+
+- A write based on a read needs both `.knew(read)` and `.link("based_on", read)`.
+- A thing's first tuple, `/0`, is the entity itself, so its first attribute is `Ref.tuple(step, 1)`.
+- Give `Then.rejected` the reason text; without it, a scenario may pass for the wrong reason.
+- `SurfaceContract` checks what a surface receives and emits, not what a view shows.
 
 ## Run NATS locally
 

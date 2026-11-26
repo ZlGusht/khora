@@ -86,7 +86,6 @@ class ScenarioFormatTest {
     void aRetractionSpecResolvesToTheRetraction() {
         assertEquals(Assertion.retraction(Identity.of(CREATE, 1)),
                 TupleSpec.retraction(Ref.tuple("create", 1)).resolve(bound(), Optional.empty()));
-        assertEquals(Basic.RETRACTED, bound().identity(Ref.known(Basic.RETRACTED), Optional.empty()));
     }
 
     @Test

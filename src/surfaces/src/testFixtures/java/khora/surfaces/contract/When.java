@@ -20,7 +20,7 @@ public sealed interface When {
         return new Read(thing, List.of(at));
     }
 
-    /** Submits a step through the surface. */
+    /** Submits a step to the kernel. */
     record Submit(Step step) implements When {
         public Submit {
             Objects.requireNonNull(step, "step");

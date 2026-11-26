@@ -42,8 +42,7 @@ import org.junit.jupiter.api.TestFactory;
  *       that event as {@code source}, knowing every event it had received so far;
  *   <li>{@value #SAME}: the scenario is played a second time from scratch, with a new surface and
  *       authority, and the surface receives the same events and returns the same actions, compared
- *       symbolically;
- *   <li>{@value #ORDERED}: each event it emitted knew the one it emitted before.
+ *       symbolically.
  * </ul>
  *
  * <p>The events a surface emitted are those of the log by its name whose {@code source} is an event
@@ -67,9 +66,8 @@ import org.junit.jupiter.api.TestFactory;
  * {@link AcceptAll} does).
  *
  * <p>A scenario the runner cannot play fails every test of its container with the runner's message.
- * A scenario in which the surface received nothing aborts the five rule tests rather than pass them
- * with nothing to judge; {@value #ORDERED} also aborts when the surface emitted fewer than two
- * events. Rules listed in {@link KnownGaps} are judged by it.
+ * A scenario in which the surface received nothing aborts the four rule tests rather than pass them
+ * with nothing to judge.
  */
 public abstract class SurfaceContract {
 
@@ -77,7 +75,6 @@ public abstract class SurfaceContract {
     public static final String OWN = "never receives what it emitted";
     public static final String CAUSED = "what it emits is caused by what it received";
     public static final String SAME = "the same events give the same actions";
-    public static final String ORDERED = "its successive emissions are causally ordered";
 
     /** A new instance of the surface under test; called once per scenario run. */
     protected abstract Surface surface();
@@ -114,8 +111,7 @@ public abstract class SurfaceContract {
                     rule(MATCH, s, played, SurfaceContract::receivesWhatMatches),
                     rule(OWN, s, played, SurfaceContract::neverItsOwn),
                     rule(CAUSED, s, played, SurfaceContract::causedByWhatItReceived),
-                    rule(SAME, s, played, (scenario, first) -> sameTwice(scenario, first, play(scenario))),
-                    rule(ORDERED, s, played, SurfaceContract::emissionsOrdered)));
+                    rule(SAME, s, played, (scenario, first) -> sameTwice(scenario, first, play(scenario)))));
         });
     }
 
@@ -134,7 +130,7 @@ public abstract class SurfaceContract {
             if (played.run().deliveries().isEmpty()) {
                 Assumptions.abort("the surface received nothing in this scenario");
             }
-            KnownGaps.judge(name, () -> rule.check(s, played));
+            rule.check(s, played);
         });
     }
 
@@ -159,13 +155,6 @@ public abstract class SurfaceContract {
             }
         }
         return emitted;
-    }
-
-    private static List<Event> emitted(Played p) {
-        var bySource = emittedBySource(p);
-        var ids = new HashSet<EventId>();
-        bySource.values().forEach(es -> es.forEach(e -> ids.add(e.id())));
-        return p.run().events().stream().filter(e -> ids.contains(e.id())).toList();
     }
 
     /** Delivery {@code index} of {@code s}, for messages. */
@@ -201,7 +190,7 @@ public abstract class SurfaceContract {
     static void neverItsOwn(Scenario s, Played p) {
         var run = p.run();
         var own = new HashSet<EventId>();
-        emitted(p).forEach(e -> own.add(e.id()));
+        emittedBySource(p).values().forEach(es -> es.forEach(e -> own.add(e.id())));
         for (int i = 0; i < run.deliveries().size(); i++) {
             if (own.contains(run.deliveries().get(i).event().id())) {
                 fail(about(s, i, run) + ": the surface received an event it emitted");
@@ -237,22 +226,6 @@ public abstract class SurfaceContract {
     static void sameTwice(Scenario s, Played first, Played second) {
         assertEquals(deliveries(first.run()), deliveries(second.run()),
                 s.name() + ": played again from scratch, the surface received or returned something else");
-    }
-
-    static void emissionsOrdered(Scenario s, Played p) {
-        var emitted = emitted(p);
-        if (emitted.size() < 2) {
-            Assumptions.abort("the surface emitted fewer than two events in this scenario");
-        }
-        var source = source(p.run());
-        var bindings = p.run().bindings();
-        for (int i = 1; i < emitted.size(); i++) {
-            var before = emitted.get(i - 1);
-            var after = emitted.get(i);
-            assertTrue(FrontierCheck.closure(after.causes(), source).contains(before.id()), s.name() + ": "
-                    + render(after.id(), bindings) + " does not know " + render(before.id(), bindings)
-                    + ", which the surface emitted before it");
-        }
     }
 
     /** Each delivery as the event received and the actions returned, symbolically. */

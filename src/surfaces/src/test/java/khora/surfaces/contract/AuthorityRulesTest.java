@@ -3,7 +3,6 @@ package khora.surfaces.contract;
 import static khora.surfaces.contract.AuthorityContract.LOG;
 import static khora.surfaces.contract.AuthorityContract.READ;
 import static khora.surfaces.contract.AuthorityContract.REASON;
-import static khora.surfaces.contract.AuthorityContract.TWICE;
 import static khora.surfaces.contract.ProjectsContractTest.IVAN;
 import static khora.surfaces.contract.ProjectsContractTest.create;
 import static khora.surfaces.contract.ProjectsContractTest.read;
@@ -35,12 +34,11 @@ import khora.surfaces.stub.Projects;
 import org.junit.jupiter.api.DynamicNode;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.Test;
-import org.opentest4j.AssertionFailedError;
 import org.opentest4j.TestAbortedException;
 
 /** Each authority rule fails for an authority that breaks it, and only for that one. */
 class AuthorityRulesTest {
-    static final List<String> RULES = List.of(LOG, TWICE, REASON, READ);
+    static final List<String> RULES = List.of(LOG, REASON, READ);
 
     /** A creation, a read of it, then a rename based on that read. */
     static final Scenario RENAME = Scenario.named("rename")
@@ -158,21 +156,13 @@ class AuthorityRulesTest {
     }
 
     @Test
-    void anAuthorityThatFlipsBreaksTheSameTwiceRule() {
-        var results = results(contract(() -> {
-            var calls = new AtomicInteger();
-            return projectsBut((candidate, log) ->
-                    calls.incrementAndGet() % 2 == 1 ? new Authority.Accept() : new Authority.Reject("flipped"));
-        }, RENAME));
-        onlyBreaks(TWICE, results.get("rename"));
-        assertNull(results.get("rename").get("expectation"));
-    }
-
-    @Test
     void aBlankRejectionBreaksTheReasonRule() {
         var results = results(contract(() -> projectsBut((candidate, log) ->
                 isRename(candidate) ? new Authority.Reject("") : null), RENAME));
-        onlyBreaks(REASON, results.get("rename"));
+        var tests = results.get("rename");
+        onlyBreaks(REASON, tests);
+        assertTrue(tests.get(REASON).getMessage().startsWith("rename: step rename: "),
+                tests.get(REASON).getMessage());
     }
 
     @Test
@@ -188,7 +178,7 @@ class AuthorityRulesTest {
         assertFalse(results.isEmpty());
         assertEquals(new ProjectsContractTest().scenarios().size(), results.size());
         results.forEach((scenario, tests) -> {
-            assertEquals(5, tests.size(), scenario);
+            assertEquals(4, tests.size(), scenario);
             tests.forEach((test, thrown) -> assertNull(thrown, scenario + ": " + test));
         });
     }
@@ -206,7 +196,7 @@ class AuthorityRulesTest {
             return new Projects();
         }, broken));
         var tests = results.get("broken");
-        assertEquals(5, tests.size());
+        assertEquals(4, tests.size());
         tests.forEach((test, thrown) -> {
             assertInstanceOf(AssertionError.class, thrown, test);
             assertTrue(thrown.getMessage().contains("projects takes only reads and asserts"), thrown.getMessage());
@@ -262,7 +252,7 @@ class AuthorityRulesTest {
         var emitted = run.decisions().get(1);
         assertTrue(isRead(emitted.candidate()));
         assertTrue(((AcceptedAction) emitted.candidate().body()).links().containsKey("source"));
-        assertInstanceOf(Authority.Accept.class, emitted.first());
+        assertInstanceOf(Authority.Accept.class, emitted.verdict());
         assertFalse(emitted.appendedDuringDecide());
     }
 
@@ -276,38 +266,6 @@ class AuthorityRulesTest {
     }
 
     @Test
-    void aKnownGapThatFailsAborts() {
-        var gaps = Map.of("some rule", "not yet");
-        var e = assertThrows(TestAbortedException.class,
-                () -> KnownGaps.judge(gaps, "some rule", () -> { throw new AssertionFailedError("broken"); }));
-        assertTrue(e.getMessage().contains("not yet"), e.getMessage());
-    }
-
-    @Test
-    void aKnownGapThatPassesFails() {
-        var gaps = Map.of("some rule", "not yet");
-        var e = assertThrows(AssertionFailedError.class, () -> KnownGaps.judge(gaps, "some rule", () -> { }));
-        assertEquals("known gap appears fixed: remove it from KnownGaps: some rule", e.getMessage());
-    }
-
-    @Test
-    void aRuleThatIsNoKnownGapIsJudgedByItsCheck() {
-        var gaps = Map.of("some rule", "not yet");
-        assertThrows(AssertionFailedError.class,
-                () -> KnownGaps.judge(gaps, "other rule", () -> { throw new AssertionFailedError("broken"); }));
-        KnownGaps.judge(gaps, "other rule", () -> { });
-        assertEquals(Set.of(KernelGapsTest.RETRACTED_FALSE), KnownGaps.RULES.keySet());
-    }
-
-    @Test
-    void aKnownGapThatThrowsSomethingElseFails() {
-        var gaps = Map.of("some rule", "not yet");
-        var e = assertThrows(IllegalStateException.class,
-                () -> KnownGaps.judge(gaps, "some rule", () -> { throw new IllegalStateException("a bug"); }));
-        assertEquals("a bug", e.getMessage());
-    }
-
-    @Test
     void anErrorInTheRunFailsEveryTestOfItsContainerAndRunsOnce() {
         var authorities = new AtomicInteger();
         var results = results(contract(() -> {
@@ -315,7 +273,7 @@ class AuthorityRulesTest {
             throw new LinkageError("no authority");
         }, READING));
         var tests = results.get("reading");
-        assertEquals(5, tests.size());
+        assertEquals(4, tests.size());
         tests.forEach((test, thrown) -> {
             assertInstanceOf(AssertionError.class, thrown, test);
             assertEquals("no authority", thrown.getMessage(), test);

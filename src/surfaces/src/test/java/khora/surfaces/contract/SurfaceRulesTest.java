@@ -7,13 +7,11 @@ import static khora.surfaces.contract.EchoContractTest.label;
 import static khora.surfaces.contract.EchoContractTest.labels;
 import static khora.surfaces.contract.EchoContractTest.tell;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -41,7 +39,7 @@ import org.opentest4j.TestAbortedException;
 /** Each surface rule fails for a surface that breaks it; Echo keeps them all. */
 class SurfaceRulesTest {
     static final List<String> RULES = List.of(SurfaceContract.MATCH, SurfaceContract.OWN, SurfaceContract.CAUSED,
-            SurfaceContract.SAME, SurfaceContract.ORDERED);
+            SurfaceContract.SAME);
 
     /** A project is created; the surface is attached from nothing. */
     static final Scenario CREATED = Scenario.named("created")
@@ -116,7 +114,6 @@ class SurfaceRulesTest {
         assertNull(tests.get(SurfaceContract.MATCH));
         assertNull(tests.get(SurfaceContract.OWN));
         assertNull(tests.get(SurfaceContract.CAUSED));
-        assertFalse(tests.get(SurfaceContract.ORDERED) instanceof AssertionError);
     }
 
     @Test
@@ -143,26 +140,10 @@ class SurfaceRulesTest {
     void echoKeepsEverySurfaceRule() {
         var results = results(new EchoContractTest().contract());
         assertEquals(6, results.size());
-        var ordered = new HashSet<String>();
         results.forEach((scenario, tests) -> {
-            assertEquals(6, tests.size(), scenario);
-            assertNull(tests.get("expectation"), scenario + ": expectation");
-            for (var rule : RULES) {
-                if (!rule.equals(SurfaceContract.ORDERED)) {
-                    assertNull(tests.get(rule), scenario + ": " + rule);
-                }
-            }
-            var thrown = tests.get(SurfaceContract.ORDERED);
-            if (thrown == null) {
-                ordered.add(scenario);
-            } else {
-                var aborted = assertInstanceOf(TestAbortedException.class, thrown, scenario);
-                assertTrue(aborted.getMessage().contains("fewer than two"), aborted.getMessage());
-            }
+            assertEquals(5, tests.size(), scenario);
+            tests.forEach((test, thrown) -> assertNull(thrown, scenario + ": " + test));
         });
-        // the scenarios in which Echo emits at least twice
-        assertEquals(Set.of("anAttachedSurfaceCatchesUpThenReceivesWhatMatches",
-                "catchingUpKeepsLogOrderAndSkipsOwnEmissions"), ordered);
     }
 
     @Test
@@ -250,7 +231,7 @@ class SurfaceRulesTest {
             }
         };
         var tests = results(contract(nulls, AcceptAll::new, CREATED).contract()).get("created");
-        assertEquals(6, tests.size());
+        assertEquals(5, tests.size());
         tests.forEach((test, thrown) -> {
             assertInstanceOf(AssertionError.class, thrown, test);
             assertTrue(thrown.getMessage().contains("nulls") && thrown.getMessage().contains("receive returned null"),

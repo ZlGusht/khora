@@ -32,16 +32,11 @@ public record Run(Bindings bindings, Optional<Answer> answer, List<Statement> st
         events = List.copyOf(events);
     }
 
-    /**
-     * One decision of the authority: its verdict, the verdict of deciding again on the same log, and
-     * whether the log grew while it decided.
-     */
-    public record Decision(Event candidate, Authority.Verdict first, Authority.Verdict second,
-            boolean appendedDuringDecide) {
+    /** One decision of the authority: its verdict, and whether it tried to change the log while deciding. */
+    public record Decision(Event candidate, Authority.Verdict verdict, boolean appendedDuringDecide) {
         public Decision {
             Objects.requireNonNull(candidate, "candidate");
-            Objects.requireNonNull(first, "first");
-            Objects.requireNonNull(second, "second");
+            Objects.requireNonNull(verdict, "verdict");
         }
     }
 

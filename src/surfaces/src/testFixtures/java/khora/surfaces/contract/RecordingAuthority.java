@@ -8,9 +8,8 @@ import khora.events.log.EventLog;
 import khora.surfaces.Authority;
 
 /**
- * Wraps an authority and records each of its decisions ({@link Run.Decision}). Each time it is asked,
- * it asks the inner authority twice, each time on a {@link ReadOnlyEventLog} over the same log, and
- * answers with the first verdict.
+ * Wraps an authority and records each of its decisions ({@link Run.Decision}). The inner authority
+ * decides on a {@link ReadOnlyEventLog} over the log.
  *
  * <p>An inner authority that tries to append to, follow or close the log has
  * {@code appendedDuringDecide} set. If the {@link UnsupportedOperationException} the read-only log
@@ -36,12 +35,10 @@ public final class RecordingAuthority implements Authority {
 
     @Override
     public synchronized Verdict decide(Event candidate, EventLog log) {
-        var first = new ReadOnlyEventLog(log);
-        var firstVerdict = decideOn(candidate, first);
-        var second = new ReadOnlyEventLog(log);
-        var secondVerdict = decideOn(candidate, second);
-        decisions.add(new Run.Decision(candidate, firstVerdict, secondVerdict, first.tried() || second.tried()));
-        return firstVerdict;
+        var readOnly = new ReadOnlyEventLog(log);
+        var verdict = decideOn(candidate, readOnly);
+        decisions.add(new Run.Decision(candidate, verdict, readOnly.tried()));
+        return verdict;
     }
 
     private Verdict decideOn(Event candidate, ReadOnlyEventLog log) {

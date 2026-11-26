@@ -84,7 +84,7 @@ class ScenarioRunnerTest {
         assertInstanceOf(Answer.Accepted.class, run.answer().orElseThrow());
         assertEquals(2, run.statements().size());
         assertEquals(2, run.decisions().size(), "one decision per submit the authority was asked about");
-        assertInstanceOf(Authority.Accept.class, run.decisions().get(1).first());
+        assertInstanceOf(Authority.Accept.class, run.decisions().get(1).verdict());
         assertTrue(run.deliveries().isEmpty());
     }
 

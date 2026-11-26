@@ -4,7 +4,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
 import khora.events.Assertion;
-import khora.events.Basic;
 import khora.events.Event;
 import khora.events.Identity;
 
@@ -29,9 +28,12 @@ public record TupleSpec(Optional<Ref> identity, Optional<Ref> attribute, Optiona
         return new TupleSpec(Optional.of(identity), Optional.of(attribute), Optional.of(value));
     }
 
-    /** Retracts the assertion {@code assertion}. */
+    /**
+     * Retracts the assertion {@code assertion}, as {@link Assertion#retraction} does: its attribute is
+     * {@link khora.events.Basic#RETRACTED}, named by the name it is made from.
+     */
     public static TupleSpec retraction(Ref assertion) {
-        return of(assertion, Ref.known(Basic.RETRACTED), RETRACTED_VALUE);
+        return of(assertion, Ref.named("khora/basic/retracted"), RETRACTED_VALUE);
     }
 
     /** The refs this tuple names, identity, attribute and value. */

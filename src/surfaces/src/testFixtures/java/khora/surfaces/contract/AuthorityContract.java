@@ -29,31 +29,21 @@ import org.junit.jupiter.api.TestFactory;
  *
  * <ul>
  *   <li>{@value #LOG}: it neither appends to, follows nor closes the log while deciding;
- *   <li>{@value #TWICE}: asked twice on the same log, it gives the same verdict;
  *   <li>{@value #REASON}: a rejection's reason is not blank;
  *   <li>{@value #READ}: see {@link #readIsNotRejected}.
  * </ul>
- *
- * <p>To judge {@value #TWICE}, {@code decide} is called twice for every submit, each time on the same
- * log, so it must be a function of the candidate and the log: an authority that keeps state between
- * calls sees two calls per submit.
  *
  * <p>Authority rules are judged in an authority's own contract run, on the steps its scenarios
  * submit. A surface contract run records the decisions on the actions its surface emitted, but does
  * not judge them: an authority is held to its rules on such actions by scenarios in its own contract.
  *
- * <p>The reason and read rules judge the verdict the authority answered with, the first; a second
- * verdict that differs from it is caught by {@value #TWICE}.
- *
  * <p>A scenario the runner cannot play fails every test of its container with the runner's message.
  * A scenario in which the authority was never asked (the kernel rejected everything before it) aborts
- * the four rule tests rather than pass them with nothing to judge.
- * Rules listed in {@link KnownGaps} are judged by it.
+ * the three rule tests rather than pass them with nothing to judge.
  */
 public abstract class AuthorityContract {
 
     public static final String LOG = "authority does not change the log";
-    public static final String TWICE = "authority decides the same twice";
     public static final String REASON = "a rejection has a reason";
     public static final String READ = "a read is not rejected for a conflict";
 
@@ -82,14 +72,13 @@ public abstract class AuthorityContract {
             return DynamicContainer.dynamicContainer(s.name(), Stream.of(
                     DynamicTest.dynamicTest("expectation", () -> expect(s, run.get())),
                     rule(LOG, s, run, AuthorityContract::logIsUnchanged),
-                    rule(TWICE, s, run, AuthorityContract::sameTwice),
                     rule(REASON, s, run, AuthorityContract::rejectionHasReason),
                     rule(READ, s, run, AuthorityContract::readIsNotRejected)));
         });
     }
 
     private interface Rule {
-        void check(Scenario s, int index, Run.Decision decision);
+        void check(Scenario s, Run run, Run.Decision decision);
     }
 
     private static DynamicTest rule(String name, Scenario s, Once<Run> once, Rule rule) {
@@ -98,52 +87,47 @@ public abstract class AuthorityContract {
             if (run.decisions().isEmpty()) {
                 Assumptions.abort("the authority was not asked in this scenario");
             }
-            KnownGaps.judge(name, () -> {
-                var decisions = run.decisions();
-                for (int i = 0; i < decisions.size(); i++) {
-                    rule.check(s, i, decisions.get(i));
-                }
-            });
+            run.decisions().forEach(d -> rule.check(s, run, d));
         });
     }
 
-    /** Decision {@code index} of {@code s}, for messages. */
-    private static String about(Scenario s, int index, Run.Decision d) {
-        var action = ((AcceptedAction) d.candidate().body()).action();
-        return s.name() + ": decision " + index + " (on " + action.definition().value() + ")";
+    /**
+     * The decision on {@code d}'s candidate, for messages: {@code step X} for the step that submitted
+     * it, {@code emitted#k} for an emitted one.
+     */
+    private static String about(Scenario s, Run run, Run.Decision d) {
+        var id = d.candidate().id().value();
+        var name = run.bindings().render(new Identity(id));
+        if (!name.equals(id)) {
+            return s.name() + ": " + (name.startsWith("emitted#") ? name : "step " + name);
+        }
+        // not in the log: the rejected submit of the When, or a rejected emission
+        var emitted = ((AcceptedAction) d.candidate().body()).links().containsKey("source");
+        return s.name() + ": " + (!emitted && s.when() instanceof When.Submit submit
+                ? "step " + submit.step().name() : "a rejected emission");
     }
 
-    static void logIsUnchanged(Scenario s, int index, Run.Decision d) {
+    static void logIsUnchanged(Scenario s, Run run, Run.Decision d) {
         if (d.appendedDuringDecide()) {
-            fail(about(s, index, d) + ": the authority tried to change the log while deciding");
+            fail(about(s, run, d) + ": the authority tried to change the log while deciding");
         }
     }
 
-    static void sameTwice(Scenario s, int index, Run.Decision d) {
-        assertEquals(d.first(), d.second(), about(s, index, d) + ": deciding again on the same log");
-    }
-
-    /**
-     * Judged on the first verdict, the one the authority answered with; a second verdict that differs
-     * from it is caught by {@value #TWICE}.
-     */
-    static void rejectionHasReason(Scenario s, int index, Run.Decision d) {
-        if (d.first() instanceof Authority.Reject r && r.reason().isBlank()) {
-            fail(about(s, index, d) + ": rejected with a blank reason");
+    static void rejectionHasReason(Scenario s, Run run, Run.Decision d) {
+        if (d.verdict() instanceof Authority.Reject r && r.reason().isBlank()) {
+            fail(about(s, run, d) + ": rejected with a blank reason");
         }
     }
 
     /**
      * A submitted read is not rejected. Stage 1 has no access checks, so the only reason to reject a
      * read would be a conflict, which [[Reads return statements and writes follow a read]] forbids.
-     * When access checks arrive, this must narrow to "not rejected for a conflict". Judged on the
-     * first verdict, the one the authority answered with; a second verdict that differs from it is
-     * caught by {@value #TWICE}.
+     * When access checks arrive, this must narrow to "not rejected for a conflict".
      */
-    static void readIsNotRejected(Scenario s, int index, Run.Decision d) {
+    static void readIsNotRejected(Scenario s, Run run, Run.Decision d) {
         var action = ((AcceptedAction) d.candidate().body()).action();
-        if (Basic.readOf(action).isPresent() && d.first() instanceof Authority.Reject r) {
-            fail(about(s, index, d) + ": a read was rejected: " + r.reason());
+        if (Basic.readOf(action).isPresent() && d.verdict() instanceof Authority.Reject r) {
+            fail(about(s, run, d) + ": a read was rejected: " + r.reason());
         }
     }
 

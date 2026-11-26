@@ -52,7 +52,6 @@ public final class Bindings {
                 names.put(id.value(), n.name());
                 yield id;
             }
-            case Ref.Known k -> k.identity();
             case Ref.Local l -> Identity.local(l.index());
             case Ref.Received r -> Identity.of(received.orElseThrow(() -> new IllegalArgumentException(
                     "no received event for a received ref")).id(), r.index());
