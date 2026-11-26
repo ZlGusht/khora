@@ -142,7 +142,8 @@ Rulings taken during Operate, with what they change in the design above. *Builde
 - **Ids in text (R16).** Emitted actions must reference events only through assert and read tuples: ids inside raw arguments or literals differ between runs.
 - **Known gaps.** Two rules fail on #36's kernel today and are aborted with their reason: a surface's own emissions are not causally ordered (also on live delivery), and a surface whose `interests()` throws fails the submit (`KernelGapsTest`, with a control kernel). A fixed gap makes its test fail.
 - **`anEmissionReachesOthersAfterItsCause`** is `anEmissionComesAfterItsCause`: the format holds one surface.
-- **After the final review.** Static factories for scenarios; a scenario for retracting a retraction; the remaining findings of the review of #36 pinned as known gaps in `KernelGapsTest`.
+- **After the final review.** Static factories for scenarios; a scenario for retracting a retraction; the remaining findings of the review of #36 pinned as known gaps.
+- **On #36's fixes (6845d75).** Five gaps flipped to "appears fixed" and became regression tests; `KernelGapsTest` is `KernelFindingsTest`. A blind write knows the thing it writes about (`aWriteAboutAThingItDoesNotKnowIsRejected` is the other half), and `Echo` labels with a literal, since a read has no tuple to name; the per-delivery comparison still shows which event each label answers.
 - **Kernel vocabulary in scenarios.** `Ref.known(identity)` names an identity the kernel defines, such as `Basic.RETRACTED`, so a retraction is the kernel's own. It is for vocabulary only, never an event id. Named identities render by their name in failure messages.
 
 ## Plan
@@ -291,8 +292,8 @@ Rulings taken during Operate, with what they change in the design above. *Builde
 
 Done:
 - The scenario format, the runner through the real kernel, `AuthorityContract` with four rules and `SurfaceContract` with five, `Echo`, and `KnownGaps`, as test fixtures of `src/surfaces`.
-- `Projects` passes `AuthorityContract` with eleven scenarios (including that retracting a retraction does not restore the statement); `Echo` passes `SurfaceContract` with six. Scenarios are written with short factories (`When.submit`, `Then.rejected("…")`, `ActionSpec.asserts`). Issue #22's done-when: delivery by interest, emission in response, acceptance and rejection, reads at a frontier (including an earlier one), and `Projects` passes.
-- Six kernel gaps of #36 pinned and skipped with their reason, each with a control where one applies: a surface's own emissions are not causally ordered; a surface whose `interests()` throws fails the submit; a retraction outside its causal past, and of a statement that does not exist, is accepted; a retracted attribute with another value still retracts; a tuple about a local identity its event does not carry is accepted.
+- `Projects` passes `AuthorityContract` with twelve scenarios (including that retracting a retraction does not restore the statement); `Echo` passes `SurfaceContract` with six. Scenarios are written with short factories (`When.submit`, `Then.rejected("…")`, `ActionSpec.asserts`). Issue #22's done-when: delivery by interest, emission in response, acceptance and rejection, reads at a frontier (including an earlier one), and `Projects` passes.
+- The findings of the review of #36 are tests. Simeon fixed five of them in #36 (6845d75): a surface whose `interests()` throws, a surface's own emissions not causally ordered, retractions outside the causal past or of a missing statement, a tuple about a missing local identity. They are regression tests in `KernelFindingsTest` and the contracts. One stays a known gap, skipped with its reason: a retracted attribute with another value still retracts.
 
 Not done:
 - Security tests (Letter [[Security tests wait for access checks]]).
@@ -300,7 +301,7 @@ Not done:
 - An authority's decisions on emitted actions are judged only through its own contract.
 
 Checked:
-- `./gradlew test`, all modules with Docker: 0 failures; in `surfaces`, 11 skipped (six known gaps on seven tests, four "nothing to check" aborts).
+- `./gradlew test`, all modules with Docker: 0 failures, rebased on #36's 6845d75; in `surfaces`, 5 skipped (one known gap, four "nothing to check" aborts).
 - Each task reviewed against its brief, fixed where asked and re-reviewed; one review of the whole branch, one fix wave, a re-review. Each rule is shown to fail with a deliberately bad implementation.
 - No change outside `src/surfaces`'s test fixtures and tests, apart from its `build.gradle.kts`; the tests that existed before K5 are unchanged and pass. `khora-validate` passes on every entity this run wrote. Nothing in `docs/` changed.
 - Open minor points: `Ref.known` accepts any identity and renders as a hash; a named identity equal to a step name renders like the step; a step that wasn't delivered shows as a list difference.
