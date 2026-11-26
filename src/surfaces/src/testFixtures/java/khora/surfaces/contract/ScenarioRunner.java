@@ -22,7 +22,8 @@ import khora.surfaces.Surface;
 
 /**
  * Plays a scenario through a fresh {@link Kernel}: a new in-memory log, a clock fixed at 1000, the
- * given steps submitted in order, then the {@code When}.
+ * given steps submitted in order (the surface under test attached where a {@link Given.AttachSurface}
+ * says), then the {@code When}. Events no step made are numbered as emitted, in log order.
  */
 public final class ScenarioRunner {
     /** The event {@link Step#UNKNOWN} stands for: one no log of a run holds. */
@@ -37,7 +38,7 @@ public final class ScenarioRunner {
      * it holds every delivery to it.
      *
      * @throws IllegalArgumentException if the scenario repeats a step name, names a step that is not
-     *     an earlier one, or attaches with no surface given
+     *     an earlier one, attaches with no surface given, or attaches the surface more than once
      * @throws IllegalStateException if a given step is rejected
      */
     public static Run run(Scenario s, Authority authority, Optional<Surface> surface) {
@@ -47,14 +48,19 @@ public final class ScenarioRunner {
         var kernel = new Kernel(recording, log, new Hlc(() -> 1000));
         var recordingSurface = surface.map(it -> new RecordingSurface(it, log));
         var bindings = new Bindings();
-        for (var step : s.given()) {
-            switch (submit(kernel, log, bindings, step)) {
-                case Answer.Accepted a -> bindings.bind(step.name(), a.event().id());
-                case Answer.Rejected r -> throw new IllegalStateException(
-                        "scenario " + s.name() + ": given step " + step.name() + " was rejected: " + r.reason());
+        for (var given : s.given()) {
+            switch (given) {
+                case Given.AttachSurface attach ->
+                        kernel.attach(recordingSurface.orElseThrow(), frontier(log, bindings, attach.from()));
+                case Step step -> {
+                    switch (submit(kernel, log, bindings, step)) {
+                        case Answer.Accepted a -> bindings.bind(step.name(), a.event().id());
+                        case Answer.Rejected r -> throw new IllegalStateException("scenario " + s.name()
+                                + ": given step " + step.name() + " was rejected: " + r.reason());
+                    }
+                }
             }
         }
-        long after = events(log, 1).size();
         Optional<Answer> answer = Optional.empty();
         List<Statement> statements = List.of();
         switch (s.when()) {
@@ -71,11 +77,11 @@ public final class ScenarioRunner {
                     frontier(log, bindings, read.at()));
         }
         var bound = new HashSet<EventId>();
-        s.given().forEach(step -> bound.add(bindings.event(step.name())));
+        s.steps().forEach(step -> bound.add(bindings.event(step.name())));
         if (s.when() instanceof When.Submit submit && answer.orElseThrow() instanceof Answer.Accepted) {
             bound.add(bindings.event(submit.step().name()));
         }
-        for (var event : events(log, after + 1)) {
+        for (var event : events(log, 1)) {
             if (!bound.contains(event.id())) {
                 bindings.emitted(event.id());
             }
@@ -123,7 +129,29 @@ public final class ScenarioRunner {
     /** Refuses a scenario whose step names repeat or point to no earlier step. */
     private static void check(Scenario s, Optional<Surface> surface) {
         var earlier = new HashSet<String>();
-        var steps = new ArrayList<>(s.given());
+        var steps = new ArrayList<Step>();
+        var attaches = 0;
+        for (var given : s.given()) {
+            switch (given) {
+                case Step step -> steps.add(step);
+                case Given.AttachSurface attach -> {
+                    attaches++;
+                    var before = new HashSet<String>();
+                    steps.forEach(step -> before.add(step.name()));
+                    attach.from().forEach(name -> checkEarlier(s, "attach", name, before));
+                }
+            }
+        }
+        if (s.when() instanceof When.Attach) {
+            attaches++;
+        }
+        if (attaches > 1) {
+            throw new IllegalArgumentException("scenario " + s.name() + " attaches the surface " + attaches
+                    + " times; it attaches it at most once");
+        }
+        if (attaches > 0 && surface.isEmpty()) {
+            throw new IllegalArgumentException("scenario " + s.name() + " attaches a surface, but none is given");
+        }
         if (s.when() instanceof When.Submit submit) {
             steps.add(submit.step());
         }
@@ -142,15 +170,10 @@ public final class ScenarioRunner {
             }
         }
         var given = new HashSet<String>();
-        s.given().forEach(step -> given.add(step.name()));
+        s.steps().forEach(step -> given.add(step.name()));
         switch (s.when()) {
             case When.Submit ignored -> { }
-            case When.Attach attach -> {
-                attach.from().forEach(name -> checkEarlier(s, "attach", name, given));
-                if (surface.isEmpty()) {
-                    throw new IllegalArgumentException("scenario " + s.name() + " attaches a surface, but none is given");
-                }
-            }
+            case When.Attach attach -> attach.from().forEach(name -> checkEarlier(s, "attach", name, given));
             case When.Read read -> read.at().forEach(name -> checkEarlier(s, "read", name, given));
         }
     }

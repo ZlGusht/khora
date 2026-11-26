@@ -47,7 +47,9 @@ import org.junit.jupiter.api.TestFactory;
  * </ul>
  *
  * <p>The events a surface emitted are those of the log by its name whose {@code source} is an event
- * it received. The surface is attached by the {@code When}, so every delivery comes after it.
+ * it received. A scenario attaches the surface once: among its given steps
+ * ({@link Given.AttachSurface}), after which later steps and a submitted {@code When} are delivered
+ * live, or as its {@code When} ({@link When.Attach}), when it only catches up.
  *
  * <p>A scenario the runner cannot play fails every test of its container with the runner's message.
  * A scenario in which the surface received nothing aborts the five rule tests rather than pass them
@@ -246,9 +248,10 @@ public abstract class SurfaceContract {
     }
 
     /**
-     * Checks that the run of {@code s} meets its {@link Then}. For {@link Then.Emits}, the actions the
-     * surface returned, flattened in order, are compared symbolically to the expected ones, each
-     * resolved against the delivery it was returned for.
+     * Checks that the run of {@code s} meets its {@link Then}. For {@link Then.Emits}, every action the
+     * surface returned from the moment it was attached (catching up, then live), flattened in order,
+     * is compared symbolically to the expected ones, each resolved against the delivery it was
+     * returned for.
      */
     static void expect(Scenario s, Run run) {
         if (!(s.then() instanceof Then.Emits emits)) {

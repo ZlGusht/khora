@@ -16,10 +16,9 @@ import khora.surfaces.Surface;
  * <p>A scenario holds no ids, and Echo's interests are data, so the project is the named thing
  * {@code project} rather than a created entity. Echo labels the project once for every event about it
  * that it receives, with the event's first tuple as the label's value, so what it emits shows what it
- * received and in which order. The surface under test is attached by the {@code When}, after the
- * given steps, so these scenarios check delivery as the surface catches up; delivery to other
- * surfaces and to a surface attached before an event stays covered by {@code ReceivingTest} and
- * {@code DeliveryTest}.
+ * received and in which order. Scenarios that attach Echo among the given steps check live delivery
+ * (and catching up on what came before); those that attach it as the {@code When} check catching up
+ * alone. Delivery among several surfaces stays covered by {@code DeliveryTest}.
  */
 class EchoContractTest extends SurfaceContract {
     static final Context ANNA = new Context("anna", Optional.empty(), "g3", 10);
@@ -57,10 +56,9 @@ class EchoContractTest extends SurfaceContract {
     protected List<Scenario> scenarios() {
         return List.of(
                 Scenario.named("anAttachedSurfaceCatchesUpThenReceivesWhatMatches")
-                        .given(tell("create", PROJECT, NAME, "Kitchen"),
-                                tell("invoice", Ref.named("invoice"), NAME, "INV-1", "create"),
-                                tell("rename", PROJECT, NAME, "Studio", "invoice"))
-                        .when(new When.Attach(List.of()))
+                        .given(tell("create", PROJECT, NAME, "Kitchen"), Given.attach(),
+                                tell("invoice", Ref.named("invoice"), NAME, "INV-1", "create"))
+                        .when(new When.Submit(tell("rename", PROJECT, NAME, "Studio", "invoice")))
                         .then(labels("create", "rename")),
                 Scenario.named("attachingFromAFrontierSkipsWhatIsInIt")
                         .given(tell("create", PROJECT, NAME, "Kitchen"),
@@ -69,18 +67,16 @@ class EchoContractTest extends SurfaceContract {
                         .when(new When.Attach(List.of("rename")))
                         .then(labels("again")),
                 Scenario.named("readsAreReceivedToo")
-                        .given(tell("create", PROJECT, NAME, "Kitchen"),
-                                Step.named("read").by(ANNA).knew("create").does(new ActionSpec.Read(PROJECT)))
-                        .when(new When.Attach(List.of("create")))
+                        .given(tell("create", PROJECT, NAME, "Kitchen"), Given.attach("create"))
+                        .when(new When.Submit(Step.named("read").by(ANNA).knew("create").does(new ActionSpec.Read(PROJECT))))
                         .then(labels("read")),
                 Scenario.named("whatASurfaceEmitsIsAnEventCausedByWhatItKnew")
-                        .given(tell("create", PROJECT, NAME, "Kitchen"),
-                                tell("rename", PROJECT, NAME, "Studio", "create"))
-                        .when(new When.Attach(List.of("create")))
+                        .given(tell("create", PROJECT, NAME, "Kitchen"), Given.attach("create"))
+                        .when(new When.Submit(tell("rename", PROJECT, NAME, "Studio", "create")))
                         .then(labels("rename")),
-                Scenario.named("anEmissionReachesOthersAfterItsCause")
-                        .given(tell("hello", PROJECT, NOTE, "hello"))
-                        .when(new When.Attach(List.of()))
+                Scenario.named("anEmissionComesAfterItsCause")
+                        .given(Given.attach())
+                        .when(new When.Submit(tell("hello", PROJECT, NOTE, "hello")))
                         .then(labels("hello")),
                 Scenario.named("catchingUpKeepsLogOrderAndSkipsOwnEmissions")
                         .given(tell("v0", PROJECT, NOTE, "v0"), tell("v1", PROJECT, NOTE, "v1"),

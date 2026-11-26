@@ -120,4 +120,46 @@ class ScenarioRunnerTest {
         var e = assertThrows(AssertionError.class, () -> AuthorityContract.expect(s, run));
         assertTrue(e.getMessage().contains("noRead"), e.getMessage());
     }
+
+    @Test
+    void attachingTheSurfaceTwiceIsRefused() {
+        var twice = Scenario.named("twice")
+                .given(create(), Given.attach("create"))
+                .when(new When.Attach(List.of()))
+                .then(new Then.Emits(List.of()));
+        var e = assertThrows(IllegalArgumentException.class,
+                () -> ScenarioRunner.run(twice, new AcceptAll(), Optional.of(EchoContractTest.labeller())));
+        assertTrue(e.getMessage().contains("twice") && e.getMessage().contains("at most once"), e.getMessage());
+        var given = Scenario.named("givenTwice")
+                .given(Given.attach(), create(), Given.attach("create"))
+                .when(new When.Submit(read("read", IVAN)))
+                .then(new Then.Emits(List.of()));
+        assertThrows(IllegalArgumentException.class,
+                () -> ScenarioRunner.run(given, new AcceptAll(), Optional.of(EchoContractTest.labeller())));
+    }
+
+    @Test
+    void attachingFromALaterStepIsRefused() {
+        var later = Scenario.named("later")
+                .given(Given.attach("create"), create())
+                .when(new When.Submit(read("read", IVAN)))
+                .then(new Then.Emits(List.of()));
+        var e = assertThrows(IllegalArgumentException.class,
+                () -> ScenarioRunner.run(later, new AcceptAll(), Optional.of(EchoContractTest.labeller())));
+        assertTrue(e.getMessage().contains("create"), e.getMessage());
+    }
+
+    @Test
+    void aSurfaceAttachedAmongTheGivenStepsReceivesTheLaterOnesLive() {
+        var live = Scenario.named("live")
+                .given(EchoContractTest.tell("create", EchoContractTest.PROJECT, NAME, "Kitchen"), Given.attach(),
+                        EchoContractTest.tell("rename", EchoContractTest.PROJECT, NAME, "Studio", "create"))
+                .when(new When.Submit(EchoContractTest.tell("again", EchoContractTest.PROJECT, NAME, "Atelier", "rename")))
+                .then(new Then.Emits(List.of()));
+        var run = ScenarioRunner.run(live, new AcceptAll(), Optional.of(EchoContractTest.labeller()));
+        assertEquals(List.of("create", "rename", "again"),
+                run.deliveries().stream().map(d -> run.bindings().render(new Identity(d.event().id().value()))).toList());
+        assertEquals(6, run.events().size(), "three steps and three labels");
+        assertEquals("emitted#1", run.bindings().render(new Identity(run.events().get(1).id().value())));
+    }
 }

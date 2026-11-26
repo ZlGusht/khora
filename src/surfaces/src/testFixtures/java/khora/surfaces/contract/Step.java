@@ -12,7 +12,7 @@ import khora.surfaces.Context;
  * links it carries (name to steps), and its action.
  */
 public record Step(String name, Context who, List<String> knew, Map<String, List<String>> links,
-        ActionSpec action) {
+        ActionSpec action) implements Given {
     /**
      * A name for {@code knew} and links that stands for an event no log holds. No step may take it.
      * It lets a scenario say "a frontier the kernel does not know" without writing an event id.
