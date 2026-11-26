@@ -8,7 +8,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import khora.events.Action;
 import khora.events.Assertion;
+import khora.events.Event;
 import khora.events.Frontier;
 import khora.events.Hlc;
 import khora.events.Identity;
@@ -26,12 +28,20 @@ import org.junit.jupiter.api.Test;
 class KernelGapsTest {
     static final String INTERESTS_THROW = "a surface whose interests throw does not fail the submit";
 
-    @Test
-    void aSurfaceWhoseInterestsThrowDoesNotFailTheSubmit() {
-        KnownGaps.judge(INTERESTS_THROW, () -> {
-            var log = new InMemoryEventLog();
-            var kernel = new Kernel(new Projects(), log, new Hlc(() -> 1000));
-            var bad = new Surface() {
+    static final Context ANNA = new Context("anna", Optional.empty(), "g3", 10);
+
+    static Action creation() {
+        return Assertion.action(Assertion.entity(), Assertion.of(Identity.local(0), Identity.named("name"),
+                new Assertion.Literal(new Json.Str("Kitchen"))));
+    }
+
+    /** Submits a creation to a kernel with the surfaces attached; returns what Echo received. */
+    private static List<Event> submitTo(boolean withThrowing) {
+        var log = new InMemoryEventLog();
+        var kernel = new Kernel(new Projects(), log, new Hlc(() -> 1000));
+        var echo = new RecordingSurface(new Echo("echo", Set.of(Interest.any()), List.of()), log);
+        if (withThrowing) {
+            kernel.attach(new Surface() {
                 @Override
                 public String name() {
                     return "bad";
@@ -43,19 +53,31 @@ class KernelGapsTest {
                 }
 
                 @Override
-                public List<khora.events.Action> receive(khora.events.Event event) {
+                public List<Action> receive(Event event) {
                     return List.of();
                 }
-            };
-            var echo = new RecordingSurface(new Echo("echo", Set.of(Interest.any()), List.of()), log);
-            kernel.attach(bad, Frontier.empty());
-            kernel.attach(echo, Frontier.empty());
-            var creation = Assertion.action(Assertion.entity(), Assertion.of(Identity.local(0), Identity.named("name"),
-                    new Assertion.Literal(new Json.Str("Kitchen"))));
-            var answer = assertDoesNotThrow(() -> kernel.submit(creation,
-                    new Context("anna", Optional.empty(), "g3", 10), Frontier.empty(), Map.of()));
-            var accepted = assertInstanceOf(Answer.Accepted.class, answer);
-            assertEquals(List.of(accepted.event()), echo.deliveries().stream().map(Run.Delivery::event).toList());
-        });
+            }, Frontier.empty());
+        }
+        kernel.attach(echo, Frontier.empty());
+        Answer answer;
+        try {
+            answer = kernel.submit(creation(), ANNA, Frontier.empty(), Map.of());
+        } catch (IllegalStateException e) {
+            if ("interests broke".equals(e.getMessage())) {
+                throw new AssertionError("the submit failed because a surface's interests threw", e);
+            }
+            throw e;
+        }
+        var accepted = assertInstanceOf(Answer.Accepted.class, answer);
+        var received = echo.deliveries().stream().map(Run.Delivery::event).toList();
+        assertEquals(List.of(accepted.event()), received);
+        return received;
+    }
+
+    @Test
+    void aSurfaceWhoseInterestsThrowDoesNotFailTheSubmit() {
+        // control: without the throwing surface the same submit is accepted and delivered to Echo
+        submitTo(false);
+        KnownGaps.judge(INTERESTS_THROW, () -> submitTo(true));
     }
 }

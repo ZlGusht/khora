@@ -18,6 +18,7 @@ public final class KnownGaps {
             SurfaceContract.ORDERED,
             "#36: a surface never receives its own emissions, so its frontier does not include them"
                     + " (review of #36, Kernel.java:219)",
+            // tested by KernelGapsTest
             "a surface whose interests throw does not fail the submit",
             "#36: Kernel.wants calls interests() outside the guard around receive (review of #36, Kernel.java:178)");
 
