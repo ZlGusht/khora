@@ -51,6 +51,10 @@ import org.junit.jupiter.api.TestFactory;
  * ({@link Given.AttachSurface}), after which later steps and a submitted {@code When} are delivered
  * live, or as its {@code When} ({@link When.Attach}), when it only catches up.
  *
+ * <p>Rule {@value #CAUSED} fails when the contract's authority rejects what the surface emits, so
+ * run a surface contract with an authority that accepts what the surface emits (the default
+ * {@link AcceptAll} does).
+ *
  * <p>A scenario the runner cannot play fails every test of its container with the runner's message.
  * A scenario in which the surface received nothing aborts the five rule tests rather than pass them
  * with nothing to judge; {@value #ORDERED} also aborts when the surface emitted fewer than two
