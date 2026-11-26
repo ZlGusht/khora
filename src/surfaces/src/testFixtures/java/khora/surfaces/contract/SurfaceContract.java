@@ -51,6 +51,17 @@ import org.junit.jupiter.api.TestFactory;
  * ({@link Given.AttachSurface}), after which later steps and a submitted {@code When} are delivered
  * live, or as its {@code When} ({@link When.Attach}), when it only catches up.
  *
+ * <p>Rules {@value #MATCH}, {@value #OWN} and {@value #CAUSED} mostly judge the kernel: it decides
+ * what a surface receives, keeps its own emissions from it, and links what it emits to their cause.
+ * What holds a surface to the right interests and the right answers are its scenarios, through their
+ * {@code expectation}.
+ *
+ * <p>Emitted actions are compared symbolically, with the events of the run named by their steps. A
+ * surface's emitted actions must therefore reference events only through the tuples of an assert and
+ * the thing of a read: an event id inside a {@link ActionSpec.Raw} argument or a literal string is
+ * compared as text, and ids differ between runs, so such a surface fails {@value #SAME} and its
+ * expectation even when it is right.
+ *
  * <p>Rule {@value #CAUSED} fails when the contract's authority rejects what the surface emits, so
  * run a surface contract with an authority that accepts what the surface emits (the default
  * {@link AcceptAll} does).
@@ -252,33 +263,46 @@ public abstract class SurfaceContract {
     }
 
     /**
-     * Checks that the run of {@code s} meets its {@link Then}. For {@link Then.Emits}, every action the
-     * surface returned from the moment it was attached (catching up, then live), flattened in order,
-     * is compared symbolically to the expected ones, each resolved against the delivery it was
-     * returned for.
+     * Checks that the run of {@code s} meets its {@link Then}. For {@link Then.Emits}, delivery by
+     * delivery from the moment the surface was attached (catching up, then live), the step whose event
+     * it received and the actions it returned are compared symbolically to the expected groups, each
+     * resolved without a received event. Deliveries that returned nothing are compared only if a group
+     * names their step.
      */
     static void expect(Scenario s, Run run) {
         if (!(s.then() instanceof Then.Emits emits)) {
             AuthorityContract.expect(s, run);
             return;
         }
+        var steps = new HashSet<String>();
+        s.steps().forEach(step -> steps.add(step.name()));
+        if (s.when() instanceof When.Submit submit) {
+            steps.add(submit.step().name());
+        }
         var bindings = run.bindings();
-        var actual = new ArrayList<Action>();
-        var expected = new ArrayList<Action>();
-        var specs = emits.actions();
+        var listed = new HashSet<String>();
+        var expected = new ArrayList<String>();
+        for (var group : emits.groups()) {
+            if (!steps.contains(group.step())) {
+                fail(s.name() + ": expects emissions after " + group.step() + ", which is no step of the scenario");
+            }
+            if (group.actions().stream().flatMap(ActionSpec::refs).anyMatch(Ref.Received.class::isInstance)) {
+                fail(s.name() + ": the emissions expected after " + group.step() + " name Ref.received; an"
+                        + " expectation is resolved without a received event, so it names the step's tuples"
+                        + " (Ref.tuple) instead");
+            }
+            listed.add(group.step());
+            expected.add(group.step() + " -> " + symbolic(
+                    group.actions().stream().map(a -> a.resolve(bindings, Optional.empty())).toList(), bindings));
+        }
+        var actual = new ArrayList<String>();
         for (var d : run.deliveries()) {
-            for (var action : d.returned()) {
-                if (actual.size() < specs.size()) {
-                    expected.add(specs.get(actual.size()).resolve(bindings, Optional.of(d.event())));
-                }
-                actual.add(action);
+            var step = render(d.event().id(), bindings);
+            if (!d.returned().isEmpty() || listed.contains(step)) {
+                actual.add(step + " -> " + symbolic(d.returned(), bindings));
             }
         }
-        if (actual.size() != specs.size()) {
-            fail(s.name() + ": expected " + specs.size() + " emitted actions, but the surface returned "
-                    + actual.size() + ": " + symbolic(actual, bindings));
-        }
-        assertEquals(symbolic(expected, bindings), symbolic(actual, bindings), s.name() + ": emitted actions");
+        assertEquals(expected, actual, s.name() + ": what the surface returned, delivery by delivery");
     }
 
     /** Actions as symbolic text: asserts by their tuples, reads by their thing, others as JSON. */

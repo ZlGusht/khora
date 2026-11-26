@@ -25,7 +25,7 @@ import org.junit.jupiter.api.TestFactory;
  * The contract every authority passes. A subclass gives the authority and its scenarios; each
  * scenario runs once through a fresh kernel and becomes a container named after it, holding the test
  * {@code expectation} (its {@link Then} holds) and one test per authority rule, each judged over
- * every decision of the run, including decisions on actions surfaces emitted:
+ * every decision of the run:
  *
  * <ul>
  *   <li>{@value #LOG}: it neither appends to, follows nor closes the log while deciding;
@@ -33,6 +33,14 @@ import org.junit.jupiter.api.TestFactory;
  *   <li>{@value #REASON}: a rejection's reason is not blank;
  *   <li>{@value #READ}: see {@link #readIsNotRejected}.
  * </ul>
+ *
+ * <p>To judge {@value #TWICE}, {@code decide} is called twice for every submit, each time on the same
+ * log, so it must be a function of the candidate and the log: an authority that keeps state between
+ * calls sees two calls per submit.
+ *
+ * <p>Authority rules are judged in an authority's own contract run, on the steps its scenarios
+ * submit. A surface contract run records the decisions on the actions its surface emitted, but does
+ * not judge them: an authority is held to its rules on such actions by scenarios in its own contract.
  *
  * <p>The reason and read rules judge the verdict the authority answered with, the first; a second
  * verdict that differs from it is caught by {@value #TWICE}.

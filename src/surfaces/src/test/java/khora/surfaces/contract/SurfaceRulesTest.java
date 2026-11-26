@@ -3,6 +3,7 @@ package khora.surfaces.contract;
 import static khora.surfaces.contract.EchoContractTest.LABEL;
 import static khora.surfaces.contract.EchoContractTest.NAME;
 import static khora.surfaces.contract.EchoContractTest.PROJECT;
+import static khora.surfaces.contract.EchoContractTest.label;
 import static khora.surfaces.contract.EchoContractTest.labels;
 import static khora.surfaces.contract.EchoContractTest.tell;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -185,6 +186,74 @@ class SurfaceRulesTest {
                 .then(labels("rename", "create"));
         var tests = results(contract(EchoContractTest::labeller, AcceptAll::new, wrong).contract()).get("wrong");
         assertInstanceOf(AssertionError.class, tests.get("expectation"));
+    }
+
+    /** A creation and a rename of it; Echo is attached from nothing, so it answers each in turn. */
+    static Scenario twoEvents(Then then) {
+        return Scenario.named("two")
+                .given(tell("create", PROJECT, NAME, "Kitchen"), tell("rename", PROJECT, NAME, "Studio", "create"))
+                .when(new When.Attach(List.of()))
+                .then(then);
+    }
+
+    static Throwable expectation(Scenario s) {
+        return results(contract(EchoContractTest::labeller, AcceptAll::new, s).contract()).get(s.name()).get("expectation");
+    }
+
+    @Test
+    void emissionsAreComparedDeliveryByDelivery() {
+        assertNull(expectation(twoEvents(labels("create", "rename"))));
+        assertNull(expectation(twoEvents(new Then.Emits(Then.Emits.after("create", label("create")),
+                Then.Emits.after("rename", label("rename"))))));
+        // the same actions, flattened, but both said to answer the creation
+        var e = expectation(twoEvents(new Then.Emits(Then.Emits.after("create", label("create"), label("rename")))));
+        assertInstanceOf(AssertionError.class, e);
+        assertTrue(e.getMessage().contains("delivery by delivery"), e.getMessage());
+        // a delivery listed with no actions must have returned nothing
+        assertInstanceOf(AssertionError.class, expectation(twoEvents(new Then.Emits(
+                Then.Emits.after("create", label("create")), Then.Emits.after("rename")))));
+    }
+
+    @Test
+    void anExpectationNamingAReceivedRefIsRefused() {
+        var e = expectation(twoEvents(new Then.Emits(Then.Emits.after("create", new ActionSpec.Assert(List.of(
+                TupleSpec.of(PROJECT, LABEL, ValueSpec.ref(Ref.received(0)))))))));
+        assertInstanceOf(AssertionError.class, e);
+        assertTrue(e.getMessage().contains("two") && e.getMessage().contains("Ref.received"), e.getMessage());
+    }
+
+    @Test
+    void anExpectationAfterNoStepIsRefused() {
+        var e = expectation(twoEvents(new Then.Emits(Then.Emits.after("nowhere", label("create")))));
+        assertInstanceOf(AssertionError.class, e);
+        assertTrue(e.getMessage().contains("two") && e.getMessage().contains("nowhere"), e.getMessage());
+    }
+
+    @Test
+    void aSurfaceWhoseReceiveReturnsNullFailsItsScenarioClearly() {
+        Supplier<Surface> nulls = () -> new Surface() {
+            @Override
+            public String name() {
+                return "nulls";
+            }
+
+            @Override
+            public Set<Interest> interests() {
+                return Set.of(Interest.any());
+            }
+
+            @Override
+            public List<Action> receive(Event event) {
+                return null;
+            }
+        };
+        var tests = results(contract(nulls, AcceptAll::new, CREATED).contract()).get("created");
+        assertEquals(6, tests.size());
+        tests.forEach((test, thrown) -> {
+            assertInstanceOf(AssertionError.class, thrown, test);
+            assertTrue(thrown.getMessage().contains("nulls") && thrown.getMessage().contains("receive returned null"),
+                    thrown.getMessage());
+        });
     }
 
     @Test

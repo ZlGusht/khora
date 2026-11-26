@@ -3,6 +3,7 @@ package khora.surfaces.contract;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Stream;
 import khora.events.Action;
 import khora.events.Assertion;
 import khora.events.Basic;
@@ -14,6 +15,15 @@ import khora.events.json.Json;
 public sealed interface ActionSpec {
     /** The action this spec stands for, its refs resolved. */
     Action resolve(Bindings bindings, Optional<Event> received);
+
+    /** The refs this spec names. */
+    default Stream<Ref> refs() {
+        return switch (this) {
+            case Assert a -> a.tuples().stream().flatMap(TupleSpec::refs);
+            case Read r -> Stream.of(r.thing());
+            case Raw ignored -> Stream.empty();
+        };
+    }
 
     /** An assert of one or more tuples. */
     record Assert(List<TupleSpec> tuples) implements ActionSpec {

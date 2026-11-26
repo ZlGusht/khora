@@ -15,7 +15,9 @@ import khora.surfaces.Surface;
 /**
  * Wraps a surface and records a {@link Run.Delivery} for each event it receives: the event, the
  * actions it returned, and the ids the log held at that moment. A surface that throws is recorded as
- * returning nothing, and the exception passes on to the kernel.
+ * returning nothing, and the exception passes on to the kernel. A surface whose {@code receive}
+ * returns null is recorded as returning nothing, and fails the run with an {@link AssertionError}
+ * naming it, which the kernel does not catch.
  */
 public final class RecordingSurface implements Surface {
     private final Surface inner;
@@ -48,6 +50,10 @@ public final class RecordingSurface implements Surface {
         List<Action> returned = List.of();
         try {
             returned = inner.receive(event);
+            if (returned == null) {
+                throw new AssertionError("surface " + inner.name() + ": receive returned null; it returns a"
+                        + " list, empty when it has nothing to emit");
+            }
             return returned;
         } finally {
             deliveries.add(new Run.Delivery(event, returned == null ? List.of() : returned, before));

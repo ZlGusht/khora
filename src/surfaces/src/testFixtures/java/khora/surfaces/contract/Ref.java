@@ -1,5 +1,7 @@
 package khora.surfaces.contract;
 
+import java.util.Objects;
+import khora.events.Identity;
 
 /** A way to name an identity in a scenario, resolved by {@link Bindings}. */
 public sealed interface Ref {
@@ -39,6 +41,16 @@ public sealed interface Ref {
         }
     }
 
+    /**
+     * A well-known identity, given as it is, such as {@link khora.events.Basic#RETRACTED}: for the
+     * vocabulary's own constants, so a scenario does not copy their names.
+     */
+    record Known(Identity identity) implements Ref {
+        public Known {
+            Objects.requireNonNull(identity, "identity");
+        }
+    }
+
     static Ref step(String name) {
         return new Step(name);
     }
@@ -57,5 +69,9 @@ public sealed interface Ref {
 
     static Ref received(int index) {
         return new Received(index);
+    }
+
+    static Ref known(Identity identity) {
+        return new Known(identity);
     }
 }

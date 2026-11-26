@@ -41,10 +41,14 @@ class EchoContractTest extends SurfaceContract {
                 .does(new ActionSpec.Assert(List.of(TupleSpec.of(thing, attribute, ValueSpec.text(value)))));
     }
 
-    /** Echo's labels for the first tuple of each of {@code steps}, in order. */
+    /** Echo's label for the first tuple of {@code step}'s event. */
+    static ActionSpec label(String step) {
+        return new ActionSpec.Assert(List.of(TupleSpec.of(PROJECT, LABEL, ValueSpec.ref(Ref.tuple(step, 0)))));
+    }
+
+    /** Echo answers the event of each of {@code steps}, in order, with its label. */
     static Then labels(String... steps) {
-        return new Then.Emits(Arrays.stream(steps).<ActionSpec>map(step -> new ActionSpec.Assert(List.of(
-                TupleSpec.of(PROJECT, LABEL, ValueSpec.ref(Ref.tuple(step, 0)))))).toList());
+        return new Then.Emits(Arrays.stream(steps).map(step -> Then.Emits.after(step, label(step))).toList());
     }
 
     @Override

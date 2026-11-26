@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.stream.Stream;
 import khora.events.Event;
 import khora.events.EventId;
 import khora.events.Frontier;
@@ -38,7 +39,8 @@ public final class ScenarioRunner {
      * it holds every delivery to it.
      *
      * @throws IllegalArgumentException if the scenario repeats a step name, names a step that is not
-     *     an earlier one, attaches with no surface given, or attaches the surface more than once
+     *     an earlier one, attaches with no surface given, attaches the surface more than once, or has a
+     *     step by the surface's name
      * @throws IllegalStateException if a given step is rejected
      */
     public static Run run(Scenario s, Authority authority, Optional<Surface> surface) {
@@ -48,6 +50,7 @@ public final class ScenarioRunner {
         var kernel = new Kernel(recording, log, new Hlc(() -> 1000));
         var recordingSurface = surface.map(it -> new RecordingSurface(it, log));
         var bindings = new Bindings();
+        refs(s).filter(Ref.Named.class::isInstance).forEach(ref -> bindings.identity(ref, Optional.empty()));
         for (var given : s.given()) {
             switch (given) {
                 case Given.AttachSurface attach ->
@@ -90,6 +93,26 @@ public final class ScenarioRunner {
                 recordingSurface.map(RecordingSurface::deliveries).orElse(List.of()), events(log, 1));
     }
 
+    /**
+     * Every ref the scenario writes, its {@code Then} included. The named ones are resolved before the
+     * run, so every run of a scenario renders the same names, whatever was resolved after it.
+     */
+    private static Stream<Ref> refs(Scenario s) {
+        var steps = s.steps().stream().map(Step::action).flatMap(ActionSpec::refs);
+        var when = switch (s.when()) {
+            case When.Submit submit -> submit.step().action().refs();
+            case When.Read read -> Stream.of(read.thing());
+            case When.Attach ignored -> Stream.<Ref>empty();
+        };
+        var then = switch (s.then()) {
+            case Then.Statements statements -> statements.tuples().stream().flatMap(TupleSpec::refs);
+            case Then.Emits emits -> emits.groups().stream().flatMap(g -> g.actions().stream()).flatMap(ActionSpec::refs);
+            case Then.Accepted ignored -> Stream.<Ref>empty();
+            case Then.Rejected ignored -> Stream.<Ref>empty();
+        };
+        return Stream.of(steps, when, then).flatMap(it -> it);
+    }
+
     private static Answer submit(Kernel kernel, EventLog log, Bindings bindings, Step step) {
         var links = new HashMap<String, Set<EventId>>();
         step.links().forEach((name, steps) -> links.put(name, new TreeSet<>(ids(bindings, steps))));
@@ -126,7 +149,11 @@ public final class ScenarioRunner {
         }
     }
 
-    /** Refuses a scenario whose step names repeat or point to no earlier step. */
+    /**
+     * Refuses a scenario whose step names repeat or point to no earlier step, that attaches the surface
+     * other than once with one given, or that has a step by the surface's name: the events a surface
+     * emitted are those by its name, so a step by that name would pass for one.
+     */
     private static void check(Scenario s, Optional<Surface> surface) {
         var earlier = new HashSet<String>();
         var steps = new ArrayList<Step>();
@@ -156,6 +183,11 @@ public final class ScenarioRunner {
             steps.add(submit.step());
         }
         for (var step : steps) {
+            if (surface.isPresent() && step.who().principal().equals(surface.get().name())) {
+                throw new IllegalArgumentException("scenario " + s.name() + ": step " + step.name() + " is by "
+                        + step.who().principal() + ", the name of the surface under test, by which its"
+                        + " emissions are known");
+            }
             for (var name : step.knew()) {
                 checkEarlier(s, step.name(), name, earlier);
             }

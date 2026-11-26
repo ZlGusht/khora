@@ -68,6 +68,11 @@ class ProjectsContractTest extends AuthorityContract {
                         .when(new When.Read(PROJECT, List.of("rename")))
                         .then(new Then.Statements(List.of(TupleSpec.entity(),
                                 TupleSpec.of(PROJECT, NAME, ValueSpec.text("Studio"))))),
+                Scenario.named("aReadAtAnEarlierFrontierIgnoresLaterWrites")
+                        .given(create(), read("read", IVAN), rename("rename", IVAN, "read", "Studio"))
+                        .when(new When.Read(PROJECT, List.of("create")))
+                        .then(new Then.Statements(List.of(TupleSpec.entity(),
+                                TupleSpec.of(PROJECT, NAME, ValueSpec.text("Kitchen"))))),
                 Scenario.named("aConcurrentRenameOfTheSameNameIsRejected")
                         .given(create(), read("ivanRead", IVAN), read("miaRead", MIA),
                                 rename("ivanRename", IVAN, "ivanRead", "Studio"))

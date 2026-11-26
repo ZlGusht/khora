@@ -17,10 +17,10 @@ public final class KnownGaps {
     public static final Map<String, String> RULES = Map.of(
             SurfaceContract.ORDERED,
             "#36: a surface never receives its own emissions, so its frontier does not include them"
-                    + " (review of #36, Kernel.java:219)",
-            // tested by KernelGapsTest
-            "a surface whose interests throw does not fail the submit",
-            "#36: Kernel.wants calls interests() outside the guard around receive (review of #36, Kernel.java:178)");
+                    + " (review of #36: Kernel.offer emits at the frontier the surface has taken)",
+            "a surface whose interests throw does not fail the submit", // tested by KernelGapsTest
+            "#36: Kernel.wants calls interests() outside the guard around receive in Kernel.offer"
+                    + " (review of #36)");
 
     private KnownGaps() {}
 

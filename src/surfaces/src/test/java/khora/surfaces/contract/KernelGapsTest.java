@@ -1,6 +1,5 @@
 package khora.surfaces.contract;
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
@@ -35,8 +34,8 @@ class KernelGapsTest {
                 new Assertion.Literal(new Json.Str("Kitchen"))));
     }
 
-    /** Submits a creation to a kernel with the surfaces attached; returns what Echo received. */
-    private static List<Event> submitTo(boolean withThrowing) {
+    /** Submits a creation to a kernel with the surfaces attached; Echo receives it alone. */
+    private static void submitTo(boolean withThrowing) {
         var log = new InMemoryEventLog();
         var kernel = new Kernel(new Projects(), log, new Hlc(() -> 1000));
         var echo = new RecordingSurface(new Echo("echo", Set.of(Interest.any()), List.of()), log);
@@ -71,7 +70,6 @@ class KernelGapsTest {
         var accepted = assertInstanceOf(Answer.Accepted.class, answer);
         var received = echo.deliveries().stream().map(Run.Delivery::event).toList();
         assertEquals(List.of(accepted.event()), received);
-        return received;
     }
 
     @Test

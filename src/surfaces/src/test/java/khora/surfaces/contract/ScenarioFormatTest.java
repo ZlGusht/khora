@@ -72,6 +72,24 @@ class ScenarioFormatTest {
     }
 
     @Test
+    void namedIdentitiesRenderByTheirName() {
+        var bindings = bound();
+        var name = Identity.named("name");
+        assertEquals(name.value(), bindings.render(name), "not yet resolved");
+        assertEquals(name, bindings.identity(Ref.named("name"), Optional.empty()));
+        assertEquals("name", bindings.render(name));
+        assertEquals("(create/0, name, \"Kitchen\")", AuthorityContract.symbolic(Assertion.of(
+                Identity.of(CREATE, 0), name, new Assertion.Literal(new Json.Str("Kitchen"))), bindings));
+    }
+
+    @Test
+    void aRetractionSpecResolvesToTheRetraction() {
+        assertEquals(Assertion.retraction(Identity.of(CREATE, 1)),
+                TupleSpec.retraction(Ref.tuple("create", 1)).resolve(bound(), Optional.empty()));
+        assertEquals(Basic.RETRACTED, bound().identity(Ref.known(Basic.RETRACTED), Optional.empty()));
+    }
+
+    @Test
     void theBuilderMakesTheRecords() {
         var anna = new Context("anna", Optional.empty(), "g", 1);
         var action = new ActionSpec.Assert(List.of(TupleSpec.entity()));

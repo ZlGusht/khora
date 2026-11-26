@@ -72,7 +72,7 @@ class ScenarioRunnerTest {
         assertFalse(first.statements().isEmpty());
         assertEquals(AuthorityContract.symbolic(first.statements(), first.bindings()),
                 AuthorityContract.symbolic(second.statements(), second.bindings()));
-        assertEquals(List.of("(, , )", "(create/0, " + Identity.named("name").value() + ", \"Studio\")"),
+        assertEquals(List.of("(, , )", "(create/0, name, \"Studio\")"),
                 AuthorityContract.symbolic(first.statements(), first.bindings()));
     }
 
@@ -136,6 +136,21 @@ class ScenarioRunnerTest {
                 .then(new Then.Emits(List.of()));
         assertThrows(IllegalArgumentException.class,
                 () -> ScenarioRunner.run(given, new AcceptAll(), Optional.of(EchoContractTest.labeller())));
+    }
+
+    @Test
+    void aStepByTheSurfacesNameIsRefused() {
+        var echo = EchoContractTest.labeller();
+        var asEcho = new khora.surfaces.Context(echo.name(), Optional.empty(), "g3", 10);
+        var s = Scenario.named("impostor")
+                .given(Given.attach(), Step.named("forged").by(asEcho).does(new ActionSpec.Assert(List.of(
+                        TupleSpec.of(EchoContractTest.PROJECT, NAME, ValueSpec.text("Kitchen"))))))
+                .when(new When.Submit(read("read", IVAN)))
+                .then(new Then.Emits());
+        var e = assertThrows(IllegalArgumentException.class,
+                () -> ScenarioRunner.run(s, new AcceptAll(), Optional.of(echo)));
+        assertTrue(e.getMessage().contains("impostor") && e.getMessage().contains("forged")
+                && e.getMessage().contains(echo.name()), e.getMessage());
     }
 
     @Test

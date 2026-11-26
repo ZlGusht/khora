@@ -1,5 +1,9 @@
 package khora.surfaces.contract;
 
+import static khora.surfaces.contract.AuthorityContract.LOG;
+import static khora.surfaces.contract.AuthorityContract.READ;
+import static khora.surfaces.contract.AuthorityContract.REASON;
+import static khora.surfaces.contract.AuthorityContract.TWICE;
 import static khora.surfaces.contract.ProjectsContractTest.IVAN;
 import static khora.surfaces.contract.ProjectsContractTest.create;
 import static khora.surfaces.contract.ProjectsContractTest.read;
@@ -36,10 +40,6 @@ import org.opentest4j.TestAbortedException;
 
 /** Each authority rule fails for an authority that breaks it, and only for that one. */
 class AuthorityRulesTest {
-    static final String LOG = "authority does not change the log";
-    static final String TWICE = "authority decides the same twice";
-    static final String REASON = "a rejection has a reason";
-    static final String READ = "a read is not rejected for a conflict";
     static final List<String> RULES = List.of(LOG, TWICE, REASON, READ);
 
     /** A creation, a read of it, then a rename based on that read. */
@@ -140,6 +140,24 @@ class AuthorityRulesTest {
     }
 
     @Test
+    void anAuthorityThatCatchesTheRefusalAndAcceptsStillBreaksTheLogRule() {
+        var results = results(contract(() -> projectsBut((candidate, log) -> {
+            if (!isRename(candidate)) {
+                return null;
+            }
+            try {
+                log.append(List.of(candidate));
+            } catch (UnsupportedOperationException e) {
+                // swallowed: the read-only log remembers the try
+            }
+            return new Authority.Accept();
+        }), RENAME));
+        var tests = results.get("rename");
+        onlyBreaks(LOG, tests);
+        assertNull(tests.get("expectation"), "the rename is accepted");
+    }
+
+    @Test
     void anAuthorityThatFlipsBreaksTheSameTwiceRule() {
         var results = results(contract(() -> {
             var calls = new AtomicInteger();
@@ -167,7 +185,7 @@ class AuthorityRulesTest {
     @Test
     void projectsKeepsEveryAuthorityRule() {
         var results = results(new ProjectsContractTest());
-        assertEquals(9, results.size());
+        assertEquals(10, results.size());
         results.forEach((scenario, tests) -> {
             assertEquals(5, tests.size(), scenario);
             tests.forEach((test, thrown) -> assertNull(thrown, scenario + ": " + test));
