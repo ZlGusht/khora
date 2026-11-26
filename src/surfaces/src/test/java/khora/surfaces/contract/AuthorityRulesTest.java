@@ -277,6 +277,30 @@ class AuthorityRulesTest {
         assertThrows(AssertionFailedError.class,
                 () -> KnownGaps.judge(gaps, "other rule", () -> { throw new AssertionFailedError("broken"); }));
         KnownGaps.judge(gaps, "other rule", () -> { });
-        assertTrue(KnownGaps.RULES.isEmpty());
+        assertEquals(Set.of(SurfaceContract.ORDERED), KnownGaps.RULES.keySet());
+    }
+
+    @Test
+    void aKnownGapThatThrowsSomethingElseFails() {
+        var gaps = Map.of("some rule", "not yet");
+        var e = assertThrows(IllegalStateException.class,
+                () -> KnownGaps.judge(gaps, "some rule", () -> { throw new IllegalStateException("a bug"); }));
+        assertEquals("a bug", e.getMessage());
+    }
+
+    @Test
+    void anErrorInTheRunFailsEveryTestOfItsContainerAndRunsOnce() {
+        var authorities = new AtomicInteger();
+        var results = results(contract(() -> {
+            authorities.incrementAndGet();
+            throw new LinkageError("no authority");
+        }, READING));
+        var tests = results.get("reading");
+        assertEquals(5, tests.size());
+        tests.forEach((test, thrown) -> {
+            assertInstanceOf(AssertionError.class, thrown, test);
+            assertEquals("no authority", thrown.getMessage(), test);
+        });
+        assertEquals(1, authorities.get());
     }
 }

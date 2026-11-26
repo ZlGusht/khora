@@ -70,7 +70,7 @@ public abstract class AuthorityContract {
             }
         }
         return scenarios.stream().map(s -> {
-            var run = new Once(s);
+            var run = new Once<>(() -> ScenarioRunner.run(s, authority(), Optional.empty()));
             return DynamicContainer.dynamicContainer(s.name(), Stream.of(
                     DynamicTest.dynamicTest("expectation", () -> expect(s, run.get())),
                     rule(LOG, s, run, AuthorityContract::logIsUnchanged),
@@ -80,36 +80,11 @@ public abstract class AuthorityContract {
         });
     }
 
-    /** The run of one scenario, played on first use and shared by the tests of its container. */
-    private final class Once {
-        private final Scenario s;
-        private Run run;
-        private RuntimeException broken;
-
-        Once(Scenario s) {
-            this.s = s;
-        }
-
-        synchronized Run get() {
-            if (run == null && broken == null) {
-                try {
-                    run = ScenarioRunner.run(s, authority(), Optional.empty());
-                } catch (RuntimeException e) {
-                    broken = e;
-                }
-            }
-            if (broken != null) {
-                throw new AssertionError(broken.getMessage(), broken);
-            }
-            return run;
-        }
-    }
-
     private interface Rule {
         void check(Scenario s, int index, Run.Decision decision);
     }
 
-    private static DynamicTest rule(String name, Scenario s, Once once, Rule rule) {
+    private static DynamicTest rule(String name, Scenario s, Once<Run> once, Rule rule) {
         return DynamicTest.dynamicTest(name, () -> {
             var run = once.get();
             if (run.decisions().isEmpty()) {

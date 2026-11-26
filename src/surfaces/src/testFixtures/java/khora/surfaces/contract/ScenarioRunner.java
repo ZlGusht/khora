@@ -33,7 +33,8 @@ public final class ScenarioRunner {
     /**
      * Runs {@code s} with {@code authority}, and {@code surface} if the scenario attaches one. The
      * authority is wrapped in a fresh {@link RecordingAuthority}, so the run holds every decision,
-     * including those on actions a surface emitted.
+     * including those on actions a surface emitted; the surface in a fresh {@link RecordingSurface}, so
+     * it holds every delivery to it.
      *
      * @throws IllegalArgumentException if the scenario repeats a step name, names a step that is not
      *     an earlier one, or attaches with no surface given
@@ -44,6 +45,7 @@ public final class ScenarioRunner {
         var log = new InMemoryEventLog();
         var recording = new RecordingAuthority(authority);
         var kernel = new Kernel(recording, log, new Hlc(() -> 1000));
+        var recordingSurface = surface.map(it -> new RecordingSurface(it, log));
         var bindings = new Bindings();
         for (var step : s.given()) {
             switch (submit(kernel, log, bindings, step)) {
@@ -64,7 +66,7 @@ public final class ScenarioRunner {
                     statements = a.statements();
                 }
             }
-            case When.Attach attach -> kernel.attach(surface.orElseThrow(), frontier(log, bindings, attach.from()));
+            case When.Attach attach -> kernel.attach(recordingSurface.orElseThrow(), frontier(log, bindings, attach.from()));
             case When.Read read -> statements = kernel.statements(bindings.identity(read.thing(), Optional.empty()),
                     frontier(log, bindings, read.at()));
         }
@@ -78,7 +80,8 @@ public final class ScenarioRunner {
                 bindings.emitted(event.id());
             }
         }
-        return new Run(bindings, answer, statements, recording.decisions(), List.of());
+        return new Run(bindings, answer, statements, recording.decisions(),
+                recordingSurface.map(RecordingSurface::deliveries).orElse(List.of()), events(log, 1));
     }
 
     private static Answer submit(Kernel kernel, EventLog log, Bindings bindings, Step step) {

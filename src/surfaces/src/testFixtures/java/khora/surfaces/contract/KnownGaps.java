@@ -8,12 +8,16 @@ import org.junit.jupiter.api.function.Executable;
 
 /**
  * The contract rules the kernel is known not to keep yet, each with why. A rule listed here that
- * fails is aborted (skipped) with its reason; one that passes fails, so the entry is removed once
- * the gap is fixed.
+ * fails (its check throws an {@link AssertionError}) is aborted (skipped) with its reason; one that
+ * passes fails, so the entry is removed once the gap is fixed. Anything else the check throws is a
+ * real failure, listed or not.
  */
 public final class KnownGaps {
     /** Rule name to the reason it does not hold yet. */
-    public static final Map<String, String> RULES = Map.of();
+    public static final Map<String, String> RULES = Map.of(
+            SurfaceContract.ORDERED,
+            "#36: a surface never receives its own emissions, so its frontier does not include them"
+                    + " (review of #36, Kernel.java:219)");
 
     private KnownGaps() {}
 
@@ -27,15 +31,15 @@ public final class KnownGaps {
         var reason = gaps.get(rule);
         try {
             check.execute();
-        } catch (Throwable t) {
+        } catch (AssertionError e) {
             if (reason != null) {
                 Assumptions.abort(reason);
             }
-            switch (t) {
-                case RuntimeException e -> throw e;
-                case Error e -> throw e;
-                default -> throw new AssertionError(t.getMessage(), t);
-            }
+            throw e;
+        } catch (RuntimeException | Error e) {
+            throw e;
+        } catch (Throwable t) {
+            throw new AssertionError(t.getMessage(), t);
         }
         if (reason != null) {
             fail("known gap appears fixed: remove it from KnownGaps: " + rule);

@@ -19,15 +19,17 @@ import khora.surfaces.Authority;
  * @param statements what a {@link When.Read} found, or what a submitted read answered with
  * @param decisions every decision the authority made, in order
  * @param deliveries every event the surface under test received, in order
+ * @param events every event of the log when the run ended, in log order
  */
 public record Run(Bindings bindings, Optional<Answer> answer, List<Statement> statements, List<Decision> decisions,
-        List<Delivery> deliveries) {
+        List<Delivery> deliveries, List<Event> events) {
     public Run {
         Objects.requireNonNull(bindings, "bindings");
         Objects.requireNonNull(answer, "answer");
         statements = List.copyOf(statements);
         decisions = List.copyOf(decisions);
         deliveries = List.copyOf(deliveries);
+        events = List.copyOf(events);
     }
 
     /**
