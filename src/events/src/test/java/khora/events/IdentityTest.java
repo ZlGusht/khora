@@ -1,0 +1,47 @@
+package khora.events;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
+import java.util.List;
+import org.junit.jupiter.api.Test;
+
+class IdentityTest {
+
+    @Test
+    void anAssertionsIdentityIsItsEventAndIndex() {
+        var e = EventId.hashOf("e");
+        assertEquals(e.value() + "/2", Identity.of(e, 2).value());
+    }
+
+    @Test
+    void aNamedIdentityIsTheHashOfItsName() {
+        assertEquals(EventId.hashOf("khora/basic/label").value(), Identity.named("khora/basic/label").value());
+    }
+
+    @Test
+    void malformedIdentitiesAreRefused() {
+        var e = EventId.hashOf("e").value();
+        for (var value : List.of("", "x", "sha256:XYZ", e + "/", e + "/-1", e + "/01", e + "/1/2")) {
+            assertThrows(IllegalArgumentException.class, () -> new Identity(value), value);
+        }
+        assertThrows(IllegalArgumentException.class, () -> Identity.of(EventId.hashOf("e"), -1));
+    }
+
+    @Test
+    void aLocalIdentityNamesATupleOfTheSameEvent() {
+        var e = EventId.hashOf("e");
+        assertEquals("/1", Identity.local(1).value());
+        assertEquals(Identity.of(e, 1), Identity.local(1).in(e));
+        assertEquals(Identity.named("x"), Identity.named("x").in(e));
+        assertThrows(IllegalArgumentException.class, () -> new Identity("/-1"));
+    }
+
+    @Test
+    void anIdentityKnowsItsIndex() {
+        var e = EventId.hashOf("e");
+        assertEquals(java.util.OptionalInt.of(3), Identity.of(e, 3).index());
+        assertEquals(java.util.OptionalInt.of(4), Identity.local(4).index());
+        assertEquals(java.util.OptionalInt.empty(), Identity.named("x").index());
+    }
+}

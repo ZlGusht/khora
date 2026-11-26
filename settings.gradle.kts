@@ -5,11 +5,11 @@ plugins {
 
 rootProject.name = "khora"
 
-include(":kernel")
-project(":kernel").projectDir = file("src/kernel")
+include(":events")
+project(":events").projectDir = file("src/events")
 
-include(":kernel-core")
-project(":kernel-core").projectDir = file("src/kernel-core")
+include(":surfaces")
+project(":surfaces").projectDir = file("src/surfaces")
 
 include(":log-nats")
 project(":log-nats").projectDir = file("src/log-nats")
