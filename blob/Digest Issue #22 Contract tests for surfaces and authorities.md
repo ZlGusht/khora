@@ -16,11 +16,11 @@ properties__author: agent:claude-opus-5-5
 ---
 ## Outcome
 
-Surfaces and authorities have contract tests: scenarios written as data (given steps, a when, a then, with step names instead of ids), played through the real kernel, and each checked against general rules (four for authorities, five for surfaces). `Projects` passes ten scenarios, the reference surface `Echo` six; issue #22's done-when is met. Not done: security tests, several surfaces per scenario, JSON scenarios.
+Surfaces and authorities have contract tests: scenarios written as data (given steps, a when, a then, with step names instead of ids), played through the real kernel, and each checked against general rules (four for authorities, five for surfaces). `Projects` passes eleven scenarios, the reference surface `Echo` six; issue #22's done-when is met. Not done: security tests, several surfaces per scenario, JSON scenarios.
 
 ## Findings
 
-- Two of the #36 review's findings are now tests: a surface's own emissions are not causally ordered (on catch-up and on live delivery), and a surface whose `interests()` throws fails the submit. Both are skipped with their reason; fixing the kernel makes them fail as "known gap appears fixed".
+- Six of the #36 review's findings are now tests (four on retractions and local identities, added after the final review); two of them: a surface's own emissions are not causally ordered (on catch-up and on live delivery), and a surface whose `interests()` throws fails the submit. Both are skipped with their reason; fixing the kernel makes them fail as "known gap appears fixed".
 - A contract has to show its rules can fail: each rule has a deliberately bad implementation it catches. Several rules would otherwise pass with nothing to judge, so they abort instead.
 - Expected emissions must say which event they answer, or a surface answering the wrong event passes.
 - Reading at the head of the log hides a kernel that ignores the frontier; a read at an earlier frontier is needed.
