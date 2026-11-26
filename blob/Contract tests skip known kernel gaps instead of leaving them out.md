@@ -24,4 +24,4 @@ Where the kernel of #36 breaks a contract rule today, the test is written, run a
 
 Leaving the rule out would hide the gap; failing the suite would block every implementation for a kernel fault. Today this covers a surface's own emissions not being causally ordered, and a surface whose interests throw failing the submit (found in the review of #36).
 
-Reversed before review: the gaps did their work (#36's fixes in 6845d75 turned five of them to "appears fixed"), #36 now tests those fixes itself, and the one left is a kernel bug to report on #36, not something K5 should carry. `KnownGaps` was removed.
+Reversed before review: the gaps did their work (#36's fixes in 6845d75 turned five of them to "appears fixed"), and #36 now tests those fixes itself, so K5 need not carry them. `KnownGaps` was removed.

@@ -20,7 +20,7 @@ Surfaces and authorities have contract tests: scenarios written as data (given s
 
 ## Findings
 
-- The review of #36 became tests first: they flipped to "fixed" when #36 fixed five findings in 6845d75, and #36 now tests those itself. The sixth, a tuple with the retracted attribute retracts whatever its value, is still open in the kernel.
+- The review of #36 became tests first: they flipped to "fixed" when #36 fixed its findings in 6845d75, and #36 now tests those itself.
 - A rule must be shown to fail: each kept rule has a deliberately bad implementation it catches, and a rule with nothing to judge in a scenario aborts instead of passing.
 - Expected emissions must say which event they answer, or a surface answering the wrong event passes.
 - Reading only at the head of the log hides a kernel that ignores the frontier; a read at an earlier frontier is needed.
@@ -43,4 +43,3 @@ Surfaces and authorities have contract tests: scenarios written as data (given s
 - K9's general authority, B1 and B2 should each ship a contract test with their scenarios.
 - The test format is the plan's *Suggestion* made concrete ([[Contract tests are scenarios checked against general rules]], [[Contract scenarios are records with symbolic references]]); the plan's Testing section and stage 0's open test-format decision can point here.
 - Proposed issue: security rules for the contracts, with P5 ([[Security tests wait for access checks]]).
-- Report on #36: a retracted attribute with another value still retracts (`Statements.about`).
