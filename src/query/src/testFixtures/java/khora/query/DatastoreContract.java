@@ -2,6 +2,8 @@ package khora.query;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -38,6 +40,8 @@ import org.junit.jupiter.api.Test;
  * queries. A datastore's test extends this and says how to build the datastore over a log that
  * already holds the events.
  *
+ * <p>A datastore that answers only at everything it holds says so with {@link #answersPastFrontiers()}.
+ *
  * <p>The content: two projects, Kitchen (budget 300) and Studio (budget 120), and three tasks, two
  * in Kitchen and one in Studio, Paint done. A third project, Garage, was created and then its creation
  * retracted; its name still stands.
@@ -51,6 +55,14 @@ public abstract class DatastoreContract {
 
     /** A datastore over {@code log}, which already holds the events it should answer from. */
     protected abstract Datastore over(EventLog log);
+
+    /**
+     * Whether the datastore answers at frontiers before everything it holds. One that does not
+     * refuses them, and the tests of past frontiers do not apply to it.
+     */
+    protected boolean answersPastFrontiers() {
+        return true;
+    }
 
     protected EventLog log;
     protected Event first;
@@ -331,11 +343,27 @@ public abstract class DatastoreContract {
         var answer = over(log).answer(Query.of(Scan.things("t")));
         assertEquals(at(second), answer.at());
         assertEquals(List.of("t"), answer.columns());
+        assertEquals(at(second), over(log).answer(Query.of(Scan.things("t")).at(at(second))).at());
+    }
+
+    @Test
+    void anAnswerAtAnEarlierFrontierSaysItsFrontier() {
+        assumeTrue(answersPastFrontiers());
         assertEquals(at(first), over(log).answer(Query.of(Scan.things("t")).at(at(first))).at());
     }
 
     @Test
+    void anEarlierFrontierIsRefusedWithoutPastReads() {
+        assumeFalse(answersPastFrontiers());
+        assertThrows(IllegalArgumentException.class,
+                () -> over(log).answer(Query.of(Scan.things("t")).at(at(first))));
+        assertThrows(IllegalArgumentException.class,
+                () -> over(log).answer(Query.of(Scan.things("t")).at(Frontier.empty())));
+    }
+
+    @Test
     void anEarlierFrontierSeesOldData() {
+        assumeTrue(answersPastFrontiers());
         assertEquals(expect(row(ref(kitchen)), row(ref(studio)), row(ref(garage))),
                 unordered(Query.of(Scan.things("t")).at(at(first))));
         assertEquals(List.of(), rows(Query.of(tasks()).at(Frontier.empty())));
@@ -370,7 +398,8 @@ public abstract class DatastoreContract {
                 .findFirst().orElseThrow();
         var read = Query.from(statement);
         assertEquals(open, read);
-        var things = over(log).answer(read.at(at(second))).rows();
-        assertEquals(expect(row(ref(kitchen)), row(ref(studio)), row(ref(tile)), row(ref(desk))), sorted(things));
+        var things = over(log).answer(read.at(at(saved))).rows();
+        assertEquals(expect(row(ref(kitchen)), row(ref(studio)), row(ref(tile)), row(ref(desk)),
+                row(ref(Identity.of(saved.id(), 0)))), sorted(things));
     }
 }

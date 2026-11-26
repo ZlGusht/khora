@@ -20,7 +20,8 @@ import khora.events.log.InMemoryEventLog;
 
 /**
  * A log of random events from a seed: things brought into being, names, sizes and owners stated,
- * statements retracted, and branches, so that some frontiers are not the first events of the log.
+ * statements retracted, and branches. Every literal value is asserted once, since the graph
+ * datastore keeps a thing's values of an attribute as a set.
  */
 final class GeneratedLog {
     static final By BY = new By("anna", Optional.empty(), "g3", "projects");
@@ -61,9 +62,9 @@ final class GeneratedLog {
                     tuples.add(Assertion.of(Identity.local(tuples.size() - 1), NAME,
                             new Literal(new Json.Str("thing " + n + "." + i))));
                 }
-                case 1 -> tuples.add(Assertion.of(thing(), SIZE, new Literal(new Json.Int(random.nextInt(50) - 10))));
+                case 1 -> tuples.add(Assertion.of(thing(), SIZE, new Literal(new Json.Int(10L * n + i - 500))));
                 case 2 -> tuples.add(Assertion.of(thing(), OWNER, new Ref(thing())));
-                case 3 -> tuples.add(Assertion.of(thing(), NAME, new Literal(new Json.Str("renamed " + n))));
+                case 3 -> tuples.add(Assertion.of(thing(), NAME, new Literal(new Json.Str("renamed " + n + "." + i))));
                 default -> {
                     if (!statements.isEmpty()) {
                         tuples.add(Assertion.retraction(statements.get(random.nextInt(statements.size()))));

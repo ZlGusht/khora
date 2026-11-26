@@ -18,6 +18,6 @@ Flagged in the Observe of [[Issue #23 Graph datastore on Neo4j]], from the revie
 
 ## Content
 
-`Neo4jDatastore` trusts its database whole: it checks neither the content against the log nor a snapshot's rows against their events, beyond the last event's id at the snapshot's position. The development compose file has a default password and no TLS.
+`Neo4jDatastore` trusts its database whole: it checks neither its content against the log nor a snapshot's rows, beyond the last event's id at the snapshot's position. The development compose file has a default password and no TLS.
 
 When: the datastore runs anywhere but a developer's machine, with the security model (ADR-0YE).

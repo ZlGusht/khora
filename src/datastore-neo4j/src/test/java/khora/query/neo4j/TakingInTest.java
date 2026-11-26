@@ -22,7 +22,7 @@ class TakingInTest {
         var store = Neo4jTestServer.empty();
         assertEquals(30, store.catchUp(generated.log));
         assertEquals(0, store.catchUp(generated.log));
-        assertEquals(0, store.take(generated.log.read(5, 10)));
+        assertEquals(0, store.take(generated.log.read(5, 10), generated.log));
         assertEquals(30, store.position());
         assertEquals(new EventsDatastore(generated.log).answer(Query.of(Scan.things("t"))).at(), store.at());
     }
@@ -31,8 +31,8 @@ class TakingInTest {
     void aGapIsRefused() {
         var generated = new GeneratedLog(12, 10);
         var store = Neo4jTestServer.empty();
-        store.take(generated.log.read(1, 3));
-        assertThrows(IllegalStateException.class, () -> store.take(generated.log.read(5, 1)));
+        store.take(generated.log.read(1, 3), generated.log);
+        assertThrows(IllegalStateException.class, () -> store.take(generated.log.read(5, 1), generated.log));
         assertEquals(3, store.position());
     }
 
@@ -51,7 +51,8 @@ class TakingInTest {
             }
             assertEquals(6, store.position());
             assertEquals(new EventsDatastore(generated.log).answer(Query.of(Scan.things("t"))).at(), store.at());
-            assertEquals(new EventsDatastore(generated.log).answer(Query.of(Scan.things("t"))), store.answer(Query.of(Scan.things("t"))));
+            assertEquals(EquivalenceTest.sorted(new EventsDatastore(generated.log).answer(Query.of(Scan.things("t")))),
+                    EquivalenceTest.sorted(store.answer(Query.of(Scan.things("t")))));
         } finally {
             following.close();
         }

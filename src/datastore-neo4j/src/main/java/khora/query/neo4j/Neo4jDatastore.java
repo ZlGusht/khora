@@ -2,18 +2,26 @@ package khora.query.neo4j;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import khora.events.AcceptedAction;
+import khora.events.Assertion;
+import khora.events.Assertion.Literal;
+import khora.events.Assertion.Ref;
 import khora.events.Assertion.Value;
+import khora.events.Basic;
+import khora.events.Event;
 import khora.events.EventId;
+import khora.events.EventSource;
 import khora.events.Frontier;
 import khora.events.Identity;
+import khora.events.json.Json;
 import khora.events.log.EventLog;
 import khora.events.log.Following;
 import khora.events.log.Logged;
@@ -25,44 +33,38 @@ import khora.query.Query;
 import org.neo4j.driver.AuthTokens;
 import org.neo4j.driver.Driver;
 import org.neo4j.driver.GraphDatabase;
-import org.neo4j.driver.Record;
 import org.neo4j.driver.Session;
 import org.neo4j.driver.SessionConfig;
 import org.neo4j.driver.TransactionContext;
 
 /**
- * The graph datastore, on Neo4j: things and the statements about them, materialized from the
- * events of a log ([[Stage 1's tasks and gate are stated in events]], item 2). It answers queries
- * at any frontier it holds, with the results of {@code EventsDatastore} (ADR-0XY decision 10).
+ * The graph datastore, on Neo4j: the entities, attributes and relationships that the log's
+ * events assert, as they stand now ([[The graph datastore materializes entities, not events]]).
  *
- * <p>The graph: each event taken in is an {@code Event} node, {@code HAS_CAUSE} its causes. Each
- * statement that brings a thing into being or states an attribute is a {@code Statement} node,
- * {@code ABOUT} its {@code Thing}; a reference value also {@code REFERS_TO} its {@code Thing}. A
- * tuple that retracts a statement adds a {@code Retraction} of it. A {@code Progress} node holds the
- * last log position taken in and the frontier of everything taken in. The datastore owns its
- * database: {@link #clear()} deletes these labels.
+ * <p>Each thing is a {@code Thing} node with its identity as {@code id}. A thing that was brought
+ * into being, {@code (,,)}, is also an {@code Entity}. A literal value is a property of its thing,
+ * keyed by the attribute's identity as it is: one value is the property, several are a list. A
+ * reference is a relationship from the thing to the thing it names, typed by the attribute's
+ * identity, holding the identity of its statement. A retraction deletes what its target
+ * asserted: the entity label, the value, or the relationship. The target is read from its
+ * event. Events are not stored; a {@code Progress} node holds the last log position taken in and
+ * the frontier of everything taken in.
  *
- * <p>A statement holds at a frontier when its event is in the frontier and no retraction in the
- * frontier names it, as {@code Statements.at} says. A frontier is checked against the datastore's
- * own events; the log is read only to take events in.
+ * <p>It answers only at that frontier. The datastore owns its database: {@link #clear()} deletes
+ * everything with these labels.
  *
- * <p>Provisional: {@link Evaluator} answers over three lookups, each a Cypher read; no operator is
- * pushed down into Cypher yet (P2). A frontier that is not the first events taken in is filtered by
- * its events, passed as a list. One write transaction per page taken in, and one for a restore.
+ * <p>Provisional: a thing's values of one attribute are a set: asserting a value it has adds
+ * nothing, and retracting it removes it, though another statement asserted it too. Values of one
+ * attribute of one thing are all integers or all strings: Neo4j lists hold one type, and an
+ * assert that mixes them is refused. {@link Evaluator} answers over three Cypher lookups; nothing
+ * is pushed down into Cypher yet (P2).
  */
 public final class Neo4jDatastore implements Datastore, AutoCloseable {
     static final int PAGE = 1000;
-    private static final String ORDER = " ORDER BY s.recorded, s.event, s.index";
 
     private static final List<String> SCHEMA = List.of(
-            "CREATE CONSTRAINT khora_event IF NOT EXISTS FOR (e:Event) REQUIRE e.id IS UNIQUE",
-            "CREATE CONSTRAINT khora_statement IF NOT EXISTS FOR (s:Statement) REQUIRE s.id IS UNIQUE",
             "CREATE CONSTRAINT khora_thing IF NOT EXISTS FOR (t:Thing) REQUIRE t.id IS UNIQUE",
-            "CREATE CONSTRAINT khora_progress IF NOT EXISTS FOR (p:Progress) REQUIRE p.key IS UNIQUE",
-            "CREATE INDEX khora_event_position IF NOT EXISTS FOR (e:Event) ON (e.position)",
-            "CREATE INDEX khora_statement_attribute IF NOT EXISTS FOR (s:Statement) ON (s.attribute)",
-            "CREATE INDEX khora_statement_creation IF NOT EXISTS FOR (s:Statement) ON (s.creation)",
-            "CREATE INDEX khora_retraction_target IF NOT EXISTS FOR (r:Retraction) ON (r.target)");
+            "CREATE CONSTRAINT khora_progress IF NOT EXISTS FOR (p:Progress) REQUIRE p.key IS UNIQUE");
 
     private final Driver driver;
     private final boolean ownsDriver;
@@ -103,7 +105,31 @@ public final class Neo4jDatastore implements Datastore, AutoCloseable {
         return driver.session(config);
     }
 
-    // Taking events in
+    // Progress
+
+    /** The last log position taken in, the frontier of everything taken in, and the last event's id. */
+    private record Progress(long position, Frontier at, Optional<EventId> last) {}
+
+    private static Progress progress(TransactionContext tx) {
+        var records = tx.run("MATCH (p:Progress {key: 'khora'}) RETURN p.position AS position, p.heads AS heads, "
+                + "p.last AS last").list();
+        if (records.isEmpty()) {
+            return new Progress(0, Frontier.empty(), Optional.empty());
+        }
+        var r = records.get(0);
+        return new Progress(r.get("position").asLong(),
+                new Frontier(new TreeSet<>(r.get("heads").asList(v -> new EventId(v.asString())))),
+                r.get("last").isNull() ? Optional.empty() : Optional.of(new EventId(r.get("last").asString())));
+    }
+
+    private static void setProgress(TransactionContext tx, Progress p) {
+        var params = new HashMap<String, Object>();
+        params.put("position", p.position());
+        params.put("heads", p.at().heads().stream().map(EventId::value).toList());
+        params.put("last", p.last().map(EventId::value).orElse(null));
+        tx.run("MERGE (p:Progress {key: 'khora'}) SET p.position = $position, p.heads = $heads, p.last = $last",
+                params).consume();
+    }
 
     /** The last log position taken in; 0 before any. */
     public long position() {
@@ -112,16 +138,18 @@ public final class Neo4jDatastore implements Datastore, AutoCloseable {
         }
     }
 
-    /** The frontier of every event taken in. */
+    /** The frontier of every event taken in: the one frontier the datastore answers at. */
     public Frontier at() {
         try (var session = session()) {
             return session.executeRead(Neo4jDatastore::progress).at();
         }
     }
 
+    // Taking events in
+
     /**
-     * Takes in the events of {@code log} after the last position taken in, a page at a time, and
-     * returns how many it took in.
+     * Takes in the events of {@code log} after the last position taken in, a page per transaction,
+     * and returns how many it took in.
      */
     public long catchUp(EventLog log) {
         long taken = 0;
@@ -130,7 +158,7 @@ public final class Neo4jDatastore implements Datastore, AutoCloseable {
             if (page.isEmpty()) {
                 return taken;
             }
-            taken += take(page);
+            taken += take(page, log);
         }
     }
 
@@ -140,22 +168,27 @@ public final class Neo4jDatastore implements Datastore, AutoCloseable {
      */
     public Following follow(EventLog log) {
         catchUp(log);
-        return log.follow(position() + 1, logged -> take(List.of(logged)));
+        return log.follow(position() + 1, logged -> take(List.of(logged), log));
     }
 
     /**
-     * Takes in {@code page}, in one transaction, and returns how many events it took in. Events at or
-     * before the last position taken in are skipped.
+     * Takes in {@code page} in one transaction and returns how many events it took in. Events at or
+     * before the last position taken in are skipped. A retraction's target is looked up in the page,
+     * then in {@code source}.
      *
      * @throws IllegalStateException if the page skips a position
      */
-    synchronized long take(List<Logged> page) {
+    synchronized long take(List<Logged> page, EventSource source) {
+        var inPage = new HashMap<EventId, Event>();
+        page.forEach(l -> inPage.put(l.event().id(), l.event()));
+        EventSource lookup = id -> Optional.ofNullable(inPage.get(id)).or(() -> source.get(id));
         try (var session = session()) {
             return session.executeWrite(tx -> {
                 var progress = progress(tx);
                 long next = progress.position() + 1;
                 var heads = new TreeSet<EventId>(progress.at().heads());
-                var rows = new ArrayList<Content.Row>();
+                var last = progress.last();
+                var writes = new Writes(tx);
                 for (var logged : page) {
                     if (logged.position() < next) {
                         continue;
@@ -163,91 +196,143 @@ public final class Neo4jDatastore implements Datastore, AutoCloseable {
                     if (logged.position() > next) {
                         throw new IllegalStateException("expected log position " + next + ", got " + logged.position());
                     }
+                    writes.event(logged.event(), lookup);
                     heads.removeAll(logged.event().causes());
                     heads.add(logged.event().id());
-                    rows.addAll(Content.of(logged));
+                    last = Optional.of(logged.event().id());
                     next++;
                 }
-                write(tx, rows);
-                setProgress(tx, next - 1, heads);
+                writes.flush();
+                setProgress(tx, new Progress(next - 1, new Frontier(heads), last));
                 return next - 1 - progress.position();
             });
         }
     }
 
-    private static void write(TransactionContext tx, List<Content.Row> rows) {
-        var events = new ArrayList<Map<String, Object>>();
-        var statements = new ArrayList<Map<String, Object>>();
-        var refs = new ArrayList<Map<String, Object>>();
-        var retractions = new ArrayList<Map<String, Object>>();
-        for (var row : rows) {
-            switch (row) {
-                case Content.EventRow e -> events.add(e.params());
-                case Content.StatementRow s -> {
-                    var p = s.params();
-                    statements.add(p);
-                    if ("ref".equals(p.get("kind"))) {
-                        refs.add(p);
+    /**
+     * The writes of a page, in order. Asserts are gathered and written together; a retraction first
+     * writes what was gathered, so it deletes what came before it.
+     */
+    private static final class Writes {
+        private final TransactionContext tx;
+        private final LinkedHashSet<String> entities = new LinkedHashSet<>();
+        /** Per thing and attribute, the literal values to add. */
+        private final Map<List<String>, LinkedHashSet<Object>> literals = new LinkedHashMap<>();
+        private final List<Map<String, Object>> relations = new ArrayList<>();
+
+        Writes(TransactionContext tx) {
+            this.tx = tx;
+        }
+
+        void event(Event event, EventSource lookup) {
+            if (!(event.body() instanceof AcceptedAction accepted)) {
+                return;
+            }
+            var tuples = Assertion.in(accepted.action()).orElse(List.of());
+            for (int i = 0; i < tuples.size(); i++) {
+                var tuple = tuples.get(i).in(event.id());
+                var id = Identity.of(event.id(), i);
+                if (tuple.equals(Assertion.entity())) {
+                    entities.add(id.value());
+                } else if (tuple.attribute().filter(Basic.RETRACTED::equals).isPresent()) {
+                    tuple.identity().ifPresent(target -> retract(target, lookup));
+                } else if (tuple.identity().isPresent() && tuple.attribute().isPresent() && tuple.value().isPresent()) {
+                    var thing = tuple.identity().get().value();
+                    var attribute = tuple.attribute().get().value();
+                    switch (tuple.value().get()) {
+                        case Ref r -> relations.add(Map.of("thing", thing, "attribute", attribute,
+                                "target", r.id().value(), "statement", id.value()));
+                        case Literal l -> literals.computeIfAbsent(List.of(thing, attribute),
+                                k -> new LinkedHashSet<>()).add(stored(l));
                     }
                 }
-                case Content.RetractionRow r -> retractions.add(r.params());
             }
         }
-        tx.run("""
-                UNWIND $rows AS e
-                CREATE (:Event {id: e.id, position: e.position, recorded: e.recorded, causes: e.causes})""",
-                Map.of("rows", events)).consume();
-        tx.run("""
-                UNWIND $rows AS e
-                MATCH (n:Event {id: e.id})
-                UNWIND e.causes AS cause
-                MATCH (c:Event {id: cause})
-                CREATE (n)-[:HAS_CAUSE]->(c)""", Map.of("rows", events)).consume();
-        tx.run("""
-                UNWIND $rows AS s
-                CREATE (n:Statement {id: s.id, event: s.event, position: s.position, recorded: s.recorded,
-                        index: s.index, thing: s.thing, creation: s.creation})
-                SET n.attribute = s.attribute, n.kind = s.kind, n.value = s.value
-                MERGE (t:Thing {id: s.thing})
-                CREATE (n)-[:ABOUT]->(t)""", Map.of("rows", statements)).consume();
-        tx.run("""
-                UNWIND $rows AS s
-                MATCH (n:Statement {id: s.id})
-                MERGE (t:Thing {id: s.value})
-                CREATE (n)-[:REFERS_TO]->(t)""", Map.of("rows", refs)).consume();
-        tx.run("""
-                UNWIND $rows AS r
-                CREATE (:Retraction {statement: r.statement, target: r.target, event: r.event, position: r.position})""",
-                Map.of("rows", retractions)).consume();
-    }
 
-    private record Progress(long position, Frontier at) {}
-
-    private static Progress progress(TransactionContext tx) {
-        var records = tx.run("MATCH (p:Progress {key: 'khora'}) RETURN p.position AS position, p.heads AS heads").list();
-        if (records.isEmpty()) {
-            return new Progress(0, Frontier.empty());
+        /**
+         * Deletes what the statement {@code target} asserted. A target that is not a statement of an
+         * event in {@code lookup}, or that asserted nothing the datastore keeps, deletes nothing.
+         */
+        private void retract(Identity target, EventSource lookup) {
+            var asserted = target.event().flatMap(lookup::get).flatMap(e -> tupleAt(e, target));
+            if (asserted.isEmpty()) {
+                return;
+            }
+            flush();
+            var tuple = asserted.get();
+            if (tuple.equals(Assertion.entity())) {
+                tx.run("MATCH (t:Thing {id: $id}) REMOVE t:Entity", Map.of("id", target.value())).consume();
+                return;
+            }
+            if (tuple.identity().isEmpty() || tuple.attribute().isEmpty() || tuple.value().isEmpty()
+                    || tuple.attribute().get().equals(Basic.RETRACTED)) {
+                return;
+            }
+            var thing = tuple.identity().get().value();
+            var attribute = tuple.attribute().get().value();
+            switch (tuple.value().get()) {
+                case Ref r -> tx.run("MATCH (:Thing {id: $thing})-[r:$($attribute) {statement: $statement}]->() DELETE r",
+                        Map.of("thing", thing, "attribute", attribute, "statement", target.value())).consume();
+                case Literal l -> tx.run("""
+                        MATCH (t:Thing {id: $thing})
+                        WITH t, t[$attribute] AS old
+                        WHERE old IS NOT NULL
+                        WITH t, CASE WHEN valueType(old) STARTS WITH 'LIST' THEN [x IN old WHERE x <> $value]
+                                     WHEN old = $value THEN [] ELSE [old] END AS kept
+                        SET t[$attribute] = CASE size(kept) WHEN 0 THEN null WHEN 1 THEN kept[0] ELSE kept END""",
+                        Map.of("thing", thing, "attribute", attribute, "value", stored(l))).consume();
+            }
         }
-        var r = records.get(0);
-        return new Progress(r.get("position").asLong(),
-                new Frontier(new TreeSet<>(r.get("heads").asList(v -> new EventId(v.asString())))));
+
+        private static Optional<Assertion> tupleAt(Event event, Identity target) {
+            if (!(event.body() instanceof AcceptedAction accepted)) {
+                return Optional.empty();
+            }
+            int index = Integer.parseInt(target.value().substring(target.value().indexOf('/') + 1));
+            var tuples = Assertion.in(accepted.action()).orElse(List.of());
+            return index < tuples.size() ? Optional.of(tuples.get(index).in(event.id())) : Optional.empty();
+        }
+
+        /** Writes the gathered asserts. */
+        void flush() {
+            if (!entities.isEmpty()) {
+                tx.run("UNWIND $ids AS id MERGE (t:Thing {id: id}) SET t:Entity",
+                        Map.of("ids", List.copyOf(entities))).consume();
+                entities.clear();
+            }
+            if (!literals.isEmpty()) {
+                var rows = new ArrayList<Map<String, Object>>();
+                literals.forEach((k, values) -> rows.add(Map.of("thing", k.get(0), "attribute", k.get(1),
+                        "values", List.copyOf(values))));
+                tx.run("""
+                        UNWIND $rows AS r
+                        MERGE (t:Thing {id: r.thing})
+                        WITH t, r, CASE WHEN t[r.attribute] IS NULL THEN []
+                                        WHEN valueType(t[r.attribute]) STARTS WITH 'LIST' THEN t[r.attribute]
+                                        ELSE [t[r.attribute]] END AS old
+                        WITH t, r, old + [v IN r.values WHERE NOT v IN old] AS merged
+                        SET t[r.attribute] = CASE size(merged) WHEN 1 THEN merged[0] ELSE merged END""",
+                        Map.of("rows", rows)).consume();
+                literals.clear();
+            }
+            if (!relations.isEmpty()) {
+                tx.run("""
+                        UNWIND $rows AS r
+                        MERGE (t:Thing {id: r.thing})
+                        MERGE (o:Thing {id: r.target})
+                        CREATE (t)-[:$(r.attribute) {statement: r.statement}]->(o)""",
+                        Map.of("rows", List.copyOf(relations))).consume();
+                relations.clear();
+            }
+        }
     }
 
-    private static void setProgress(TransactionContext tx, long position, Set<EventId> heads) {
-        tx.run("MERGE (p:Progress {key: 'khora'}) SET p.position = $position, p.heads = $heads",
-                Map.of("position", position, "heads", heads.stream().map(EventId::value).toList())).consume();
-    }
-
-    /**
-     * Deletes everything the datastore holds. The progress goes first, so a clear cut short leaves a
-     * datastore that refuses to take events in (they are already there), rather than one that
-     * answers from part of its content.
-     */
+    /** Deletes everything the datastore holds, the progress first. */
     public synchronized void clear() {
         try (var session = session()) {
             session.executeWriteWithoutResult(tx -> tx.run("MATCH (p:Progress) DELETE p").consume());
             session.run("""
-                    MATCH (n:Event|Statement|Thing|Retraction|Progress)
+                    MATCH (n:Thing)
                     CALL (n) { DETACH DELETE n } IN TRANSACTIONS OF 10000 ROWS""").consume();
         }
     }
@@ -260,29 +345,66 @@ public final class Neo4jDatastore implements Datastore, AutoCloseable {
             return session.executeRead(tx -> {
                 var progress = progress(tx);
                 var rows = new ArrayList<String>();
-                tx.run("MATCH (e:Event) RETURN e.id AS id, e.position AS position, e.recorded AS recorded, "
-                        + "e.causes AS causes ORDER BY e.position").forEachRemaining(
-                                r -> rows.add(Content.EventRow.of(r).toJson().canonical()));
-                tx.run("MATCH (s:Statement) RETURN s.id AS id, s.event AS event, s.position AS position, "
-                        + "s.recorded AS recorded, s.index AS index, s.thing AS thing, s.attribute AS attribute, "
-                        + "s.kind AS kind, s.value AS value ORDER BY s.position, s.index").forEachRemaining(
-                                r -> rows.add(Content.StatementRow.of(r).toJson().canonical()));
-                tx.run("MATCH (r:Retraction) RETURN r.statement AS statement, r.target AS target, r.event AS event, "
-                        + "r.position AS position ORDER BY r.position, r.statement").forEachRemaining(
-                                r -> rows.add(Content.RetractionRow.of(r).toJson().canonical()));
-                return new Snapshot(progress.position(), progress.at(), rows);
+                tx.run("MATCH (t:Thing) RETURN t.id AS id, t:Entity AS entity, properties(t) AS p ORDER BY t.id")
+                        .forEachRemaining(r -> {
+                            var attributes = new TreeMap<String, Json>();
+                            r.get("p").asMap().forEach((k, v) -> {
+                                if (!k.equals("id")) {
+                                    var values = new ArrayList<Json>();
+                                    valuesOf(v).forEach(x -> values.add(Assertion.valueJson(x)));
+                                    attributes.put(k, new Json.Arr(values));
+                                }
+                            });
+                            rows.add(Json.Obj.of(Map.of("type", new Json.Str(r.get("entity").asBoolean() ? "entity" : "thing"),
+                                    "id", new Json.Str(r.get("id").asString()), "attributes", new Json.Obj(attributes)))
+                                    .canonical());
+                        });
+                tx.run("MATCH (t:Thing)-[r]->(o:Thing) RETURN t.id AS thing, type(r) AS attribute, o.id AS target, "
+                        + "r.statement AS statement ORDER BY r.statement").forEachRemaining(r -> rows.add(Json.Obj.of(Map.of(
+                                "type", new Json.Str("relation"), "statement", new Json.Str(r.get("statement").asString()),
+                                "thing", new Json.Str(r.get("thing").asString()),
+                                "attribute", new Json.Str(r.get("attribute").asString()),
+                                "target", new Json.Str(r.get("target").asString()))).canonical()));
+                return new Snapshot(progress.position(), progress.at(), progress.last(), rows);
             });
         }
     }
 
     /** Replaces everything the datastore holds with {@code snapshot}. */
     public synchronized void restore(Snapshot snapshot) {
-        var rows = snapshot.content();
+        var things = new ArrayList<Map<String, Object>>();
+        var relations = new ArrayList<Map<String, Object>>();
+        for (var row : snapshot.parsed()) {
+            switch (row.str("type")) {
+                case "entity", "thing" -> {
+                    var attributes = new HashMap<String, Object>();
+                    row.obj("attributes").members().forEach((k, v) -> {
+                        var values = ((Json.Arr) v).items().stream()
+                                .map(x -> stored((Literal) Assertion.valueOf((Json.Obj) x))).toList();
+                        attributes.put(k, values.size() == 1 ? values.get(0) : values);
+                    });
+                    things.add(Map.of("id", row.str("id"), "entity", row.str("type").equals("entity"),
+                            "attributes", attributes));
+                }
+                case "relation" -> relations.add(Map.of("thing", row.str("thing"), "attribute", row.str("attribute"),
+                        "target", row.str("target"), "statement", row.str("statement")));
+                default -> throw new IllegalArgumentException("unknown row type " + row.str("type"));
+            }
+        }
         clear();
         try (var session = session()) {
             session.executeWriteWithoutResult(tx -> {
-                write(tx, rows);
-                setProgress(tx, snapshot.position(), snapshot.at().heads());
+                tx.run("""
+                        UNWIND $rows AS r
+                        CREATE (t:Thing {id: r.id})
+                        SET t += r.attributes
+                        WITH t, r WHERE r.entity
+                        SET t:Entity""", Map.of("rows", things)).consume();
+                tx.run("""
+                        UNWIND $rows AS r
+                        MATCH (t:Thing {id: r.thing}), (o:Thing {id: r.target})
+                        CREATE (t)-[:$(r.attribute) {statement: r.statement}]->(o)""", Map.of("rows", relations)).consume();
+                setProgress(tx, new Progress(snapshot.position(), snapshot.at(), snapshot.last()));
             });
         }
     }
@@ -295,10 +417,8 @@ public final class Neo4jDatastore implements Datastore, AutoCloseable {
      */
     public synchronized void rebuild(Snapshot snapshot, EventLog log) {
         if (snapshot.position() > 0) {
-            var last = log.read(snapshot.position(), 1);
-            var expected = snapshot.content().stream().filter(r -> r instanceof Content.EventRow e
-                    && e.position() == snapshot.position()).map(r -> ((Content.EventRow) r).id()).findFirst();
-            if (last.isEmpty() || expected.isEmpty() || !last.get(0).event().id().equals(expected.get())) {
+            var at = log.read(snapshot.position(), 1);
+            if (at.isEmpty() || !Optional.of(at.get(0).event().id()).equals(snapshot.last())) {
                 throw new IllegalArgumentException("the snapshot is not of this log at position " + snapshot.position());
             }
         }
@@ -306,15 +426,15 @@ public final class Neo4jDatastore implements Datastore, AutoCloseable {
         catchUp(log);
     }
 
-    /** The number of nodes per label and of relationships per type, for tests. */
+    /** The number of nodes per label and of relationships, for tests. */
     Map<String, Long> shape() {
         try (var session = session()) {
             return session.executeRead(tx -> {
                 var shape = new TreeMap<String, Long>();
                 tx.run("MATCH (n) UNWIND labels(n) AS label RETURN label, count(*) AS n").forEachRemaining(
                         r -> shape.put(r.get("label").asString(), r.get("n").asLong()));
-                tx.run("MATCH ()-[r]->() RETURN type(r) AS type, count(*) AS n").forEachRemaining(
-                        r -> shape.put("-" + r.get("type").asString() + "->", r.get("n").asLong()));
+                tx.run("MATCH ()-[r]->() RETURN count(r) AS n").forEachRemaining(r -> shape.put("relationships",
+                        r.get("n").asLong()));
                 return shape;
             });
         }
@@ -322,113 +442,90 @@ public final class Neo4jDatastore implements Datastore, AutoCloseable {
 
     // Answering
 
+    /**
+     * {@inheritDoc}
+     *
+     * @throws IllegalArgumentException if the query names a frontier other than everything taken in
+     */
     @Override
     public Answer answer(Query query) {
         try (var session = session()) {
             return session.executeRead(tx -> {
-                var view = view(tx, query.at());
-                return Evaluator.answer(query, query.at().orElse(view.at()), new TxGraph(tx, view));
+                var at = progress(tx).at();
+                if (query.at().isPresent() && !query.at().get().heads().equals(at.heads())) {
+                    throw new IllegalArgumentException("the graph datastore answers only at everything it has taken in");
+                }
+                return Evaluator.answer(query, at, new TxGraph(tx));
             });
         }
-    }
-
-    /**
-     * Which statements a read sees: those of the first {@code upTo} events taken in, or, when
-     * {@code events} is present, those of these events.
-     */
-    private record View(Frontier at, long upTo, Optional<List<String>> events) {
-        String holds() {
-            return events.isEmpty()
-                    ? "s.position <= $upTo AND NOT EXISTS { MATCH (r:Retraction {target: s.id}) WHERE r.position <= $upTo }"
-                    : "s.event IN $events AND NOT EXISTS { MATCH (r:Retraction {target: s.id}) WHERE r.event IN $events }";
-        }
-
-        Map<String, Object> params(Map<String, Object> more) {
-            var p = new HashMap<String, Object>(more);
-            p.put("upTo", upTo);
-            events.ifPresent(e -> p.put("events", e));
-            return p;
-        }
-    }
-
-    /**
-     * The view at {@code at}, or at everything taken in.
-     *
-     * @throws IllegalArgumentException if the frontier holds an event the datastore lacks
-     */
-    private static View view(TransactionContext tx, Optional<Frontier> at) {
-        var progress = progress(tx);
-        if (at.isEmpty() || at.get().heads().equals(progress.at().heads())) {
-            return new View(progress.at(), progress.position(), Optional.empty());
-        }
-        var heads = at.get().heads();
-        if (heads.isEmpty()) {
-            return new View(at.get(), 0, Optional.empty());
-        }
-        long top = 0;
-        for (var r : tx.run("UNWIND $ids AS id OPTIONAL MATCH (e:Event {id: id}) RETURN id, e.position AS position",
-                Map.of("ids", heads.stream().map(EventId::value).toList())).list()) {
-            if (r.get("position").isNull()) {
-                throw new IllegalArgumentException("unknown event " + r.get("id").asString());
-            }
-            top = Math.max(top, r.get("position").asLong());
-        }
-        var needed = new HashSet<String>();
-        heads.forEach(h -> needed.add(h.value()));
-        var closure = new ArrayList<String>();
-        for (long high = top; high >= 1 && !needed.isEmpty(); high -= PAGE) {
-            for (var r : tx.run("MATCH (e:Event) WHERE e.position <= $high AND e.position > $low "
-                    + "RETURN e.id AS id, e.causes AS causes ORDER BY e.position DESC",
-                    Map.of("high", high, "low", high - PAGE)).list()) {
-                if (needed.remove(r.get("id").asString())) {
-                    closure.add(r.get("id").asString());
-                    needed.addAll(r.get("causes").asList(org.neo4j.driver.Value::asString));
-                }
-            }
-        }
-        if (!needed.isEmpty()) {
-            throw new IllegalArgumentException("unknown event " + needed.iterator().next());
-        }
-        return closure.size() == top
-                ? new View(at.get(), top, Optional.empty())
-                : new View(at.get(), top, Optional.of(closure));
     }
 
     /** The three lookups of {@link Graph}, as reads in one transaction. */
     private static final class TxGraph implements Graph {
         private final TransactionContext tx;
-        private final View view;
         private final Map<List<Identity>, List<Value>> values = new HashMap<>();
 
-        TxGraph(TransactionContext tx, View view) {
+        TxGraph(TransactionContext tx) {
             this.tx = tx;
-            this.view = view;
-        }
-
-        private List<Record> read(String match, String returns, Map<String, Object> params) {
-            return tx.run(match + " WHERE " + view.holds() + " RETURN " + returns + ORDER, view.params(params)).list();
         }
 
         @Override
         public List<Identity> things() {
-            return read("MATCH (s:Statement {creation: true})", "s.id AS id", Map.of()).stream()
+            return tx.run("MATCH (t:Entity) RETURN t.id AS id ORDER BY id").list().stream()
                     .map(r -> new Identity(r.get("id").asString())).toList();
         }
 
         @Override
         public List<Fact> with(Identity attribute) {
-            return read("MATCH (s:Statement {attribute: $attribute})", "s.thing AS thing, s.kind AS kind, s.value AS value",
-                    Map.of("attribute", attribute.value())).stream()
-                    .map(r -> new Fact(new Identity(r.get("thing").asString()), Content.value(r))).toList();
+            var facts = new ArrayList<Fact>();
+            var params = Map.<String, Object>of("attribute", attribute.value());
+            tx.run("MATCH (t:Thing) WHERE t[$attribute] IS NOT NULL RETURN t.id AS id, t[$attribute] AS v ORDER BY id",
+                    params).forEachRemaining(r -> valuesOf(r.get("v").asObject())
+                            .forEach(v -> facts.add(new Fact(new Identity(r.get("id").asString()), v))));
+            tx.run("MATCH (t:Thing)-[r:$($attribute)]->(o:Thing) RETURN t.id AS id, o.id AS o ORDER BY r.statement",
+                    params).forEachRemaining(r -> facts.add(new Fact(new Identity(r.get("id").asString()),
+                            new Ref(new Identity(r.get("o").asString())))));
+            return facts;
         }
 
         @Override
         public List<Value> values(Identity thing, Identity attribute) {
-            return values.computeIfAbsent(List.of(thing, attribute), k -> read(
-                    "MATCH (:Thing {id: $thing})<-[:ABOUT]-(s:Statement {attribute: $attribute})",
-                    "s.kind AS kind, s.value AS value", Map.of("thing", thing.value(), "attribute", attribute.value()))
-                    .stream().map(Content::value).toList());
+            return values.computeIfAbsent(List.of(thing, attribute), k -> {
+                var result = new ArrayList<Value>();
+                var params = Map.<String, Object>of("thing", thing.value(), "attribute", attribute.value());
+                tx.run("MATCH (t:Thing {id: $thing}) RETURN t[$attribute] AS v", params)
+                        .forEachRemaining(r -> result.addAll(valuesOf(r.get("v").asObject())));
+                tx.run("MATCH (:Thing {id: $thing})-[r:$($attribute)]->(o:Thing) RETURN o.id AS o ORDER BY r.statement",
+                        params).forEachRemaining(r -> result.add(new Ref(new Identity(r.get("o").asString()))));
+                return result;
+            });
         }
+    }
+
+    /** The property a literal is kept as: a 64-bit integer, or a string. */
+    static Object stored(Literal l) {
+        return switch (l.value()) {
+            case Json.Int n -> n.value();
+            case Json.Str s -> s.value();
+            default -> throw new IllegalStateException("a literal is a string or an integer");
+        };
+    }
+
+    /** The literals a property holds: none, one, or a list. */
+    static List<Value> valuesOf(Object property) {
+        return switch (property) {
+            case null -> List.of();
+            case List<?> list -> list.stream().map(Neo4jDatastore::literal).toList();
+            default -> List.of(literal(property));
+        };
+    }
+
+    private static Value literal(Object o) {
+        return switch (o) {
+            case Long n -> new Literal(new Json.Int(n));
+            case String s -> new Literal(new Json.Str(s));
+            default -> throw new IllegalStateException("a property holds integers or strings, not " + o.getClass());
+        };
     }
 
     @Override

@@ -12,4 +12,9 @@ class Neo4jDatastoreTest extends DatastoreContract {
         store.catchUp(log);
         return store;
     }
+
+    @Override
+    protected boolean answersPastFrontiers() {
+        return false;
+    }
 }

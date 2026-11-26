@@ -10,7 +10,7 @@ Java 25 everywhere: the code is compiled and tested with Java 25, and the Gradle
 | `surfaces` | `khora.surfaces`, `khora.surfaces.stub` | Surfaces, in the language of events: a `Surface` receives the events its interests match and emits actions in response; an `Authority` accepts or rejects actions on its things; the `Kernel` turns accepted actions into events in an `EventLog` and delivers them. `Projects` is a stub authority. |
 | `log-nats` | `khora.events.log.nats` | `NatsEventLog`: the event log on NATS JetStream. Tests run against real NATS in Docker. `bench` source set: `LogBench`. |
 | `query` | `khora.query` | Searches as data: a `Query` is an envelope (frontier, set or multiset, returned columns, order, page) around a body of operators, `Scan`, `Filter`, `Not` and `Aggregate`, checked when it is built. Its canonical JSON is stored as the value of the `khora/query` attribute. A `Datastore` answers queries; `EventsDatastore` works answers out from a log's events, through `Evaluator` over a `Graph`. Test fixture: `DatastoreContract`, the tests every datastore must pass. Depends on `events`. |
-| `datastore-neo4j` | `khora.query.neo4j` | The graph datastore on Neo4j: `Neo4jDatastore` takes in a log's events (`catchUp`, `follow`) and keeps things, statements, retractions and events as a graph. It answers queries at any frontier it holds, through `Evaluator`, with the answers of `EventsDatastore`. A `Snapshot` is its content at a position, as JSON lines; `rebuild` restores one and catches up with the log. Tests run against real Neo4j in Docker. Depends on `query`. |
+| `datastore-neo4j` | `khora.query.neo4j` | The graph datastore on Neo4j: `Neo4jDatastore` takes in a log's events (`catchUp`, `follow`) and keeps what they assert as it stands now. An entity is a node, its literal attributes are properties, and a reference is a relationship; a retraction deletes what its target asserted. Events are not stored. It answers queries at everything it has taken in, through `Evaluator`. A `Snapshot` is its content at a position, as JSON lines; `rebuild` restores one and catches up with the log. Tests run against real Neo4j in Docker. Depends on `query`. |
 
 Design, decisions and measurements: the runs `blob/Issue #18 Event types ids and clock.md` (`events`, `surfaces`), `blob/Issue #21 Surface contract types.md` `blob/Issue #19 Log store on NATS.md` (`log-nats`) `blob/Issue #25 Query as a data structure.md` (`query`) and `blob/Issue #23 Graph datastore on Neo4j.md` (`datastore-neo4j`).
 
@@ -79,7 +79,8 @@ try (var store = Neo4jDatastore.open("bolt://localhost:7687", "neo4j", "khora-de
 ```
 
 - The datastore owns its database: `clear()` and `restore` delete what it holds.
-- A query at a frontier with an event the datastore has not taken in is refused; it does not wait.
+- It answers only at everything it has taken in. A query at any other frontier is refused; it neither waits nor reads the past.
+- Attribute identities are used as they are, as property keys and relationship types.
 - `rebuild(Snapshot.read(file), log)` restores a snapshot and takes in the rest of the log. It refuses a snapshot of another log.
 
 ## Run NATS locally

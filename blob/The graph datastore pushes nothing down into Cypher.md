@@ -18,6 +18,6 @@ Flagged in the Observe of [[Issue #23 Graph datastore on Neo4j]], from the revie
 
 ## Content
 
-`Evaluator` answers over three Cypher lookups; filters, negation and aggregates run in memory, and a `Has` condition asks once per thing and attribute. A frontier whose events are not the first ones taken in is passed to Cypher as the list of its events, which every statement is checked against, and finding them reads the events from the frontier's latest head down.
+`Evaluator` answers over three Cypher lookups; filters, negation and aggregates run in memory, and a `Has` condition asks once per thing and attribute. A scan of an attribute reads every `Thing`, since a property keyed by an attribute's identity has no index.
 
-When: pushdown and planning (P2), or a past read on a branch is slow. Keeping each event's ancestors as an interval, or its branch, would avoid the list.
+When: pushdown and planning (P2), or a scan is slow. Indexes per attribute, or a label per attribute, would avoid the full read.

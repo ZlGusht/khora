@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
 import khora.events.Frontier;
 import khora.query.EventsDatastore;
 import khora.query.Operator.Scan;
@@ -29,7 +30,7 @@ class SnapshotTest {
         var shape = store.shape();
 
         store.clear();
-        store.take(generated.log.read(1, 120));
+        store.take(generated.log.read(1, 120), generated.log);
         var file = dir.resolve("at-120.jsonl");
         store.snapshot().write(file);
         store.clear();
@@ -39,14 +40,15 @@ class SnapshotTest {
         assertEquals(shape, store.shape());
         assertEquals(300, store.position());
         var all = Query.of(Scan.statements("t", GeneratedLog.NAME, "n"));
-        assertEquals(new EventsDatastore(generated.log).answer(all), store.answer(all));
+        assertEquals(EquivalenceTest.sorted(new EventsDatastore(generated.log).answer(all)),
+                EquivalenceTest.sorted(store.answer(all)));
     }
 
     @Test
     void aSnapshotIsAtAFrontier() throws IOException {
         var generated = new GeneratedLog(8, 40);
         var store = Neo4jTestServer.empty();
-        store.take(generated.log.read(1, 25));
+        store.take(generated.log.read(1, 25), generated.log);
         var snapshot = store.snapshot();
         assertEquals(25, snapshot.position());
         assertEquals(Frontier.of(generated.events.subList(0, 25).stream().map(e -> e.id()).toList(), generated.log),
@@ -60,7 +62,7 @@ class SnapshotTest {
     @Test
     void anEmptyDatastoreHasAnEmptySnapshot() {
         var snapshot = Neo4jTestServer.empty().snapshot();
-        assertEquals(new Snapshot(0, Frontier.empty(), List.of()), snapshot);
+        assertEquals(new Snapshot(0, Frontier.empty(), Optional.empty(), List.of()), snapshot);
     }
 
     @Test
@@ -76,9 +78,9 @@ class SnapshotTest {
     @Test
     void aMalformedSnapshotIsRefused() throws IOException {
         var file = dir.resolve("bad.jsonl");
-        Files.writeString(file, "{\"type\":\"snapshot\",\"version\":1,\"position\":1,\"at\":[]}\n{\"type\":\"thing\"}\n");
+        Files.writeString(file, "{\"type\":\"snapshot\",\"version\":2,\"position\":0,\"at\":[]}\n{\"type\":\"event\"}\n");
         assertThrows(IllegalArgumentException.class, () -> Snapshot.read(file));
-        Files.writeString(file, "{\"type\":\"snapshot\",\"version\":2,\"position\":0,\"at\":[]}\n");
+        Files.writeString(file, "{\"type\":\"snapshot\",\"version\":1,\"position\":0,\"at\":[]}\n");
         assertThrows(IllegalArgumentException.class, () -> Snapshot.read(file));
     }
 }

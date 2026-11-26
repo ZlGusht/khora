@@ -12,10 +12,15 @@ class Neo4jSnapshotDatastoreTest extends DatastoreContract {
     @Override
     protected Datastore over(EventLog log) {
         var store = Neo4jTestServer.empty();
-        store.take(log.read(1, 1));
+        store.take(log.read(1, 1), log);
         var snapshot = store.snapshot();
         store.clear();
         store.rebuild(snapshot, log);
         return store;
+    }
+
+    @Override
+    protected boolean answersPastFrontiers() {
+        return false;
     }
 }
