@@ -10,11 +10,12 @@ relationships__in_process:
   - "[[Milestone Stage 1 kernel core]]"
 relationships__in_context_of:
   - "[[Surfaces]]"
-properties__status: open
+properties__status: closed
 properties__started_at: 2026-11-25
-properties__current_phase: Operate
+properties__current_phase: Process(v)
 properties__issue: 22
 properties__author: agent:claude-opus-5-5
+properties__ended_at: 2026-11-26
 ---
 Run for GitHub issue #22 (K5), on branch `issue/22-contract-tests-surfaces-authorities`, stacked on #36 (K1), whose `surfaces` module it tests. Superpowers brainstorming is the Laydown.
 
@@ -284,3 +285,21 @@ Rulings taken during Operate, with what they change in the design above. *Builde
 - [ ] **Step 2:** Run `./gradlew :surfaces:test --tests '*KernelGapsTest'`. Expected: the test is skipped with that reason (the gap exists today).
 - [ ] **Step 3:** Run `./gradlew test` (all modules; Docker running for `log-nats`). Expected: all PASS or skipped as above; output quiet.
 - [ ] **Step 4: Commit** `Pin the kernel gaps found in the review of #36`.
+
+## Verified
+
+Done:
+- The scenario format, the runner through the real kernel, `AuthorityContract` with four rules and `SurfaceContract` with five, `Echo`, and `KnownGaps`, as test fixtures of `src/surfaces`.
+- `Projects` passes `AuthorityContract` with ten scenarios; `Echo` passes `SurfaceContract` with six. Issue #22's done-when: delivery by interest, emission in response, acceptance and rejection, reads at a frontier (including an earlier one), and `Projects` passes.
+- Two kernel gaps of #36 pinned and skipped with their reason.
+
+Not done:
+- Security tests (Letter [[Security tests wait for access checks]]).
+- Several surfaces in one scenario, asynchronous delivery, JSON scenario files.
+- An authority's decisions on emitted actions are judged only through its own contract.
+
+Checked:
+- `./gradlew test`, all modules with Docker: 289 tests, 0 failures, 7 skipped (two known gaps on three tests, four "nothing to check" aborts).
+- Each task reviewed against its brief, fixed where asked and re-reviewed; one review of the whole branch, one fix wave, a re-review. Each rule is shown to fail with a deliberately bad implementation.
+- No change outside `src/surfaces`'s test fixtures and tests, apart from its `build.gradle.kts`; the tests that existed before K5 are unchanged and pass. `khora-validate` passes on every entity this run wrote. Nothing in `docs/` changed.
+- Open minor points: `Ref.known` accepts any identity and renders as a hash; a named identity equal to a step name renders like the step; a step that wasn't delivered shows as a list difference.
