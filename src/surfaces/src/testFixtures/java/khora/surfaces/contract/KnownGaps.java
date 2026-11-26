@@ -28,7 +28,7 @@ public final class KnownGaps {
             "#36: nothing checks that a tuple names a statement that exists (review of #36: Causality.check)",
             "a retracted attribute with another value does not retract", // tested by KernelGapsTest
             "#36: Statements treats every tuple with the retracted attribute as a retraction, whatever its"
-                    + " value (review of #36: Statements.at)",
+                    + " value (review of #36: Statements.about)",
             "a tuple about a local identity its event does not carry is rejected", // tested by KernelGapsTest
             "#36: a local /n is not checked against the tuples of its event (review of #36: Assertion.parse)");
 

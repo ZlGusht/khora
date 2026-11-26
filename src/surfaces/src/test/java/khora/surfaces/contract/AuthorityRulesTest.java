@@ -185,6 +185,7 @@ class AuthorityRulesTest {
     @Test
     void projectsKeepsEveryAuthorityRule() {
         var results = results(new ProjectsContractTest());
+        assertFalse(results.isEmpty());
         assertEquals(new ProjectsContractTest().scenarios().size(), results.size());
         results.forEach((scenario, tests) -> {
             assertEquals(5, tests.size(), scenario);

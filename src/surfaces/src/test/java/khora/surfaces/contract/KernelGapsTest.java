@@ -109,6 +109,11 @@ class KernelGapsTest {
 
     @Test
     void aRetractionOfAMissingStatementIsRejected() {
+        // control: the same retraction of a statement that exists is accepted (as in the test above)
+        play(Scenario.named("exists").given(CREATE)
+                .when(When.submit(Step.named("retract").by(ANNA).knew("create")
+                        .does(ActionSpec.asserts(TupleSpec.retraction(Ref.tuple("create", 1))))))
+                .then(Then.accepted()));
         KnownGaps.judge(RETRACT_MISSING, () -> play(Scenario.named("missing").given(CREATE)
                 .when(When.submit(Step.named("retract").by(ANNA).knew("create")
                         .does(ActionSpec.asserts(TupleSpec.retraction(Ref.tuple("create", 5))))))
@@ -119,7 +124,8 @@ class KernelGapsTest {
     void aRetractedAttributeWithAnotherValueDoesNotRetract() {
         var notRetracted = Step.named("notRetracted").by(ANNA).knew("create").does(ActionSpec.asserts(
                 TupleSpec.of(Ref.tuple("create", 1), Ref.known(Basic.RETRACTED), ValueSpec.text("false"))));
-        // control: without that tuple the name holds
+        // control: without that tuple the name holds. The gap assumes the kernel accepts the tuple; a fix that
+        // rejects it at submit instead fails the given step, and this test then fails outright: rewrite it then.
         play(Scenario.named("plain").given(CREATE).when(When.read(PROJECT, "create"))
                 .then(Then.statements(TupleSpec.entity(), TupleSpec.of(PROJECT, NAME, ValueSpec.text("Kitchen")))));
         KnownGaps.judge(RETRACTED_FALSE, () -> play(Scenario.named("false").given(CREATE, notRetracted)
@@ -129,6 +135,8 @@ class KernelGapsTest {
 
     @Test
     void aTupleAboutAMissingLocalIdentityIsRejected() {
+        // control: a tuple about a local identity its event carries is accepted
+        play(Scenario.named("local").when(When.submit(CREATE)).then(Then.accepted()));
         KnownGaps.judge(DANGLING_LOCAL, () -> play(Scenario.named("dangling")
                 .when(When.submit(Step.named("dangling").by(ANNA)
                         .does(ActionSpec.asserts(TupleSpec.of(Ref.local(5), NAME, ValueSpec.text("x"))))))
