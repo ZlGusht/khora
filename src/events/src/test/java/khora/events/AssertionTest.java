@@ -83,6 +83,17 @@ class AssertionTest {
     }
 
     @Test
+    void localIdentitiesMustNameATupleOfTheAssert() {
+        for (var tuple : List.of(
+                Assertion.of(Identity.local(5), NAME, new Assertion.Literal(new Json.Int(1))),
+                Assertion.of(P, Identity.local(2), new Assertion.Literal(new Json.Int(1))),
+                Assertion.of(P, NAME, new Assertion.Ref(Identity.local(2))))) {
+            assertThrows(IllegalArgumentException.class, () -> Assertion.action(Assertion.entity(), tuple), tuple.toString());
+        }
+        Assertion.action(Assertion.entity(), Assertion.of(Identity.local(0), NAME, new Assertion.Ref(Identity.local(1))));
+    }
+
+    @Test
     void retractionIsATupleWithTheRetractedAttribute() {
         assertEquals(Assertion.of(P, Basic.RETRACTED, new Assertion.Literal(new Json.Str("true"))),
                 Assertion.retraction(P));

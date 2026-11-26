@@ -46,6 +46,48 @@ class CausalityTest {
         assertEquals(Optional.of(Causality.Flaw.NOT_AFTER_CAUSES), Causality.check(event(1000, e1.id()), log));
     }
 
+    static Event naming(long recorded, Identity named, EventId... causes) {
+        return Event.create(List.of(causes), recorded, Optional.empty(), new AcceptedAction(BY,
+                Assertion.action(Assertion.retraction(named))));
+    }
+
+    static Event referring(long recorded, Identity named, EventId... causes) {
+        return Event.create(List.of(causes), recorded, Optional.empty(), new AcceptedAction(BY,
+                Assertion.action(Assertion.of(Identity.named("p"), Identity.named("see"), new Assertion.Ref(named)))));
+    }
+
+    @Test
+    void aStatementOutsideTheCausalPastIsRefused() {
+        var log = new InMemoryEventLog();
+        var e1 = event(1000);
+        var e2 = event(1001);
+        log.append(List.of(e1, e2));
+        var statement = Identity.of(e1.id(), 0);
+        assertEquals(Optional.empty(), Causality.check(naming(1002, statement, e1.id()), log));
+        assertEquals(Optional.of(Causality.Flaw.STATEMENT_OUTSIDE_PAST), Causality.check(naming(1002, statement), log));
+        assertEquals(Optional.of(Causality.Flaw.STATEMENT_OUTSIDE_PAST),
+                Causality.check(naming(1002, statement, e2.id()), log));
+        assertEquals(Optional.of(Causality.Flaw.STATEMENT_OUTSIDE_PAST),
+                Causality.check(referring(1002, statement, e2.id()), log));
+        assertEquals(Optional.empty(), Causality.check(referring(1002, statement, e1.id()), log));
+    }
+
+    @Test
+    void aStatementTheEventDoesNotHoldIsRefused() {
+        var log = new InMemoryEventLog();
+        var e1 = event(1000);
+        log.append(List.of(e1));
+        assertEquals(Optional.of(Causality.Flaw.UNKNOWN_STATEMENT),
+                Causality.check(naming(1001, Identity.of(e1.id(), 1), e1.id()), log));
+        assertEquals(Optional.of(Causality.Flaw.UNKNOWN_STATEMENT),
+                Causality.check(referring(1001, Identity.of(e1.id(), 7), e1.id()), log));
+    }
+
+    @Test
+    void namedIdentitiesNeedNoPast() {
+        assertEquals(Optional.empty(), Causality.check(naming(1000, Identity.named("p")), new InMemoryEventLog()));
+    }
+
     @Test
     void aLinkOutsideTheCausalPastIsRefused() {
         var log = new InMemoryEventLog();

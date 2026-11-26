@@ -42,6 +42,12 @@ public record Event(EventId id, SortedSet<EventId> causes, long recorded, Option
         if (!salt.matches("[0-9a-f]{32}")) {
             throw new IllegalArgumentException("salt is not 32 lowercase hex digits");
         }
+        if (recorded < 0) {
+            throw new IllegalArgumentException("recorded is negative: " + recorded);
+        }
+        if (occurred.isPresent() && (occurred.get() < 0 || occurred.get() > Hlc.millis(recorded))) {
+            throw new IllegalArgumentException("occurred is not between 0 and when it was recorded: " + occurred.get());
+        }
         var sortedCauses = new TreeSet<EventId>();
         sortedCauses.addAll(causes);
         causes = Collections.unmodifiableSortedSet(sortedCauses);

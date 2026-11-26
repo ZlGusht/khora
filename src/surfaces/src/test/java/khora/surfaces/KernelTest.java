@@ -113,7 +113,28 @@ class KernelTest {
     void aBlindWriteIsAccepted() {
         var r = read(IVAN, at(created));
         accepted(rename(IVAN, r, "Studio"));
-        accepted(kernel.submit(Assertion.action(named(project, "Atelier")), MIA, Frontier.empty(), Map.of()));
+        accepted(kernel.submit(Assertion.action(named(project, "Atelier")), MIA, at(created), Map.of()));
+    }
+
+    @Test
+    void aWriteAboutAThingItDoesNotKnowIsRejected() {
+        assertInstanceOf(Answer.Rejected.class,
+                kernel.submit(Assertion.action(named(project, "Atelier")), MIA, Frontier.empty(), Map.of()));
+        var stray = Identity.of(created.id(), 5);
+        assertInstanceOf(Answer.Rejected.class,
+                kernel.submit(Assertion.action(Assertion.retraction(stray)), MIA, at(created), Map.of()));
+    }
+
+    @Test
+    void aCauseFarAheadOfWallTimeIsRejectedAndTheKernelGoesOn() {
+        var log = new InMemoryEventLog();
+        var future = Event.create(List.of(), Long.MAX_VALUE - 1, Optional.empty(),
+                new AcceptedAction(ANNA.by("projects"), Assertion.action(Assertion.entity())));
+        log.append(List.of(future));
+        var k = new Kernel(new Projects(), log, new Hlc(() -> 1000));
+        assertInstanceOf(Answer.Rejected.class,
+                k.submit(Assertion.action(Assertion.entity()), ANNA, at(future), Map.of()));
+        accepted(k.submit(Assertion.action(Assertion.entity()), ANNA, Frontier.empty(), Map.of()));
     }
 
     @Test

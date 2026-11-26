@@ -39,7 +39,7 @@ public final class About {
         if (holder.isEmpty()) {
             return java.util.Optional.empty();
         }
-        int index = Integer.parseInt(id.value().substring(id.value().indexOf('/') + 1));
+        int index = id.index().orElseThrow();
         if (holder.get().equals(event.id())) {
             return index < own.size() ? own.get(index).in(event.id()).identity() : java.util.Optional.empty();
         }

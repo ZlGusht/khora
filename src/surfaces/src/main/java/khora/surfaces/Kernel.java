@@ -1,5 +1,6 @@
 package khora.surfaces;
 
+import java.io.Serial;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -23,6 +24,7 @@ import khora.events.Identity;
 import khora.events.Statement;
 import khora.events.Statements;
 import khora.events.log.EventLog;
+import khora.events.log.EventLogException;
 
 /**
  * An event log, a clock and the authority: where actions are submitted, become events, and are
@@ -35,7 +37,12 @@ import khora.events.log.EventLog;
  * each attached surface receives each event its interests match once, and never one it emitted.
  * What a surface emits in response is submitted as an action by that surface, knowing what it had
  * taken in, linked to its {@code source}; a chain of emissions in response to emissions stops after
- * {@value #MAX_GENERATIONS} steps. A surface that throws loses that event; delivery goes on.
+ * {@value #MAX_GENERATIONS} steps. A surface's emissions are causally ordered: each knows the ones
+ * before it. A surface that throws, or whose emission fails, loses that event; delivery goes on, and
+ * no failure in delivery reaches the submitter.
+ *
+ * <p>An append whose outcome is unknown is retried with the same event, which the log stores once;
+ * if it still fails, {@link Unconfirmed} carries the event.
  *
  * <p>Provisional: one authority, synchronous delivery under one lock, no access checks at
  * delivery, and an emitted action the authority rejects is dropped without a trace.
@@ -43,6 +50,9 @@ import khora.events.log.EventLog;
 public final class Kernel {
     /** How many emissions in response to emissions are delivered before a chain is cut off. */
     public static final int MAX_GENERATIONS = 64;
+
+    /** How often an append whose outcome is unknown is tried with the same event. */
+    public static final int APPEND_ATTEMPTS = 3;
 
     private static final System.Logger LOG = System.getLogger(Kernel.class.getName());
 
@@ -158,20 +168,63 @@ public final class Kernel {
         if (flaw.isPresent()) {
             return new Answer.Rejected(flaw.get().name());
         }
-        log.append(List.of(event));
+        // Answered before appending: what holds at knew does not depend on the new event, and
+        // nothing may fail between the append and the return.
+        var answer = new Answer.Accepted(event, read.map(thing -> Statements.about(thing, knew, log)).orElse(List.of()));
+        append(event);
         var newHeads = new TreeSet<EventId>(heads.heads());
         newHeads.removeAll(event.causes());
         newHeads.add(event.id());
         heads = new Frontier(newHeads);
         if (origin != null) {
             origin.emitted.add(event.id());
+            origin.taken = FrontierCheck.combine(origin.taken, new Frontier(new TreeSet<>(Set.of(event.id()))), log);
         }
-        var answer = new Answer.Accepted(event, read.map(thing -> Statements.about(thing, knew, log)).orElse(List.of()));
         queue.add(new Delivery(event, generation));
         if (!draining) {
             drain();
         }
         return answer;
+    }
+
+    /**
+     * Appends {@code event}, retrying the same event when the outcome is unknown: the log stores an
+     * id once, so a retry never stores it twice.
+     *
+     * @throws Unconfirmed if every attempt failed
+     */
+    private void append(Event event) {
+        EventLogException last = null;
+        for (int attempt = 0; attempt < APPEND_ATTEMPTS; attempt++) {
+            try {
+                log.append(List.of(event));
+                return;
+            } catch (EventLogException e) {
+                last = e;
+            }
+        }
+        throw new Unconfirmed(event, last);
+    }
+
+    /**
+     * An accepted event the log did not confirm storing: it may be stored or not. Appending
+     * {@link #event()} itself again is safe; submitting the action again makes a new event.
+     */
+    public static final class Unconfirmed extends RuntimeException {
+        @Serial
+        private static final long serialVersionUID = 1L;
+
+        private final transient Event event;
+
+        Unconfirmed(Event event, EventLogException cause) {
+            super("event " + event.id().value() + " may not be stored", cause);
+            this.event = event;
+        }
+
+        /** The event that may not be stored. */
+        public Event event() {
+            return event;
+        }
     }
 
     /** Delivers queued events, in order, to every attached surface that is not catching up. */
@@ -191,8 +244,21 @@ public final class Kernel {
         }
     }
 
-    /** Hands {@code event} to the attachment if it wants it and has neither received nor emitted it. */
+    /**
+     * Hands {@code event} to the attachment if it wants it and has neither received nor emitted it.
+     * Nothing escapes: a failure loses this event for this attachment only, so it never reaches the
+     * submitter of an event already appended.
+     */
     private void offer(Attachment attachment, Event event, int generation) {
+        try {
+            deliver(attachment, event, generation);
+        } catch (RuntimeException e) {
+            LOG.log(System.Logger.Level.WARNING, "delivering event " + event.id().value() + " to surface "
+                    + attachment.surface.name() + " failed; delivery goes on", e);
+        }
+    }
+
+    private void deliver(Attachment attachment, Event event, int generation) {
         if (attachment.received.contains(event.id()) || attachment.emitted.contains(event.id())
                 || !wants(attachment.surface, event, log)) {
             return;
@@ -216,7 +282,12 @@ public final class Kernel {
         }
         var by = new Context(attachment.surface.name(), Optional.empty(), "surface", 0);
         for (var action : emitted) {
-            accept(action, by, attachment.taken, Map.of("source", Set.of(event.id())), attachment, generation + 1);
+            try {
+                accept(action, by, attachment.taken, Map.of("source", Set.of(event.id())), attachment, generation + 1);
+            } catch (RuntimeException e) {
+                LOG.log(System.Logger.Level.WARNING, "an action surface " + attachment.surface.name()
+                        + " emitted on event " + event.id().value() + " failed; delivery goes on", e);
+            }
         }
     }
 

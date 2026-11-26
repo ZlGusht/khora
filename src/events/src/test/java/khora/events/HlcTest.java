@@ -51,9 +51,24 @@ class HlcTest {
 
     @Test
     void refusesToPassTheLargestTime() {
-        assertThrows(IllegalArgumentException.class, () -> new Hlc(() -> 1000).next(Long.MAX_VALUE));
-        var clock = new Hlc(() -> 1000);
+        long end = Hlc.millis(Long.MAX_VALUE);
+        assertThrows(IllegalArgumentException.class, () -> new Hlc(() -> end).next(Long.MAX_VALUE));
+        var clock = new Hlc(() -> end);
         assertEquals(Long.MAX_VALUE, clock.next(Long.MAX_VALUE - 1));
         assertThrows(IllegalArgumentException.class, clock::next);
+    }
+
+    @Test
+    void aTimeFarAheadOfWallTimeIsRefusedAndTheClockDoesNotMove() {
+        var clock = new Hlc(() -> 1000);
+        var before = clock.next();
+        assertThrows(IllegalArgumentException.class, () -> clock.next(Long.MAX_VALUE - 1));
+        assertThrows(IllegalArgumentException.class,
+                () -> clock.next(Hlc.pack(1000 + Hlc.MAX_DRIFT_MILLIS + 1, 0)));
+        var after = clock.next();
+        assertEquals(1000, Hlc.millis(after));
+        assertTrue(after > before);
+        var ahead = Hlc.pack(1000 + Hlc.MAX_DRIFT_MILLIS, 5);
+        assertTrue(clock.next(ahead) > ahead);
     }
 }

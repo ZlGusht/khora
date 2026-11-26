@@ -59,7 +59,8 @@ class JsonTest {
     @Test
     void parseRefusesOtherValues() {
         for (String text : List.of("1.5", "1e3", "true", "null", "{\"a\":1,\"a\":2}", "{} x",
-                "92233720368547758070", "-", "\"open", "[1,]")) {
+                "92233720368547758070", "-", "\"open", "[1,]", "-0", "[-0]",
+                "\"\\u-123\"", "\"\\u+abc\"", "\"\\u12 4\"", "\"\\u١٢٣٤\"")) {
             assertThrows(IllegalArgumentException.class, () -> Json.parse(text), text);
         }
     }

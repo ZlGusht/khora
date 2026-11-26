@@ -36,4 +36,12 @@ class IdentityTest {
         assertEquals(Identity.named("x"), Identity.named("x").in(e));
         assertThrows(IllegalArgumentException.class, () -> new Identity("/-1"));
     }
+
+    @Test
+    void anIdentityKnowsItsIndex() {
+        var e = EventId.hashOf("e");
+        assertEquals(java.util.OptionalInt.of(3), Identity.of(e, 3).index());
+        assertEquals(java.util.OptionalInt.of(4), Identity.local(4).index());
+        assertEquals(java.util.OptionalInt.empty(), Identity.named("x").index());
+    }
 }

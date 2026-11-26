@@ -114,7 +114,27 @@ public record Assertion(Optional<Identity> identity, Optional<Identity> attribut
         if (tuples.isEmpty()) {
             throw new IllegalArgumentException("an assert carries at least one tuple");
         }
+        for (var tuple : tuples) {
+            for (var id : tuple.identities()) {
+                if (id.isLocal() && id.index().orElseThrow() >= tuples.size()) {
+                    throw new IllegalArgumentException("no tuple " + id.value() + " in an assert of " + tuples.size());
+                }
+            }
+        }
         return List.copyOf(tuples);
+    }
+
+    /** The identities this tuple names, as identity, attribute and reference value. */
+    public List<Identity> identities() {
+        var ids = new ArrayList<Identity>(3);
+        identity.ifPresent(ids::add);
+        attribute.ifPresent(ids::add);
+        value.ifPresent(v -> {
+            if (v instanceof Ref r) {
+                ids.add(r.id());
+            }
+        });
+        return ids;
     }
 
     private Json.Obj toJson() {

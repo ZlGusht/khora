@@ -44,7 +44,6 @@ import khora.events.About;
 import khora.events.Event;
 import khora.events.EventId;
 import khora.events.EventJson;
-import khora.events.EventSource;
 import khora.events.Identity;
 import khora.events.log.EventLog;
 import khora.events.log.EventLogException;
@@ -411,14 +410,26 @@ public final class NatsEventLog implements EventLog {
         }
     }
 
-    /** Reads the whole log and keeps the events about {@code thing}: no index yet. */
+    /**
+     * Reads the whole log, a page of {@value #MAX_APPEND} events at a time, and keeps the events
+     * about {@code thing}: no index yet. Other events a page needs are looked up by id.
+     */
     @Override
     public List<Event> about(Identity thing) {
-        var events = scan(1, Integer.MAX_VALUE, Subjects.ALL).stream().map(Logged::event).toList();
-        var byId = new HashMap<EventId, Event>();
-        events.forEach(e -> byId.put(e.id(), e));
-        EventSource source = id -> Optional.ofNullable(byId.get(id));
-        return events.stream().filter(e -> About.of(e, source).contains(thing)).toList();
+        var found = new ArrayList<Event>();
+        long position = 1;
+        while (true) {
+            var page = scan(position, MAX_APPEND, Subjects.ALL);
+            if (page.isEmpty()) {
+                return found;
+            }
+            for (var logged : page) {
+                if (About.of(logged.event(), this::get).contains(thing)) {
+                    found.add(logged.event());
+                }
+            }
+            position = page.getLast().position() + 1;
+        }
     }
 
     /**

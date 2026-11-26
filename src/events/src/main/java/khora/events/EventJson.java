@@ -46,12 +46,19 @@ public final class EventJson {
         return toJson(e, true).canonical();
     }
 
-    /** The event read from text; refuses an id that does not match the content. */
+    /**
+     * The event read from its canonical text; refuses an id that does not match the content, and any
+     * other text for the same event, so that each event has one text.
+     */
     public static Event read(String text) {
         if (!(Json.parse(text) instanceof Json.Obj o)) {
             throw new IllegalArgumentException("an event is a JSON object");
         }
-        return fromJson(o);
+        var event = fromJson(o);
+        if (!write(event).equals(text)) {
+            throw new IllegalArgumentException("not the canonical text of event " + event.id().value());
+        }
+        return event;
     }
 
     static Json.Obj content(SortedSet<EventId> causes, long recorded, Optional<Long> occurred, String salt,

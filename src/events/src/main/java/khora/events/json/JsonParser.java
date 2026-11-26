@@ -136,11 +136,15 @@ final class JsonParser {
                     if (pos + 4 > text.length()) {
                         throw error("short \\u escape");
                     }
-                    try {
-                        out.append((char) Integer.parseInt(text.substring(pos, pos + 4), 16));
-                    } catch (NumberFormatException ex) {
-                        throw error("bad \\u escape");
+                    int code = 0;
+                    for (int i = 0; i < 4; i++) {
+                        int digit = Character.digit(text.charAt(pos + i), 16);
+                        if (digit < 0 || text.charAt(pos + i) >= 0x80) {
+                            throw error("bad \\u escape");
+                        }
+                        code = code * 16 + digit;
                     }
+                    out.append((char) code);
                     pos += 4;
                 }
                 default -> throw error("bad escape \\" + e);
@@ -162,6 +166,9 @@ final class JsonParser {
         }
         if (text.charAt(digits) == '0' && pos - digits > 1) {
             throw error("leading zero");
+        }
+        if (digits > start && pos - digits == 1 && text.charAt(digits) == '0') {
+            throw error("-0 is not an integer of its own");
         }
         if (pos < text.length() && (text.charAt(pos) == '.' || text.charAt(pos) == 'e' || text.charAt(pos) == 'E')) {
             throw error("only integers are allowed");

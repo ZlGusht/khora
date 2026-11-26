@@ -27,7 +27,7 @@ class EventTest {
 
     @Test
     void eventRoundTrips() {
-        var e = Event.create(List.of(A, B), 1000, Optional.of(900L),
+        var e = Event.create(List.of(A, B), Hlc.pack(1000, 0), Optional.of(900L),
                 new AcceptedAction(new By("anna", Optional.of("ivan"), "g3", "projects"), Assertion.action(Assertion.entity())), SALT);
         var back = EventJson.read(EventJson.write(e));
         assertEquals(e, back);
@@ -126,6 +126,30 @@ class EventTest {
         assertEquals(linked, EventJson.read(EventJson.write(linked)));
         assertTrue(EventJson.write(linked).contains("\"links\":{\"based_on\":[\"" + A.value() + "\"]}"));
         assertNotEquals(event(List.of(A), SALT).id(), linked.id());
+    }
+
+    @Test
+    void timesOutOfRangeAreRefused() {
+        var body = new AcceptedAction(BY, Assertion.action(Assertion.entity()));
+        assertThrows(IllegalArgumentException.class, () -> Event.create(List.of(), -1, Optional.empty(), body, SALT));
+        assertThrows(IllegalArgumentException.class,
+                () -> Event.create(List.of(), Hlc.pack(1000, 0), Optional.of(-1L), body, SALT));
+        assertThrows(IllegalArgumentException.class,
+                () -> Event.create(List.of(), Hlc.pack(1000, 0), Optional.of(1001L), body, SALT));
+        Event.create(List.of(), Hlc.pack(1000, 0), Optional.of(1000L), body, SALT);
+    }
+
+    @Test
+    void onlyTheCanonicalTextIsRead() {
+        var text = EventJson.write(event(List.of(A), SALT));
+        for (var other : List.of(
+                " " + text,
+                text.replace("\"causes\":[\"" + A.value() + "\"]", "\"causes\":[\"" + A.value() + "\",\"" + A.value() + "\"]"),
+                text.replace("\"principal\":\"anna\"", "\"principal\":\"\\u0061nna\""))) {
+            assertNotEquals(text, other);
+            assertThrows(IllegalArgumentException.class, () -> EventJson.read(other), other);
+        }
+        assertEquals(text, EventJson.write(EventJson.read(text)));
     }
 
     @Test

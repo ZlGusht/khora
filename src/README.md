@@ -10,6 +10,39 @@ Java 25 everywhere: the code is compiled and tested with Java 25, and the Gradle
 | `surfaces` | `khora.surfaces`, `khora.surfaces.stub` | Surfaces, in the language of events: a `Surface` receives the events its interests match and emits actions in response; an `Authority` accepts or rejects actions on its things; the `Kernel` turns accepted actions into events in an `EventLog` and delivers them. `Projects` is a stub authority. |
 | `log-nats` | `khora.events.log.nats` | `NatsEventLog`: the event log on NATS JetStream. Tests run against real NATS in Docker. `bench` source set: `LogBench`. |
 
+## Layout and build files
+
+A path like `src/events/src/main/java/khora/events/Event.java` reads in four parts:
+
+| Part | What it is |
+| --- | --- |
+| `src/` | the repository's code folder |
+| `events/` | the Gradle module |
+| `src/main/java/` | Gradle's place for a module's main code; tests are in `src/test/java/`, test fixtures in `src/testFixtures/java/` |
+| `khora/events/` | the Java package, `khora.events` |
+
+The build files are Gradle scripts in the Kotlin DSL (`.kts`); the code itself is all Java.
+
+| File | Says |
+| --- | --- |
+| `settings.gradle.kts` | which modules exist, and the folder of each |
+| `build.gradle.kts` (root) | what every module shares: the Java 25 toolchain, JUnit, Maven Central |
+| `src/<module>/build.gradle.kts` | the module's own plugins and dependencies |
+| `gradle/libs.versions.toml` | the versions of outside libraries, named as `libs.<name>` |
+
+How modules depend on each other:
+
+- `events` depends on nothing.
+- `surfaces` and `log-nats` depend on `events`, and not on each other. So the kernel runs on any `EventLog`, and only `log-nats` sees NATS.
+
+The words the module build files use:
+
+- `api(…)`: a dependency whose types appear in this module's public types, so modules using this one see it too.
+- `implementation(…)`: a dependency used only inside this module.
+- `testFixtures`: code other modules' tests may use, such as `InMemoryEventLog`. `java-test-fixtures` makes it; `testImplementation(testFixtures(project(":events")))` uses it.
+
+To add a module: create `src/<module>/build.gradle.kts`, add two lines to `settings.gradle.kts` as for the others, and depend on `events` with `api` or `implementation`.
+
 Design, decisions and measurements: the runs `blob/Issue #18 Event types ids and clock.md` (`events`, `surfaces`), `blob/Issue #21 Surface contract types.md` and `blob/Issue #19 Log store on NATS.md` (`log-nats`).
 
 ## Prerequisites
@@ -61,7 +94,7 @@ Most code goes through the `Kernel` instead, which checks `Causality`, asks the 
 - `append` stores all events or none. An exception does not always mean "not stored": after a timeout the batch may be stored whole. Appending the same events again is safe.
 - An event is stored once: within NATS's deduplication window (2 minutes) by its id; beyond it, ids are salted content hashes, so different events never share one.
 - More than 1000 events in one append are refused.
-- `about` reads the whole log: there is no index yet.
+- `about` reads the whole log, a page at a time: there is no index yet.
 - Following may stop on an event it cannot read; the log logs the position.
 
 For tests of code that uses the log, depend on the `events` module's test fixtures and use `InMemoryEventLog`. To check a new `EventLog`, extend `EventLogContract`.

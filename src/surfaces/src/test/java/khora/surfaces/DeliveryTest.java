@@ -3,6 +3,7 @@ package khora.surfaces;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
@@ -10,17 +11,25 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeSet;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import khora.events.AcceptedAction;
 import khora.events.Action;
 import khora.events.Assertion;
 import khora.events.Event;
+import khora.events.EventId;
 import khora.events.Frontier;
 import khora.events.FrontierCheck;
 import khora.events.Hlc;
 import khora.events.Identity;
+import khora.events.Order;
 import khora.events.json.Json;
+import khora.events.log.EventLog;
+import khora.events.log.EventLogException;
+import khora.events.log.Following;
 import khora.events.log.InMemoryEventLog;
+import khora.events.log.Logged;
 import khora.surfaces.stub.Projects;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,7 +40,7 @@ class DeliveryTest {
     static final Identity NOTE = Identity.named("note");
     static final Context ANNA = new Context("anna", Optional.empty(), "g3", 10);
 
-    static final class Probe implements Surface {
+    static class Probe implements Surface {
         final String name;
         final List<Event> received = new ArrayList<>();
         final Function<Event, List<Action>> respond;
@@ -154,6 +163,122 @@ class DeliveryTest {
         kernel.attach(watcher, Frontier.empty());
         var e = submit(note("hello"));
         assertEquals(List.of(e), watcher.received);
+    }
+
+    @Test
+    void aSurfaceWhoseInterestsThrowDoesNotFailTheSubmit() {
+        var broken = new Probe("broken", e -> List.of()) {
+            @Override
+            public Set<Interest> interests() {
+                throw new IllegalStateException("broken interests");
+            }
+        };
+        var watcher = new Probe("watcher", e -> List.of());
+        kernel.attach(broken, Frontier.empty());
+        kernel.attach(watcher, Frontier.empty());
+        var e = submit(note("hello"));
+        assertEquals(List.of(e), watcher.received);
+        assertEquals(1, log.read(1, 100).size());
+    }
+
+    @Test
+    void anEmissionThatFailsDoesNotFailTheSubmit() {
+        kernel.attach(new Probe("bad", e -> List.of(new Action(Identity.named("orders/place"), Json.Obj.of(Map.of())))),
+                Frontier.empty());
+        var watcher = new Probe("watcher", e -> List.of());
+        kernel.attach(watcher, Frontier.empty());
+        var e = submit(note("hello"));
+        assertEquals(List.of(e), watcher.received);
+    }
+
+    @Test
+    void aSurfacesOwnEmissionsAreCausallyOrdered() {
+        var twice = new Probe("twice", e -> by(e).equals("anna") ? List.of(note("first"), note("second")) : List.of());
+        var watcher = new Probe("watcher", e -> List.of());
+        kernel.attach(twice, Frontier.empty());
+        kernel.attach(watcher, Frontier.empty());
+        submit(note("hello"));
+        var first = watcher.received.get(1);
+        var second = watcher.received.get(2);
+        assertEquals("twice", by(first));
+        assertEquals("twice", by(second));
+        assertEquals(Order.BEFORE, FrontierCheck.compare(
+                new Frontier(new TreeSet<>(Set.of(first.id()))), new Frontier(new TreeSet<>(Set.of(second.id()))), log));
+    }
+
+    /** A log whose next appends fail, after storing the events or before. */
+    static final class FlakyLog implements EventLog {
+        final InMemoryEventLog inner = new InMemoryEventLog();
+        int failures;
+        boolean storeBeforeFailing;
+        int appends;
+
+        @Override
+        public List<Long> append(List<Event> events) {
+            appends++;
+            if (failures > 0) {
+                failures--;
+                if (storeBeforeFailing) {
+                    inner.append(events);
+                }
+                throw new EventLogException("timed out");
+            }
+            return inner.append(events);
+        }
+
+        @Override
+        public List<Logged> read(long from, int max) {
+            return inner.read(from, max);
+        }
+
+        @Override
+        public Optional<Event> get(EventId id) {
+            return inner.get(id);
+        }
+
+        @Override
+        public List<Event> about(Identity thing) {
+            return inner.about(thing);
+        }
+
+        @Override
+        public Following follow(long from, Consumer<Logged> handler) {
+            return inner.follow(from, handler);
+        }
+
+        @Override
+        public void close() {
+            inner.close();
+        }
+    }
+
+    static List<Event> stored(EventLog log) {
+        return log.read(1, 100).stream().map(Logged::event).toList();
+    }
+
+    @Test
+    void anAppendWithAnUnknownOutcomeIsRetriedWithTheSameEvent() {
+        for (boolean storedBeforeFailing : new boolean[] {true, false}) {
+            var flaky = new FlakyLog();
+            var k = new Kernel(new Projects(), flaky, new Hlc(() -> 1000));
+            flaky.failures = 1;
+            flaky.storeBeforeFailing = storedBeforeFailing;
+            var e = assertInstanceOf(Answer.Accepted.class, k.submit(note("once"), ANNA, Frontier.empty(), Map.of())).event();
+            assertEquals(List.of(e), stored(flaky));
+            assertEquals(2, flaky.appends);
+        }
+    }
+
+    @Test
+    void anAppendThatKeepsFailingCarriesTheEvent() {
+        var flaky = new FlakyLog();
+        var k = new Kernel(new Projects(), flaky, new Hlc(() -> 1000));
+        flaky.failures = Kernel.APPEND_ATTEMPTS;
+        flaky.storeBeforeFailing = true;
+        var failed = assertThrows(Kernel.Unconfirmed.class, () -> k.submit(note("once"), ANNA, Frontier.empty(), Map.of()));
+        assertEquals(List.of(failed.event()), stored(flaky));
+        flaky.append(List.of(failed.event()));
+        assertEquals(List.of(failed.event()), stored(flaky));
     }
 
     @Test
