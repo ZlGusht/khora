@@ -7,7 +7,7 @@ Java 25 everywhere: the code is compiled and tested with Java 25, and the Gradle
 | Module | Package | What it holds |
 | --- | --- | --- |
 | `events` | `khora.events`, `khora.events.json`, `khora.events.log` | Events and the log. An `Event` is something that happened, kept with what it knew of; an accepted action, whose asserts are tuples `(identity, attribute, value)`, is its one kind so far. Ids are salted hashes of canonical JSON; recorded time is a hybrid logical clock; frontiers are sets of events closed under causes; `Causality` checks an event against what it knew. `EventLog` stores events. Test fixtures: `InMemoryEventLog` and `EventLogContract`, the tests every log must pass. No dependencies. |
-| `surfaces` | `khora.surfaces`, `khora.surfaces.stub` | Surfaces, in the language of events: a `Surface` receives the events its interests match and emits actions in response; an `Authority` accepts or rejects actions on its things; the `Kernel` turns accepted actions into events in an `EventLog` and delivers them. `Projects` is a stub authority. |
+| `surfaces` | `khora.surfaces`, `khora.surfaces.stub` | Surfaces, in the language of events: a `Surface` receives the events its interests match and emits actions in response; an `Authority` accepts or rejects actions on its things; the `Kernel` turns accepted actions into events in an `EventLog` and delivers them. `Projects` is a stub authority. Test fixtures (`khora.surfaces.contract`): `AuthorityContract` and `SurfaceContract`, the tests every authority and surface must pass, as scenarios through the kernel; `Echo`, a reference surface. |
 | `log-nats` | `khora.events.log.nats` | `NatsEventLog`: the event log on NATS JetStream. Tests run against real NATS in Docker. `bench` source set: `LogBench`. |
 
 ## Layout and build files
@@ -43,7 +43,7 @@ The words the module build files use:
 
 To add a module: create `src/<module>/build.gradle.kts`, add two lines to `settings.gradle.kts` as for the others, and depend on `events` with `api` or `implementation`.
 
-Design, decisions and measurements: the runs `blob/Issue #18 Event types ids and clock.md` (`events`, `surfaces`), `blob/Issue #21 Surface contract types.md` and `blob/Issue #19 Log store on NATS.md` (`log-nats`).
+Design, decisions and measurements: the runs `blob/Issue #18 Event types ids and clock.md` (`events`, `surfaces`), `blob/Issue #21 Surface contract types.md` `blob/Issue #19 Log store on NATS.md` (`log-nats`) and `blob/Issue #22 Contract tests for surfaces and authorities.md` (the contracts).
 
 ## Prerequisites
 
@@ -98,6 +98,8 @@ Most code goes through the `Kernel` instead, which checks `Causality`, asks the 
 - Following may stop on an event it cannot read; the log logs the position.
 
 For tests of code that uses the log, depend on the `events` module's test fixtures and use `InMemoryEventLog`. To check a new `EventLog`, extend `EventLogContract`.
+
+To check a new `Authority` or `Surface`, depend on the `surfaces` module's test fixtures and extend `AuthorityContract` or `SurfaceContract` with your scenarios (`Scenario.named(...).given(...).when(...).then(...)`); each scenario is also held to the contract's general rules. `ProjectsContractTest` and `EchoContractTest` are examples.
 
 ## Run NATS locally
 

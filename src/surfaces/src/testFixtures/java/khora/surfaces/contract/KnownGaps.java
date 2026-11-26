@@ -15,7 +15,7 @@ import org.junit.jupiter.api.function.Executable;
 public final class KnownGaps {
     /** Rule name to the reason it does not hold yet. */
     public static final Map<String, String> RULES = Map.of(
-            "a retracted attribute with another value does not retract", // tested by KernelFindingsTest
+            "a retracted attribute with another value does not retract", // tested by KernelGapsTest
             "#36: Statements treats every tuple with the retracted attribute as a retraction, whatever its"
                     + " value (review of #36: Statements.about)");
 

@@ -143,7 +143,7 @@ Rulings taken during Operate, with what they change in the design above. *Builde
 - **Known gaps.** Two rules fail on #36's kernel today and are aborted with their reason: a surface's own emissions are not causally ordered (also on live delivery), and a surface whose `interests()` throws fails the submit (`KernelGapsTest`, with a control kernel). A fixed gap makes its test fail.
 - **`anEmissionReachesOthersAfterItsCause`** is `anEmissionComesAfterItsCause`: the format holds one surface.
 - **After the final review.** Static factories for scenarios; a scenario for retracting a retraction; the remaining findings of the review of #36 pinned as known gaps.
-- **On #36's fixes (6845d75).** Five gaps flipped to "appears fixed" and became regression tests; `KernelGapsTest` is `KernelFindingsTest`. A blind write knows the thing it writes about (`aWriteAboutAThingItDoesNotKnowIsRejected` is the other half), and `Echo` labels with a literal, since a read has no tuple to name; the per-delivery comparison still shows which event each label answers.
+- **On #36's fixes (6845d75).** Five gaps flipped to "appears fixed"; #36 added its own tests for them, so `KernelGapsTest` keeps only the open one. A blind write knows the thing it writes about (`aWriteAboutAThingItDoesNotKnowIsRejected` is the other half), and `Echo` labels with a literal, since a read has no tuple to name; the per-delivery comparison still shows which event each label answers.
 - **Kernel vocabulary in scenarios.** `Ref.known(identity)` names an identity the kernel defines, such as `Basic.RETRACTED`, so a retraction is the kernel's own. It is for vocabulary only, never an event id. Named identities render by their name in failure messages.
 
 ## Plan
@@ -293,7 +293,7 @@ Rulings taken during Operate, with what they change in the design above. *Builde
 Done:
 - The scenario format, the runner through the real kernel, `AuthorityContract` with four rules and `SurfaceContract` with five, `Echo`, and `KnownGaps`, as test fixtures of `src/surfaces`.
 - `Projects` passes `AuthorityContract` with twelve scenarios (including that retracting a retraction does not restore the statement); `Echo` passes `SurfaceContract` with six. Scenarios are written with short factories (`When.submit`, `Then.rejected("…")`, `ActionSpec.asserts`). Issue #22's done-when: delivery by interest, emission in response, acceptance and rejection, reads at a frontier (including an earlier one), and `Projects` passes.
-- The findings of the review of #36 are tests. Simeon fixed five of them in #36 (6845d75): a surface whose `interests()` throws, a surface's own emissions not causally ordered, retractions outside the causal past or of a missing statement, a tuple about a missing local identity. They are regression tests in `KernelFindingsTest` and the contracts. One stays a known gap, skipped with its reason: a retracted attribute with another value still retracts.
+- The findings of the review of #36 are tests. Simeon fixed five of them in #36 (6845d75): a surface whose `interests()` throws, a surface's own emissions not causally ordered, retractions outside the causal past or of a missing statement, a tuple about a missing local identity. They are covered by #36's own tests (`CausalityTest`, `AssertionTest`, `DeliveryTest`) and by the contracts. One stays a known gap, skipped with its reason: a retracted attribute with another value still retracts.
 
 Not done:
 - Security tests (Letter [[Security tests wait for access checks]]).
