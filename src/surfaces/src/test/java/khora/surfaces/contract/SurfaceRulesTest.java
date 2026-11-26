@@ -38,7 +38,7 @@ import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.Test;
 import org.opentest4j.TestAbortedException;
 
-/** Each surface rule fails for a surface that breaks it; Echo keeps them all, but for the known gap. */
+/** Each surface rule fails for a surface that breaks it; Echo keeps them all. */
 class SurfaceRulesTest {
     static final List<String> RULES = List.of(SurfaceContract.MATCH, SurfaceContract.OWN, SurfaceContract.CAUSED,
             SurfaceContract.SAME, SurfaceContract.ORDERED);
@@ -143,7 +143,7 @@ class SurfaceRulesTest {
     void echoKeepsEverySurfaceRule() {
         var results = results(new EchoContractTest().contract());
         assertEquals(6, results.size());
-        var gap = new HashSet<String>();
+        var ordered = new HashSet<String>();
         results.forEach((scenario, tests) -> {
             assertEquals(6, tests.size(), scenario);
             assertNull(tests.get("expectation"), scenario + ": expectation");
@@ -152,15 +152,17 @@ class SurfaceRulesTest {
                     assertNull(tests.get(rule), scenario + ": " + rule);
                 }
             }
-            var ordered = assertInstanceOf(TestAbortedException.class, tests.get(SurfaceContract.ORDERED), scenario);
-            if (ordered.getMessage().contains(KnownGaps.RULES.get(SurfaceContract.ORDERED))) {
-                gap.add(scenario);
+            var thrown = tests.get(SurfaceContract.ORDERED);
+            if (thrown == null) {
+                ordered.add(scenario);
             } else {
-                assertTrue(ordered.getMessage().contains("fewer than two"), ordered.getMessage());
+                var aborted = assertInstanceOf(TestAbortedException.class, thrown, scenario);
+                assertTrue(aborted.getMessage().contains("fewer than two"), aborted.getMessage());
             }
         });
+        // the scenarios in which Echo emits at least twice
         assertEquals(Set.of("anAttachedSurfaceCatchesUpThenReceivesWhatMatches",
-                "catchingUpKeepsLogOrderAndSkipsOwnEmissions"), gap);
+                "catchingUpKeepsLogOrderAndSkipsOwnEmissions"), ordered);
     }
 
     @Test
@@ -203,15 +205,15 @@ class SurfaceRulesTest {
     @Test
     void emissionsAreComparedDeliveryByDelivery() {
         assertNull(expectation(twoEvents(labels("create", "rename"))));
-        assertNull(expectation(twoEvents(new Then.Emits(Then.Emits.after("create", label("create")),
-                Then.Emits.after("rename", label("rename"))))));
+        assertNull(expectation(twoEvents(new Then.Emits(Then.Emits.after("create", label()),
+                Then.Emits.after("rename", label())))));
         // the same actions, flattened, but both said to answer the creation
-        var e = expectation(twoEvents(new Then.Emits(Then.Emits.after("create", label("create"), label("rename")))));
+        var e = expectation(twoEvents(new Then.Emits(Then.Emits.after("create", label(), label()))));
         assertInstanceOf(AssertionError.class, e);
         assertTrue(e.getMessage().contains("delivery by delivery"), e.getMessage());
         // a delivery listed with no actions must have returned nothing
         assertInstanceOf(AssertionError.class, expectation(twoEvents(new Then.Emits(
-                Then.Emits.after("create", label("create")), Then.Emits.after("rename")))));
+                Then.Emits.after("create", label()), Then.Emits.after("rename")))));
     }
 
     @Test
@@ -224,7 +226,7 @@ class SurfaceRulesTest {
 
     @Test
     void anExpectationAfterNoStepIsRefused() {
-        var e = expectation(twoEvents(new Then.Emits(Then.Emits.after("nowhere", label("create")))));
+        var e = expectation(twoEvents(new Then.Emits(Then.Emits.after("nowhere", label()))));
         assertInstanceOf(AssertionError.class, e);
         assertTrue(e.getMessage().contains("two") && e.getMessage().contains("nowhere"), e.getMessage());
     }

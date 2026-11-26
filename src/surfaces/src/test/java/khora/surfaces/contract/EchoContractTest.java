@@ -15,9 +15,10 @@ import khora.surfaces.Surface;
  *
  * <p>A scenario holds no ids, and Echo's interests are data, so the project is the named thing
  * {@code project} rather than a created entity. Echo labels the project once for every event about it
- * that it receives, with the event's first tuple as the label's value, so what it emits shows what it
- * received and in which order. Scenarios that attach Echo among the given steps check live delivery
- * (and catching up on what came before); those that attach it as the {@code When} check catching up
+ * that it receives, with the literal {@code seen} as the label's value: a label never names a tuple
+ * the received event may lack (a read carries none). What it emits is compared delivery by delivery,
+ * so each label still shows which event it answers, and in which order. Scenarios that attach Echo
+ * among the given steps check live delivery (and catching up on what came before); those that attach it as the {@code When} check catching up
  * alone. Delivery among several surfaces stays covered by {@code DeliveryTest}.
  */
 class EchoContractTest extends SurfaceContract {
@@ -32,7 +33,7 @@ class EchoContractTest extends SurfaceContract {
     static Echo labeller() {
         var aboutProject = Interest.about(Identity.named("project"));
         return new Echo("echo", Set.of(aboutProject), List.of(new Echo.Rule(aboutProject,
-                List.of(ActionSpec.asserts(TupleSpec.of(PROJECT, LABEL, ValueSpec.ref(Ref.received(0))))))));
+                List.of(label()))));
     }
 
     /** Asserts {@code (thing, attribute, value)}, knowing {@code knew}. */
@@ -41,14 +42,14 @@ class EchoContractTest extends SurfaceContract {
                 .does(ActionSpec.asserts(TupleSpec.of(thing, attribute, ValueSpec.text(value))));
     }
 
-    /** Echo's label for the first tuple of {@code step}'s event. */
-    static ActionSpec label(String step) {
-        return ActionSpec.asserts(TupleSpec.of(PROJECT, LABEL, ValueSpec.ref(Ref.tuple(step, 0))));
+    /** Echo's label of the project, the same whatever event it answers. */
+    static ActionSpec label() {
+        return ActionSpec.asserts(TupleSpec.of(PROJECT, LABEL, ValueSpec.text("seen")));
     }
 
     /** Echo answers the event of each of {@code steps}, in order, with its label. */
     static Then labels(String... steps) {
-        return new Then.Emits(Arrays.stream(steps).map(step -> Then.Emits.after(step, label(step))).toList());
+        return new Then.Emits(Arrays.stream(steps).map(step -> Then.Emits.after(step, label())).toList());
     }
 
     @Override

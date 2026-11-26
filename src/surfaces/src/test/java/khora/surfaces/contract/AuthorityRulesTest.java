@@ -296,9 +296,7 @@ class AuthorityRulesTest {
         assertThrows(AssertionFailedError.class,
                 () -> KnownGaps.judge(gaps, "other rule", () -> { throw new AssertionFailedError("broken"); }));
         KnownGaps.judge(gaps, "other rule", () -> { });
-        assertEquals(Set.of(SurfaceContract.ORDERED, KernelGapsTest.INTERESTS_THROW, KernelGapsTest.RETRACT_OUTSIDE_PAST,
-                KernelGapsTest.RETRACT_MISSING, KernelGapsTest.RETRACTED_FALSE, KernelGapsTest.DANGLING_LOCAL),
-                KnownGaps.RULES.keySet());
+        assertEquals(Set.of(KernelFindingsTest.RETRACTED_FALSE), KnownGaps.RULES.keySet());
     }
 
     @Test

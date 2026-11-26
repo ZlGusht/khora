@@ -82,9 +82,14 @@ class ProjectsContractTest extends AuthorityContract {
                         .then(Then.accepted()),
                 Scenario.named("aBlindWriteIsAccepted")
                         .given(create(), read("read", IVAN), rename("rename", IVAN, "read", "Studio"))
-                        .when(When.submit(Step.named("blind").by(MIA).does(ActionSpec.asserts(
+                        .when(When.submit(Step.named("blind").by(MIA).knew("create").does(ActionSpec.asserts(
                                 TupleSpec.of(PROJECT, NAME, ValueSpec.text("Atelier"))))))
                         .then(Then.accepted()),
+                Scenario.named("aWriteAboutAThingItDoesNotKnowIsRejected")
+                        .given(create(), read("read", IVAN), rename("rename", IVAN, "read", "Studio"))
+                        .when(When.submit(Step.named("blind").by(MIA).does(ActionSpec.asserts(
+                                TupleSpec.of(PROJECT, NAME, ValueSpec.text("Atelier"))))))
+                        .then(Then.rejected("STATEMENT_OUTSIDE_PAST")),
                 Scenario.named("anUnknownFrontierIsRejected")
                         .given(create())
                         .when(When.submit(Step.named("read").by(IVAN).knew(Step.UNKNOWN)

@@ -2,6 +2,7 @@ package khora.surfaces.contract;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.List;
 import java.util.Map;
@@ -24,13 +25,12 @@ import khora.surfaces.Surface;
 import khora.surfaces.stub.Projects;
 import org.junit.jupiter.api.Test;
 
-/** Kernel behaviour the contract tests found missing; each is judged through {@link KnownGaps}. */
-class KernelGapsTest {
-    static final String INTERESTS_THROW = "a surface whose interests throw does not fail the submit";
-    static final String RETRACT_OUTSIDE_PAST = "a retraction of a statement outside its causal past is rejected";
-    static final String RETRACT_MISSING = "a retraction of a statement that does not exist is rejected";
+/**
+ * Kernel behaviour the contract tests found missing. Those fixed are plain regression tests; the
+ * one still open is judged through {@link KnownGaps}.
+ */
+class KernelFindingsTest {
     static final String RETRACTED_FALSE = "a retracted attribute with another value does not retract";
-    static final String DANGLING_LOCAL = "a tuple about a local identity its event does not carry is rejected";
 
     static final Context ANNA = new Context("anna", Optional.empty(), "g3", 10);
 
@@ -63,16 +63,7 @@ class KernelGapsTest {
             }, Frontier.empty());
         }
         kernel.attach(echo, Frontier.empty());
-        Answer answer;
-        try {
-            answer = kernel.submit(creation(), ANNA, Frontier.empty(), Map.of());
-        } catch (IllegalStateException e) {
-            if ("interests broke".equals(e.getMessage())) {
-                throw new AssertionError("the submit failed because a surface's interests threw", e);
-            }
-            throw e;
-        }
-        var accepted = assertInstanceOf(Answer.Accepted.class, answer);
+        var accepted = assertInstanceOf(Answer.Accepted.class, kernel.submit(creation(), ANNA, Frontier.empty(), Map.of()));
         var received = echo.deliveries().stream().map(Run.Delivery::event).toList();
         assertEquals(List.of(accepted.event()), received);
     }
@@ -81,7 +72,7 @@ class KernelGapsTest {
     void aSurfaceWhoseInterestsThrowDoesNotFailTheSubmit() {
         // control: without the throwing surface the same submit is accepted and delivered to Echo
         submitTo(false);
-        KnownGaps.judge(INTERESTS_THROW, () -> submitTo(true));
+        submitTo(true);
     }
 
     static final Ref NAME = Ref.named("name");
@@ -101,10 +92,10 @@ class KernelGapsTest {
                 .when(When.submit(Step.named("retract").by(ANNA).knew("create")
                         .does(ActionSpec.asserts(TupleSpec.retraction(Ref.tuple("create", 1))))))
                 .then(Then.accepted()));
-        KnownGaps.judge(RETRACT_OUTSIDE_PAST, () -> play(Scenario.named("blind").given(CREATE)
+        play(Scenario.named("blind").given(CREATE)
                 .when(When.submit(Step.named("retract").by(ANNA)
                         .does(ActionSpec.asserts(TupleSpec.retraction(Ref.tuple("create", 1))))))
-                .then(Then.rejected())));
+                .then(Then.rejected("STATEMENT_OUTSIDE_PAST")));
     }
 
     @Test
@@ -114,10 +105,10 @@ class KernelGapsTest {
                 .when(When.submit(Step.named("retract").by(ANNA).knew("create")
                         .does(ActionSpec.asserts(TupleSpec.retraction(Ref.tuple("create", 1))))))
                 .then(Then.accepted()));
-        KnownGaps.judge(RETRACT_MISSING, () -> play(Scenario.named("missing").given(CREATE)
+        play(Scenario.named("missing").given(CREATE)
                 .when(When.submit(Step.named("retract").by(ANNA).knew("create")
                         .does(ActionSpec.asserts(TupleSpec.retraction(Ref.tuple("create", 5))))))
-                .then(Then.rejected())));
+                .then(Then.rejected("UNKNOWN_STATEMENT")));
     }
 
     @Test
@@ -134,12 +125,11 @@ class KernelGapsTest {
     }
 
     @Test
-    void aTupleAboutAMissingLocalIdentityIsRejected() {
-        // control: a tuple about a local identity its event carries is accepted
+    void aTupleAboutAMissingLocalIdentityCannotBeBuilt() {
+        // control: a tuple about a local identity its event carries is built and accepted
         play(Scenario.named("local").when(When.submit(CREATE)).then(Then.accepted()));
-        KnownGaps.judge(DANGLING_LOCAL, () -> play(Scenario.named("dangling")
-                .when(When.submit(Step.named("dangling").by(ANNA)
-                        .does(ActionSpec.asserts(TupleSpec.of(Ref.local(5), NAME, ValueSpec.text("x"))))))
-                .then(Then.rejected())));
+        var e = assertThrows(IllegalArgumentException.class, () -> Assertion.action(
+                Assertion.of(Identity.local(5), Identity.named("name"), new Assertion.Literal(new Json.Str("x")))));
+        assertEquals("no tuple /5 in an assert of 1", e.getMessage());
     }
 }
