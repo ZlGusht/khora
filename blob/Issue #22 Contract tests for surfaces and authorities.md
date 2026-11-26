@@ -124,6 +124,25 @@ The existing tests stay; the scenarios cover the same ground through the contrac
 - How the read-only log view and the run-twice checks are implemented.
 - How a probe surface records deliveries for the surface rules.
 
+### Decided while building
+
+Rulings taken during Operate, with what they change in the design above. *Builder's calls*, for review in the pull request.
+
+- **Given can attach the surface (R12).** `Scenario.given` is a list of `Given`: a `Step` or an `AttachSurface(from)`. A scenario attaches the surface under test at most once, among its given steps or as the `When`, so both catch-up and live delivery are tested. Several surfaces stay out of the format (kernel-level, `DeliveryTest`).
+- **Statements of a submitted read (R1, R8).** `Then.Statements` checks a `When.Read` against `Kernel.statements`, and a `When.Submit` of a read against the statements its answer carries. With a submit of anything else it is a broken scenario.
+- **Reads at an earlier frontier.** `Projects` has ten scenarios: the eight of `KernelTest`, `theRenamedNameHoldsAtTheRename` (R7) and `aReadAtAnEarlierFrontierIgnoresLaterWrites` (final review). Who acted, an event's causes and a read's `at` link are kernel guarantees and stay in `KernelTest`.
+- **An event no log holds (R6).** The reserved step name `?unknown` stands for it, for `anUnknownFrontierIsRejected`.
+- **Frontiers normalised (R5).** The runner reduces every frontier it builds with `Frontier.of`.
+- **One run per container (R9, Task 2).** `ScenarioRunner.run` always records; a scenario runs once and its run is shared by the expectation and the rule tests; a broken scenario fails all of them with the runner's message.
+- **Read rule (R2).** "A read is not rejected for a conflict" is checked as "a submitted read is not rejected": stage 1 has no access checks. It narrows when they arrive.
+- **First verdict (R10).** The reason and read rules judge the verdict the kernel acts on; a differing second verdict is the same-twice rule's. `decide` is called twice per submit and must be a function of the candidate and the log.
+- **Nothing to judge (R11, R13).** Rules abort, rather than pass, when the authority was not asked, the surface received nothing, or the surface emitted fewer than two events (for the causal-order rule).
+- **Emissions per delivery (R14, R15).** `Then.Emits` lists, per step the surface answered, the actions it returned (`Emits.after(step, actions...)`); expectations cannot use `Ref.received`. Unbound events render as `emitted#k` over the whole log.
+- **Ids in text (R16).** Emitted actions must reference events only through assert and read tuples: ids inside raw arguments or literals differ between runs.
+- **Known gaps.** Two rules fail on #36's kernel today and are aborted with their reason: a surface's own emissions are not causally ordered (also on live delivery), and a surface whose `interests()` throws fails the submit (`KernelGapsTest`, with a control kernel). A fixed gap makes its test fail.
+- **`anEmissionReachesOthersAfterItsCause`** is `anEmissionComesAfterItsCause`: the format holds one surface.
+- **Kernel vocabulary in scenarios.** `Ref.known(identity)` names an identity the kernel defines, such as `Basic.RETRACTED`, so a retraction is the kernel's own. It is for vocabulary only, never an event id. Named identities render by their name in failure messages.
+
 ## Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
