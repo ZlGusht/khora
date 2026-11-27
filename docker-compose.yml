@@ -15,7 +15,11 @@
 # the expected-last-msg-id check). AtomicBatchSpikeTest pins that behaviour; NatsTestServer uses
 # the same image. Upgrade all three together.
 #
-# Ports are published on 127.0.0.1 only: this is a development setup without authentication.
+# `neo4j` runs the graph datastore's database (Neo4jDatastore), Bolt on 7687, browser on 7474. Its
+# password is KHORA_NEO4J_PASSWORD, by default khora-dev-password. The image is pinned, as in
+# Neo4jTestServer; upgrade both together.
+#
+# Ports are published on 127.0.0.1 only: this is a development setup, without authentication for NATS.
 services:
   nats:
     image: nats:2.12.15-alpine
@@ -37,6 +41,17 @@ services:
       - ./nats/nats-server-default-sync.conf:/etc/nats/nats-server.conf:ro
       - nats-default-sync-data:/data
 
+  neo4j:
+    image: neo4j:2026.10.2-community
+    environment:
+      NEO4J_AUTH: neo4j/${KHORA_NEO4J_PASSWORD:-khora-dev-password}
+    ports:
+      - "127.0.0.1:7474:7474"
+      - "127.0.0.1:7687:7687"
+    volumes:
+      - neo4j-data:/data
+
 volumes:
+  neo4j-data:
   nats-data:
   nats-default-sync-data:

@@ -9,6 +9,8 @@ Java 25 everywhere: the code is compiled and tested with Java 25, and the Gradle
 | `events` | `khora.events`, `khora.events.json`, `khora.events.log` | Events and the log. An `Event` is something that happened, kept with what it knew of; an accepted action, whose asserts are tuples `(identity, attribute, value)`, is its one kind so far. Ids are salted hashes of canonical JSON; recorded time is a hybrid logical clock; frontiers are sets of events closed under causes; `Causality` checks an event against what it knew. `EventLog` stores events. Test fixtures: `InMemoryEventLog` and `EventLogContract`, the tests every log must pass. No dependencies. |
 | `surfaces` | `khora.surfaces`, `khora.surfaces.stub` | Surfaces, in the language of events: a `Surface` receives the events its interests match and emits actions in response; an `Authority` accepts or rejects actions on its things; the `Kernel` turns accepted actions into events in an `EventLog` and delivers them. `Projects` is a stub authority. Test fixtures (`khora.surfaces.contract`): `AuthorityContract` and `SurfaceContract`, the tests every authority and surface must pass, as scenarios through the kernel; `Echo`, a reference surface. |
 | `log-nats` | `khora.events.log.nats` | `NatsEventLog`: the event log on NATS JetStream. Tests run against real NATS in Docker. `bench` source set: `LogBench`. |
+| `query` | `khora.query` | Searches as data: a `Query` is an envelope (frontier, set or multiset, returned columns, order, page) around a body of operators, `Scan`, `Filter`, `Not` and `Aggregate`, checked when it is built. Its canonical JSON is stored as the value of the `khora/query` attribute. A `Datastore` answers queries; `EventsDatastore` works answers out from a log's events, through `Evaluator` over a `Graph`. Test fixture: `DatastoreContract`, the tests every datastore must pass. Depends on `events`. |
+| `datastore-neo4j` | `khora.query.neo4j` | The graph datastore on Neo4j: `Neo4jDatastore` takes in a log's events (`catchUp`, `follow`) and keeps what they assert as it stands now. An entity is a node, its literal attributes are properties, and a reference is a relationship; a retraction deletes what its target asserted. Events are not stored. It answers queries at everything it has taken in, through `Evaluator`. A `Snapshot` is its content at a position, as JSON lines; `rebuild` restores one and catches up with the log. Tests run against real Neo4j in Docker. Depends on `query`. |
 
 ## Layout and build files
 
@@ -33,7 +35,8 @@ The build files are Gradle scripts in the Kotlin DSL (`.kts`); the code itself i
 How modules depend on each other:
 
 - `events` depends on nothing.
-- `surfaces` and `log-nats` depend on `events`, and not on each other. So the kernel runs on any `EventLog`, and only `log-nats` sees NATS.
+- `surfaces`, `log-nats` and `query` depend on `events`, and not on each other. So the kernel runs on any `EventLog`, and only `log-nats` sees NATS.
+- `datastore-neo4j` depends on `query`.
 
 The words the module build files use:
 
@@ -43,11 +46,11 @@ The words the module build files use:
 
 To add a module: create `src/<module>/build.gradle.kts`, add two lines to `settings.gradle.kts` as for the others, and depend on `events` with `api` or `implementation`.
 
-Design, decisions and measurements: the runs `blob/Issue #18 Event types ids and clock.md` (`events`, `surfaces`), `blob/Issue #21 Surface contract types.md`, `blob/Issue #19 Log store on NATS.md` (`log-nats`) and `blob/Issue #22 Contract tests for surfaces and authorities.md` (the contracts).
+Design, decisions and measurements: the runs `blob/Issue #18 Event types ids and clock.md` (`events`, `surfaces`), `blob/Issue #21 Surface contract types.md`, `blob/Issue #19 Log store on NATS.md` (`log-nats`), `blob/Issue #22 Contract tests for surfaces and authorities.md` (the contracts), `blob/Issue #25 Query as a data structure.md` (`query`) and `blob/Issue #23 Graph datastore on Neo4j.md` (`datastore-neo4j`).
 
 ## Prerequisites
 
-- **Docker**, running. The `log-nats` tests start NATS 2.12.15 in containers.
+- **Docker**, running. The `log-nats` tests start NATS 2.12.15 in containers; the `datastore-neo4j` tests start Neo4j 2026.10.2 community in one container.
 - **Any Java 17 or later** to start Gradle's wrapper. Gradle then switches to Java 25 for its daemon and the build, and downloads JDK 25 into `~/.gradle/jdks` if it is missing. Installing JDK 25 yourself (e.g. Temurin 25) avoids the download.
 - Nothing else. Gradle 9.9.1 comes with the wrapper.
 
@@ -97,7 +100,22 @@ Most code goes through the `Kernel` instead, which checks `Causality`, asks the 
 - `about` reads the whole log, a page at a time: there is no index yet.
 - Following may stop on an event it cannot read; the log logs the position.
 
-For tests of code that uses the log, depend on the `events` module's test fixtures and use `InMemoryEventLog`. To check a new `EventLog`, extend `EventLogContract`.
+For tests of code that uses the log, depend on the `events` module's test fixtures and use `InMemoryEventLog`. To check a new `EventLog`, extend `EventLogContract`; to check a new `Datastore`, extend `DatastoreContract` from the `query` module's test fixtures.
+
+## Using the graph datastore from code
+
+```java
+try (var store = Neo4jDatastore.open("bolt://localhost:7687", "neo4j", "khora-dev-password");
+        Following f = store.follow(log)) {         // takes in the log, then each new event
+    Answer open = store.answer(Query.of(Scan.things("t")));
+    store.snapshot().write(Path.of("graph.jsonl"));   // its content at a position
+}
+```
+
+- The datastore owns its database: `clear()` and `restore` delete what it holds.
+- It answers only at everything it has taken in. A query at any other frontier is refused; it neither waits nor reads the past.
+- Attribute identities are used as they are, as property keys and relationship types.
+- `rebuild(Snapshot.read(file), log)` restores a snapshot and takes in the rest of the log. It refuses a snapshot of another log.
 
 To check a new `Authority` or `Surface`, depend on the `surfaces` module's test fixtures and extend `AuthorityContract` or `SurfaceContract` with your scenarios (`Scenario.named(...).given(...).when(...).then(...)`); each scenario is also held to the contract's general rules. `ProjectsContractTest` and `EchoContractTest` are examples. Some things to know when writing scenarios:
 
@@ -109,7 +127,7 @@ To check a new `Authority` or `Surface`, depend on the `surfaces` module's test 
 ## Run NATS locally
 
 ```sh
-docker compose up -d        # NATS on localhost:4222, monitoring on localhost:8222
+docker compose up -d        # NATS on localhost:4222, monitoring on localhost:8222; Neo4j on localhost:7687
 docker compose down         # stop; add -v to delete the stored log
 ```
 
