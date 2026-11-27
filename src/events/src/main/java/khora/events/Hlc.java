@@ -5,7 +5,7 @@ import java.util.function.LongSupplier;
 
 /**
  * A hybrid logical clock for recorded time: close to wall time, never going backwards, and always
- * after an event's causes (ADR-0YB decision 1).
+ * after the trigger of the event it times (ADR-0YB decision 1).
  *
  * <p>A time is the wall time in milliseconds in the high 48 bits and a counter in the low 16 bits.
  * A counter overflow carries into the milliseconds.

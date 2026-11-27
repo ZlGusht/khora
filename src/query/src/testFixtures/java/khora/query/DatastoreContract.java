@@ -6,20 +6,16 @@ import static org.junit.jupiter.api.Assumptions.assumeFalse;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
-import java.util.TreeSet;
-import khora.events.AcceptedAction;
+import khora.events.Emitted;
 import khora.events.Assertion;
 import khora.events.Assertion.Literal;
 import khora.events.Assertion.Ref;
 import khora.events.Assertion.Value;
 import khora.events.By;
 import khora.events.Event;
-import khora.events.EventId;
-import khora.events.Frontier;
 import khora.events.Identity;
 import khora.events.Statements;
 import khora.events.json.Json;
@@ -36,11 +32,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * The tests every {@link Datastore} passes: each operator, the envelope, frontiers, and stored
+ * The tests every {@link Datastore} passes: each operator, the envelope, positions, and stored
  * queries. A datastore's test extends this and says how to build the datastore over a log that
  * already holds the events.
  *
- * <p>A datastore that answers only at everything it holds says so with {@link #answersPastFrontiers()}.
+ * <p>A datastore that answers only at everything it holds says so with {@link #answersPastPositions()}.
  *
  * <p>The content: two projects, Kitchen (budget 300) and Studio (budget 120), and three tasks, two
  * in Kitchen and one in Studio, Paint done. A third project, Garage, was created and then its creation
@@ -57,10 +53,10 @@ public abstract class DatastoreContract {
     protected abstract Datastore over(EventLog log);
 
     /**
-     * Whether the datastore answers at frontiers before everything it holds. One that does not
-     * refuses them, and the tests of past frontiers do not apply to it.
+     * Whether the datastore answers at positions before everything it has taken in. One that does
+     * not refuses them, and the tests of past positions do not apply to it.
      */
-    protected boolean answersPastFrontiers() {
+    protected boolean answersPastPositions() {
         return true;
     }
 
@@ -77,14 +73,14 @@ public abstract class DatastoreContract {
     @BeforeEach
     void content() {
         log = new InMemoryEventLog();
-        first = event(1000, List.of(),
+        first = event(1000,
                 Assertion.entity(), named(0, "Kitchen"), Assertion.of(Identity.local(0), BUDGET, integer(300)),
                 Assertion.entity(), named(3, "Studio"), Assertion.of(Identity.local(3), BUDGET, integer(120)),
                 Assertion.entity(), named(6, "Garage"));
         kitchen = Identity.of(first.id(), 0);
         studio = Identity.of(first.id(), 3);
         garage = Identity.of(first.id(), 6);
-        second = event(1001, List.of(first.id()),
+        second = event(1001,
                 Assertion.retraction(garage),
                 Assertion.entity(), named(1, "Tile"), Assertion.of(Identity.local(1), PROJECT, new Ref(kitchen)),
                 Assertion.entity(), named(4, "Paint"), Assertion.of(Identity.local(4), PROJECT, new Ref(kitchen)),
@@ -97,8 +93,8 @@ public abstract class DatastoreContract {
         log.append(List.of(second));
     }
 
-    protected static Event event(long recorded, List<EventId> causes, Assertion... tuples) {
-        return Event.create(causes, recorded, Optional.empty(), new AcceptedAction(BY, Assertion.action(tuples)));
+    protected static Event event(long recorded, Assertion... tuples) {
+        return Event.create(Optional.empty(), recorded, Optional.empty(), new Emitted(BY, Assertion.action(tuples)));
     }
 
     protected static Assertion named(int local, String name) {
@@ -117,10 +113,10 @@ public abstract class DatastoreContract {
         return new Ref(id);
     }
 
-    protected static Frontier at(Event... events) {
-        var ids = new TreeSet<EventId>();
-        Arrays.stream(events).forEach(e -> ids.add(e.id()));
-        return new Frontier(ids);
+    /** The log position of {@code event}. */
+    protected long at(Event event) {
+        return log.read(1, Integer.MAX_VALUE).stream().filter(l -> l.event().equals(event)).findFirst()
+                .orElseThrow().position();
     }
 
     private List<List<Value>> rows(Query query) {
@@ -179,7 +175,7 @@ public abstract class DatastoreContract {
     @Test
     void retractedStatementsDoNotShow() {
         var paintName = Identity.of(second.id(), 5);
-        log.append(List.of(event(1002, List.of(second.id()), Assertion.retraction(paintName))));
+        log.append(List.of(event(1002, Assertion.retraction(paintName))));
         assertEquals(expect(row(ref(kitchen), text("Kitchen")), row(ref(studio), text("Studio")),
                 row(ref(garage), text("Garage")), row(ref(tile), text("Tile")), row(ref(desk), text("Desk"))),
                 unordered(Query.of(names())));
@@ -295,7 +291,7 @@ public abstract class DatastoreContract {
 
     @Test
     void sumBeyondALongIsRefused() {
-        var big = event(1002, List.of(second.id()), Assertion.of(tile, BUDGET, integer(Long.MAX_VALUE)));
+        var big = event(1002, Assertion.of(tile, BUDGET, integer(Long.MAX_VALUE)));
         log.append(List.of(big));
         var sum = Query.of(Aggregate.of(Scan.statements("t", BUDGET, "b"), List.of(), Function.SUM, "b", "s"));
         assertThrows(ArithmeticException.class, () -> over(log).answer(sum));
@@ -312,7 +308,7 @@ public abstract class DatastoreContract {
 
     @Test
     void setSemanticsAppliesBeforeAnAggregateCounts() {
-        var again = event(1002, List.of(second.id()), Assertion.of(tile, PROJECT, ref(kitchen)));
+        var again = event(1002, Assertion.of(tile, PROJECT, ref(kitchen)));
         log.append(List.of(again));
         var count = Query.of(Aggregate.count(tasks(), List.of("p"), "n"));
         assertEquals(expect(row(ref(kitchen), integer(2)), row(ref(studio), integer(1))), unordered(count));
@@ -336,10 +332,10 @@ public abstract class DatastoreContract {
         assertEquals(List.of(row(integer(2), ref(kitchen)), row(integer(1), ref(studio))), rows(q));
     }
 
-    // Frontiers
+    // Positions
 
     @Test
-    void anAnswerSaysItsFrontier() {
+    void anAnswerSaysItsPosition() {
         var answer = over(log).answer(Query.of(Scan.things("t")));
         assertEquals(at(second), answer.at());
         assertEquals(List.of("t"), answer.columns());
@@ -347,40 +343,39 @@ public abstract class DatastoreContract {
     }
 
     @Test
-    void anAnswerAtAnEarlierFrontierSaysItsFrontier() {
-        assumeTrue(answersPastFrontiers());
+    void anAnswerAtAnEarlierPositionSaysItsPosition() {
+        assumeTrue(answersPastPositions());
         assertEquals(at(first), over(log).answer(Query.of(Scan.things("t")).at(at(first))).at());
     }
 
     @Test
-    void anEarlierFrontierIsRefusedWithoutPastReads() {
-        assumeFalse(answersPastFrontiers());
+    void anEarlierPositionIsRefusedWithoutPastReads() {
+        assumeFalse(answersPastPositions());
         assertThrows(IllegalArgumentException.class,
                 () -> over(log).answer(Query.of(Scan.things("t")).at(at(first))));
         assertThrows(IllegalArgumentException.class,
-                () -> over(log).answer(Query.of(Scan.things("t")).at(Frontier.empty())));
+                () -> over(log).answer(Query.of(Scan.things("t")).at(0)));
     }
 
     @Test
-    void anEarlierFrontierSeesOldData() {
-        assumeTrue(answersPastFrontiers());
+    void anEarlierPositionSeesOldData() {
+        assumeTrue(answersPastPositions());
         assertEquals(expect(row(ref(kitchen)), row(ref(studio)), row(ref(garage))),
                 unordered(Query.of(Scan.things("t")).at(at(first))));
-        assertEquals(List.of(), rows(Query.of(tasks()).at(Frontier.empty())));
+        assertEquals(List.of(), rows(Query.of(tasks()).at(0)));
     }
 
     @Test
-    void aFrontierWithAnUnknownEventIsRefused() {
-        var unknown = event(5000, List.of(), Assertion.entity());
+    void aPositionPastTheLogIsRefused() {
         assertThrows(IllegalArgumentException.class,
-                () -> over(log).answer(Query.of(Scan.things("t")).at(at(unknown))));
+                () -> over(log).answer(Query.of(Scan.things("t")).at(at(second) + 1)));
     }
 
     @Test
     void anEmptyLogAnswersNothing() {
         log = new InMemoryEventLog();
         var answer = over(log).answer(Query.of(Scan.things("t")));
-        assertEquals(Frontier.empty(), answer.at());
+        assertEquals(0, answer.at());
         assertEquals(List.of(), answer.rows());
     }
 
@@ -390,10 +385,10 @@ public abstract class DatastoreContract {
     void aStoredQueryIsReadBackAndAnswered() {
         var open = Query.of(new Not(Scan.things("t"), new Filter(Scan.things("t"), new Condition.Has("t", DONE))))
                 .orderedBy(Sort.ascending("t"));
-        var saved = event(1002, List.of(second.id()),
+        var saved = event(1002,
                 Assertion.entity(), open.stored(Identity.local(0)));
         log.append(List.of(saved));
-        var statement = Statements.about(Identity.of(saved.id(), 0), at(saved), log).stream()
+        var statement = Statements.about(Identity.of(saved.id(), 0), List.of(first, second, saved)).stream()
                 .filter(s -> s.assertion().attribute().filter(Query.ATTRIBUTE::equals).isPresent())
                 .findFirst().orElseThrow();
         var read = Query.from(statement);

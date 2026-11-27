@@ -64,7 +64,7 @@ class EquivalenceTest {
         for (int upTo : List.of(1, 20, 60, 120)) {
             store.take(generated.log.read(store.position() + 1, (int) (upTo - store.position())), generated.log);
             for (var query : queries()) {
-                var expected = reference.answer(query.at(store.at()));
+                var expected = reference.answer(query.at(store.position()));
                 var actual = store.answer(query);
                 var what = upTo + " " + query.toJson().canonical();
                 if (query.order().isEmpty()) {

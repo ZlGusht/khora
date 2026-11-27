@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-import khora.events.AcceptedAction;
+import khora.events.Emitted;
 import khora.events.Action;
 import khora.events.Assertion;
 import khora.events.Basic;
@@ -25,11 +25,11 @@ class InterestTest {
     static final khora.events.EventSource SOURCE = new khora.events.log.InMemoryEventLog();
 
     static Event event(Action action) {
-        return Event.create(List.of(), 1000, Optional.empty(), new AcceptedAction(BY, action));
+        return Event.create(Optional.empty(), 1000, Optional.empty(), new Emitted(BY, action));
     }
 
     @Test
-    void anyInterestMatchesEveryAcceptedAction() {
+    void anyInterestMatchesEveryEmitted() {
         assertTrue(Interest.any().matches(event(Assertion.action(Assertion.entity())), SOURCE));
     }
 

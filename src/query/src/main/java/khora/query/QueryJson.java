@@ -7,10 +7,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.TreeSet;
 import khora.events.Assertion;
-import khora.events.EventId;
-import khora.events.Frontier;
 import khora.events.Identity;
 import khora.events.json.Json;
 
@@ -22,7 +19,7 @@ import khora.events.json.Json;
  * <pre>
  * {"body": {"filter": {"input": {"scan": {"as": "p"}},
  *                      "where": {"has": {"column": "p", "attribute": "sha256:..."}}}},
- *  "at": ["sha256:..."], "semantics": "set", "return": ["p"],
+ *  "at": 42, "semantics": "set", "return": ["p"],
  *  "order": [{"column": "p", "direction": "asc"}], "page": {"limit": 10, "offset": 0}}
  * </pre>
  */
@@ -32,7 +29,7 @@ final class QueryJson {
     static Json.Obj write(Query q) {
         var m = new HashMap<String, Json>();
         m.put("body", operator(q.body()));
-        q.at().ifPresent(f -> m.put("at", new Json.Arr(f.heads().stream().<Json>map(h -> new Json.Str(h.value())).toList())));
+        q.at().ifPresent(p -> m.put("at", new Json.Int(p)));
         m.put("semantics", name(q.semantics()));
         m.put("return", strings(q.returns()));
         if (!q.order().isEmpty()) {
@@ -49,12 +46,11 @@ final class QueryJson {
         var o = obj(json, "a query");
         members(o, Set.of("body", "return"), Set.of("at", "semantics", "order", "page"));
         var body = operator(o.get("body").orElseThrow());
-        Optional<Frontier> at = o.get("at").map(a -> {
-            var heads = new TreeSet<EventId>();
-            for (var item : arr(a, "at").items()) {
-                heads.add(new EventId(str(item, "a head")));
+        Optional<Long> at = o.get("at").map(a -> {
+            if (!(a instanceof Json.Int i)) {
+                throw new IllegalArgumentException("at is a log position");
             }
-            return new Frontier(heads);
+            return i.value();
         });
         var semantics = o.get("semantics").map(s -> named(Query.Semantics.class, s, "semantics"))
                 .orElse(Query.Semantics.SET);

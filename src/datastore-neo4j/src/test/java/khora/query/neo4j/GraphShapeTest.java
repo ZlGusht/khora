@@ -5,7 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import khora.events.AcceptedAction;
+import khora.events.Emitted;
 import khora.events.Assertion;
 import khora.events.Assertion.Literal;
 import khora.events.Assertion.Ref;
@@ -78,9 +78,9 @@ class GraphShapeTest {
         return "{\"attributes\":{" + body + "},\"id\":\"" + id.value() + "\",\"type\":\"entity\"}";
     }
 
-    private static Event event(List<Event> causes, Assertion... tuples) {
-        return Event.create(causes.stream().map(Event::id).toList(), 1000 + causes.size(), Optional.empty(),
-                new AcceptedAction(GeneratedLog.BY, Assertion.action(tuples)));
+    private static Event event(List<Event> earlier, Assertion... tuples) {
+        return Event.create(Optional.empty(), 1000 + earlier.size(), Optional.empty(),
+                new Emitted(GeneratedLog.BY, Assertion.action(tuples)));
     }
 
     private static Literal text(String s) {

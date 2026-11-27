@@ -18,7 +18,7 @@ public final class About {
     /** The things {@code event} is about, in the order its action names them, given the events of {@code source}. */
     public static Set<Identity> of(Event event, EventSource source) {
         var things = new LinkedHashSet<Identity>();
-        if (!(event.body() instanceof AcceptedAction accepted)) {
+        if (!(event.body() instanceof Emitted accepted)) {
             return things;
         }
         Basic.readOf(accepted.action()).ifPresent(things::add);
@@ -44,8 +44,8 @@ public final class About {
             return index < own.size() ? own.get(index).in(event.id()).identity() : java.util.Optional.empty();
         }
         return source.get(holder.get())
-                .filter(e -> e.body() instanceof AcceptedAction)
-                .flatMap(e -> Assertion.in(((AcceptedAction) e.body()).action())
+                .filter(e -> e.body() instanceof Emitted)
+                .flatMap(e -> Assertion.in(((Emitted) e.body()).action())
                         .filter(tuples -> index < tuples.size())
                         .flatMap(tuples -> tuples.get(index).in(e.id()).identity()));
     }

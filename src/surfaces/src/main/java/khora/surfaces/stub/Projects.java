@@ -1,25 +1,36 @@
 package khora.surfaces.stub;
 
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
-import khora.events.AcceptedAction;
+import khora.events.Action;
 import khora.events.Assertion;
 import khora.events.Basic;
+import khora.events.By;
+import khora.events.Emitted;
 import khora.events.Event;
-import khora.events.FrontierCheck;
+import khora.events.EventId;
 import khora.events.Identity;
-import khora.events.log.EventLog;
-import khora.surfaces.Authority;
+import khora.surfaces.Gate;
 
 /**
- * A stub authority for projects. It takes reads and asserts. A write linked {@code based_on} a read
- * is rejected when an event it did not know of asserts on the same identity and attribute
- * ([[Reads return statements and writes follow a read]]); a write without one is blind and accepted.
+ * A stub gate for project names: a project has one current name. It guards asserts of
+ * {@link #NAME}. A rename replaces the name it read by retracting it; it is refused when that name
+ * is already replaced, or is not a statement this gate knows. A name asserted without retracting one
+ * is blind, and passes.
  *
- * <p>Provisional: no attribute definitions or merge rules; a conflict check walks the whole log.
+ * <p>Exploration: the conflict is found from what the write says it replaces, not from what it
+ * knew. Without this gate both renames become events, and each surface reads them its own way.
  */
-public final class Projects implements Authority {
+public final class Projects implements Gate {
+    /** The attribute this gate guards. */
+    public static final Identity NAME = Identity.named("name");
+
+    private final Set<Identity> statements = new HashSet<>();
+    private final Map<Identity, EventId> replaced = new HashMap<>();
 
     @Override
     public String name() {
@@ -27,49 +38,44 @@ public final class Projects implements Authority {
     }
 
     @Override
-    public Verdict decide(Event candidate, EventLog log) {
-        var accepted = (AcceptedAction) candidate.body();
-        if (Basic.readOf(accepted.action()).isPresent()) {
-            return new Accept();
-        }
-        if (Assertion.in(accepted.action()).isEmpty()) {
-            return new Reject("projects takes only reads and asserts");
-        }
-        if (!accepted.links().containsKey("based_on")) {
-            return new Accept();
-        }
-        var known = FrontierCheck.closure(candidate.causes(), log);
-        var touched = touched(candidate);
-        for (long from = 1; ; from += EventLog.MAX_APPEND) {
-            var page = log.read(from, EventLog.MAX_APPEND);
-            for (var logged : page) {
-                var event = logged.event();
-                if (known.contains(event.id())) {
-                    continue;
-                }
-                var overlap = touched(event);
-                overlap.retainAll(touched);
-                if (!overlap.isEmpty()) {
-                    return new Reject("conflicts with " + event.id().value() + ", which the write did not know of");
-                }
+    public boolean guards(Action action) {
+        return tuples(action).stream().anyMatch(t -> t.attribute().equals(Optional.of(NAME)));
+    }
+
+    @Override
+    public Verdict decide(Action action, By by) {
+        for (var tuple : tuples(action)) {
+            if (!tuple.attribute().equals(Optional.of(Basic.RETRACTED)) || tuple.identity().isEmpty()) {
+                continue;
             }
-            if (page.size() < EventLog.MAX_APPEND) {
-                return new Accept();
+            var target = tuple.identity().get();
+            if (!statements.contains(target)) {
+                return new Refuse("replaces " + target.value() + ", which is not a statement projects knows");
+            }
+            var by_ = replaced.get(target);
+            if (by_ != null) {
+                return new Refuse("replaces " + target.value() + ", which " + by_.value() + " already replaced");
+            }
+        }
+        return new Pass();
+    }
+
+    @Override
+    public void take(Event event) {
+        if (!(event.body() instanceof Emitted emitted)) {
+            return;
+        }
+        var tuples = Assertion.in(emitted.action()).orElse(List.of());
+        for (int i = 0; i < tuples.size(); i++) {
+            var tuple = tuples.get(i).in(event.id());
+            statements.add(Identity.of(event.id(), i));
+            if (tuple.attribute().equals(Optional.of(Basic.RETRACTED)) && tuple.identity().isPresent()) {
+                replaced.putIfAbsent(tuple.identity().get(), event.id());
             }
         }
     }
 
-    /** The (identity, attribute) pairs an event asserts on. */
-    private static Set<List<Identity>> touched(Event event) {
-        var pairs = new HashSet<List<Identity>>();
-        if (event.body() instanceof AcceptedAction accepted) {
-            for (var tuple : Assertion.in(accepted.action()).orElse(List.of())) {
-                var resolved = tuple.in(event.id());
-                if (resolved.identity().isPresent() && resolved.attribute().isPresent()) {
-                    pairs.add(List.of(resolved.identity().get(), resolved.attribute().get()));
-                }
-            }
-        }
-        return pairs;
+    private static List<Assertion> tuples(Action action) {
+        return Assertion.in(action).orElse(List.of());
     }
 }

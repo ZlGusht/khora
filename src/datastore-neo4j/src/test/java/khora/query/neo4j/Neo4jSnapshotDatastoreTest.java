@@ -20,7 +20,7 @@ class Neo4jSnapshotDatastoreTest extends DatastoreContract {
     }
 
     @Override
-    protected boolean answersPastFrontiers() {
+    protected boolean answersPastPositions() {
         return false;
     }
 }

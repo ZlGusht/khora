@@ -13,7 +13,6 @@ import java.util.Optional;
 import khora.events.Assertion.Literal;
 import khora.events.Assertion.Ref;
 import khora.events.Assertion.Value;
-import khora.events.Frontier;
 import khora.events.json.Json;
 
 /**
@@ -25,8 +24,8 @@ import khora.events.json.Json;
 public final class Evaluator {
     private Evaluator() {}
 
-    /** The answer to {@code query} over {@code graph}, which holds what is true at {@code at}. */
-    public static Answer answer(Query query, Frontier at, Graph graph) {
+    /** The answer to {@code query} over {@code graph}, which holds what stands at log position {@code at}. */
+    public static Answer answer(Query query, long at, Graph graph) {
         var set = query.semantics() == Query.Semantics.SET;
         var rows = new ArrayList<List<Value>>();
         for (var row : evaluate(query.body(), graph, set)) {

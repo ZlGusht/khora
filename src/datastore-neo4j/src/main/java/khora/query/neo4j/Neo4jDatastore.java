@@ -9,8 +9,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.TreeMap;
-import java.util.TreeSet;
-import khora.events.AcceptedAction;
+import khora.events.Emitted;
 import khora.events.Assertion;
 import khora.events.Assertion.Literal;
 import khora.events.Assertion.Ref;
@@ -19,7 +18,6 @@ import khora.events.Basic;
 import khora.events.Event;
 import khora.events.EventId;
 import khora.events.EventSource;
-import khora.events.Frontier;
 import khora.events.Identity;
 import khora.events.json.Json;
 import khora.events.log.EventLog;
@@ -47,10 +45,9 @@ import org.neo4j.driver.TransactionContext;
  * reference is a relationship from the thing to the thing it names, typed by the attribute's
  * identity, holding the identity of its statement. A retraction deletes what its target
  * asserted: the entity label, the value, or the relationship. The target is read from its
- * event. Events are not stored; a {@code Progress} node holds the last log position taken in and
- * the frontier of everything taken in.
+ * event. Events are not stored; a {@code Progress} node holds the last log position taken in.
  *
- * <p>It answers only at that frontier. The datastore owns its database: {@link #clear()} deletes
+ * <p>It answers only at that position. The datastore owns its database: {@link #clear()} deletes
  * everything with these labels.
  *
  * <p>Provisional: a thing's values of one attribute are a set: asserting a value it has adds
@@ -107,27 +104,25 @@ public final class Neo4jDatastore implements Datastore, AutoCloseable {
 
     // Progress
 
-    /** The last log position taken in, the frontier of everything taken in, and the last event's id. */
-    private record Progress(long position, Frontier at, Optional<EventId> last) {}
+    /** The last log position taken in, and the last event's id. */
+    private record Progress(long position, Optional<EventId> last) {}
 
     private static Progress progress(TransactionContext tx) {
-        var records = tx.run("MATCH (p:Progress {key: 'khora'}) RETURN p.position AS position, p.heads AS heads, "
+        var records = tx.run("MATCH (p:Progress {key: 'khora'}) RETURN p.position AS position, "
                 + "p.last AS last").list();
         if (records.isEmpty()) {
-            return new Progress(0, Frontier.empty(), Optional.empty());
+            return new Progress(0, Optional.empty());
         }
         var r = records.get(0);
         return new Progress(r.get("position").asLong(),
-                new Frontier(new TreeSet<>(r.get("heads").asList(v -> new EventId(v.asString())))),
                 r.get("last").isNull() ? Optional.empty() : Optional.of(new EventId(r.get("last").asString())));
     }
 
     private static void setProgress(TransactionContext tx, Progress p) {
         var params = new HashMap<String, Object>();
         params.put("position", p.position());
-        params.put("heads", p.at().heads().stream().map(EventId::value).toList());
         params.put("last", p.last().map(EventId::value).orElse(null));
-        tx.run("MERGE (p:Progress {key: 'khora'}) SET p.position = $position, p.heads = $heads, p.last = $last",
+        tx.run("MERGE (p:Progress {key: 'khora'}) SET p.position = $position, p.last = $last",
                 params).consume();
     }
 
@@ -135,13 +130,6 @@ public final class Neo4jDatastore implements Datastore, AutoCloseable {
     public long position() {
         try (var session = session()) {
             return session.executeRead(Neo4jDatastore::progress).position();
-        }
-    }
-
-    /** The frontier of every event taken in: the one frontier the datastore answers at. */
-    public Frontier at() {
-        try (var session = session()) {
-            return session.executeRead(Neo4jDatastore::progress).at();
         }
     }
 
@@ -186,7 +174,6 @@ public final class Neo4jDatastore implements Datastore, AutoCloseable {
             return session.executeWrite(tx -> {
                 var progress = progress(tx);
                 long next = progress.position() + 1;
-                var heads = new TreeSet<EventId>(progress.at().heads());
                 var last = progress.last();
                 var writes = new Writes(tx);
                 for (var logged : page) {
@@ -197,13 +184,11 @@ public final class Neo4jDatastore implements Datastore, AutoCloseable {
                         throw new IllegalStateException("expected log position " + next + ", got " + logged.position());
                     }
                     writes.event(logged.event(), lookup);
-                    heads.removeAll(logged.event().causes());
-                    heads.add(logged.event().id());
                     last = Optional.of(logged.event().id());
                     next++;
                 }
                 writes.flush();
-                setProgress(tx, new Progress(next - 1, new Frontier(heads), last));
+                setProgress(tx, new Progress(next - 1, last));
                 return next - 1 - progress.position();
             });
         }
@@ -225,7 +210,7 @@ public final class Neo4jDatastore implements Datastore, AutoCloseable {
         }
 
         void event(Event event, EventSource lookup) {
-            if (!(event.body() instanceof AcceptedAction accepted)) {
+            if (!(event.body() instanceof Emitted accepted)) {
                 return;
             }
             var tuples = Assertion.in(accepted.action()).orElse(List.of());
@@ -285,7 +270,7 @@ public final class Neo4jDatastore implements Datastore, AutoCloseable {
         }
 
         private static Optional<Assertion> tupleAt(Event event, Identity target) {
-            if (!(event.body() instanceof AcceptedAction accepted)) {
+            if (!(event.body() instanceof Emitted accepted)) {
                 return Optional.empty();
             }
             int index = Integer.parseInt(target.value().substring(target.value().indexOf('/') + 1));
@@ -365,7 +350,7 @@ public final class Neo4jDatastore implements Datastore, AutoCloseable {
                                 "thing", new Json.Str(r.get("thing").asString()),
                                 "attribute", new Json.Str(r.get("attribute").asString()),
                                 "target", new Json.Str(r.get("target").asString()))).canonical()));
-                return new Snapshot(progress.position(), progress.at(), progress.last(), rows);
+                return new Snapshot(progress.position(), progress.last(), rows);
             });
         }
     }
@@ -404,7 +389,7 @@ public final class Neo4jDatastore implements Datastore, AutoCloseable {
                         UNWIND $rows AS r
                         MATCH (t:Thing {id: r.thing}), (o:Thing {id: r.target})
                         CREATE (t)-[:$(r.attribute) {statement: r.statement}]->(o)""", Map.of("rows", relations)).consume();
-                setProgress(tx, new Progress(snapshot.position(), snapshot.at(), snapshot.last()));
+                setProgress(tx, new Progress(snapshot.position(), snapshot.last()));
             });
         }
     }
@@ -445,14 +430,14 @@ public final class Neo4jDatastore implements Datastore, AutoCloseable {
     /**
      * {@inheritDoc}
      *
-     * @throws IllegalArgumentException if the query names a frontier other than everything taken in
+     * @throws IllegalArgumentException if the query names a position other than everything taken in
      */
     @Override
     public Answer answer(Query query) {
         try (var session = session()) {
             return session.executeRead(tx -> {
-                var at = progress(tx).at();
-                if (query.at().isPresent() && !query.at().get().heads().equals(at.heads())) {
+                long at = progress(tx).position();
+                if (query.at().isPresent() && query.at().get() != at) {
                     throw new IllegalArgumentException("the graph datastore answers only at everything it has taken in");
                 }
                 return Evaluator.answer(query, at, new TxGraph(tx));

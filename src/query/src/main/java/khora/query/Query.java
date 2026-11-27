@@ -4,7 +4,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import khora.events.Assertion;
-import khora.events.Frontier;
 import khora.events.Identity;
 import khora.events.Statement;
 import khora.events.json.Json;
@@ -18,17 +17,17 @@ import khora.events.json.Json;
  * Its canonical JSON ({@link #toJson}) is how it is stored: as the value of the {@code khora/query}
  * attribute ({@link #stored}), like any other statement.
  *
- * <p>Provisional: the envelope's time is a frontier only; reads by recorded or occurred time wait
- * for K7. No annotations yet. The JSON carries no version of its own.
+ * <p>Exploration: the envelope's time is a log position: the answer holds for the log's events up to
+ * it. Reads by recorded or occurred time wait for K7. No annotations yet. The JSON carries no version of its own.
  *
  * @param body what to compute
- * @param at the frontier to answer at; absent, the datastore answers at everything it holds
+ * @param at the log position to answer at; absent, the datastore answers at everything it has taken in
  * @param semantics whether repeated rows are kept
  * @param returns the columns of the answer, in order: columns of the body
  * @param order how the answer is sorted, by returned columns; empty leaves the datastore's order
  * @param page which part of the sorted answer to give
  */
-public record Query(Operator body, Optional<Frontier> at, Semantics semantics, List<String> returns, List<Sort> order,
+public record Query(Operator body, Optional<Long> at, Semantics semantics, List<String> returns, List<Sort> order,
         Optional<Page> page) {
 
     /** The attribute whose value is a stored query's canonical JSON. */
@@ -37,6 +36,9 @@ public record Query(Operator body, Optional<Frontier> at, Semantics semantics, L
     public Query {
         Objects.requireNonNull(body, "body");
         Objects.requireNonNull(at, "at");
+        if (at.isPresent() && at.get() < 0) {
+            throw new IllegalArgumentException("a position is not negative: " + at.get());
+        }
         Objects.requireNonNull(semantics, "semantics");
         Objects.requireNonNull(page, "page");
         returns = Columns.distinct(returns, "return");
@@ -89,9 +91,9 @@ public record Query(Operator body, Optional<Frontier> at, Semantics semantics, L
         return new Query(body, Optional.empty(), Semantics.SET, body.columns(), List.of(), Optional.empty());
     }
 
-    /** This query answered at {@code frontier}. */
-    public Query at(Frontier frontier) {
-        return new Query(body, Optional.of(frontier), semantics, returns, order, page);
+    /** This query answered at log position {@code position}. */
+    public Query at(long position) {
+        return new Query(body, Optional.of(position), semantics, returns, order, page);
     }
 
     /** This query with {@code semantics}. */

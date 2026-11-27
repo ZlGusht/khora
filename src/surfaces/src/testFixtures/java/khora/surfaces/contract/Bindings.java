@@ -5,10 +5,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.TreeSet;
 import khora.events.Event;
 import khora.events.EventId;
-import khora.events.Frontier;
 import khora.events.Identity;
 
 /**
@@ -58,13 +56,6 @@ public final class Bindings {
         };
     }
 
-    /** The frontier of the given steps' events, as their heads. */
-    public Frontier frontier(List<String> stepNames) {
-        var heads = new TreeSet<EventId>();
-        stepNames.forEach(s -> heads.add(event(s)));
-        return new Frontier(heads);
-    }
-
     /** Records an event no step made, numbered from 1 in the order called. */
     public void emitted(EventId id) {
         emitted.add(id);
@@ -72,10 +63,13 @@ public final class Bindings {
 
     /**
      * An identity for people: step name, {@code name/n}, the name of a resolved {@link Ref.Named},
-     * {@code emitted#k}, or its value.
+     * {@code emitted#k}, or its value; a local identity, {@code /n}, as it is.
      */
     public String render(Identity id) {
         var text = id.value();
+        if (id.isLocal()) {
+            return text;
+        }
         var slash = text.indexOf('/');
         var event = slash > 0 ? text.substring(0, slash) : text;
         var suffix = slash > 0 ? text.substring(slash) : "";

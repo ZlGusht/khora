@@ -5,12 +5,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.TreeSet;
 import khora.events.Assertion;
 import khora.events.Assertion.Literal;
 import khora.events.Assertion.Ref;
 import khora.events.EventId;
-import khora.events.Frontier;
 import khora.events.Identity;
 import khora.events.Statement;
 import khora.events.json.Json;
@@ -36,10 +34,8 @@ class QueryTest {
                 new Condition.And(List.of(new Condition.Has("t", NAME, new Literal(new Json.Str("Tile"))),
                         new Condition.Compare("p", Op.NE, new Ref(THING)))))));
         var open = new Not(named, new Filter(Scan.things("t"), new Condition.Compare("t", Op.EQ, new Ref(THING))));
-        var heads = new TreeSet<EventId>();
-        heads.add(EventId.hashOf("e"));
         return Query.of(Aggregate.count(open, List.of("p"), "n"))
-                .at(new Frontier(heads))
+                .at(42)
                 .with(Query.Semantics.MULTISET)
                 .returning("n", "p")
                 .orderedBy(Sort.descending("n"), Sort.ascending("p"))

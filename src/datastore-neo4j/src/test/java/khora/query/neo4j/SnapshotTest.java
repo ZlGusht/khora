@@ -9,7 +9,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
-import khora.events.Frontier;
 import khora.query.EventsDatastore;
 import khora.query.Operator.Scan;
 import khora.query.Query;
@@ -45,14 +44,13 @@ class SnapshotTest {
     }
 
     @Test
-    void aSnapshotIsAtAFrontier() throws IOException {
+    void aSnapshotIsAtAPosition() throws IOException {
         var generated = new GeneratedLog(8, 40);
         var store = Neo4jTestServer.empty();
         store.take(generated.log.read(1, 25), generated.log);
         var snapshot = store.snapshot();
         assertEquals(25, snapshot.position());
-        assertEquals(Frontier.of(generated.events.subList(0, 25).stream().map(e -> e.id()).toList(), generated.log),
-                snapshot.at());
+        assertEquals(java.util.Optional.of(generated.events.get(24).id()), snapshot.last());
         var file = dir.resolve("s.jsonl");
         snapshot.write(file);
         assertEquals(snapshot, Snapshot.read(file));
@@ -62,7 +60,7 @@ class SnapshotTest {
     @Test
     void anEmptyDatastoreHasAnEmptySnapshot() {
         var snapshot = Neo4jTestServer.empty().snapshot();
-        assertEquals(new Snapshot(0, Frontier.empty(), Optional.empty(), List.of()), snapshot);
+        assertEquals(new Snapshot(0, Optional.empty(), List.of()), snapshot);
     }
 
     @Test

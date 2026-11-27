@@ -5,7 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.List;
 import java.util.Optional;
-import khora.events.AcceptedAction;
+import khora.events.Emitted;
 import khora.events.Assertion;
 import khora.events.Event;
 import khora.query.EventsDatastore;
@@ -24,7 +24,7 @@ class TakingInTest {
         assertEquals(0, store.catchUp(generated.log));
         assertEquals(0, store.take(generated.log.read(5, 10), generated.log));
         assertEquals(30, store.position());
-        assertEquals(new EventsDatastore(generated.log).answer(Query.of(Scan.things("t"))).at(), store.at());
+        assertEquals(new EventsDatastore(generated.log).answer(Query.of(Scan.things("t"))).at(), store.position());
     }
 
     @Test
@@ -43,14 +43,14 @@ class TakingInTest {
         var following = store.follow(generated.log);
         try {
             assertEquals(5, store.position());
-            var next = Event.create(List.of(generated.events.get(4).id()), 2000, Optional.empty(),
-                    new AcceptedAction(GeneratedLog.BY, Assertion.action(Assertion.entity())));
+            var next = Event.create(Optional.empty(), 2000, Optional.empty(),
+                    new Emitted(GeneratedLog.BY, Assertion.action(Assertion.entity())));
             generated.log.append(List.of(next));
             for (int i = 0; i < 200 && store.position() < 6; i++) {
                 Thread.sleep(25);
             }
             assertEquals(6, store.position());
-            assertEquals(new EventsDatastore(generated.log).answer(Query.of(Scan.things("t"))).at(), store.at());
+            assertEquals(new EventsDatastore(generated.log).answer(Query.of(Scan.things("t"))).at(), store.position());
             assertEquals(EquivalenceTest.sorted(new EventsDatastore(generated.log).answer(Query.of(Scan.things("t")))),
                     EquivalenceTest.sorted(store.answer(Query.of(Scan.things("t")))));
         } finally {

@@ -6,10 +6,10 @@ Java 25 everywhere: the code is compiled and tested with Java 25, and the Gradle
 
 | Module | Package | What it holds |
 | --- | --- | --- |
-| `events` | `khora.events`, `khora.events.json`, `khora.events.log` | Events and the log. An `Event` is something that happened, kept with what it knew of; an accepted action, whose asserts are tuples `(identity, attribute, value)`, is its one kind so far. Ids are salted hashes of canonical JSON; recorded time is a hybrid logical clock; frontiers are sets of events closed under causes; `Causality` checks an event against what it knew. `EventLog` stores events. Test fixtures: `InMemoryEventLog` and `EventLogContract`, the tests every log must pass. No dependencies. |
-| `surfaces` | `khora.surfaces`, `khora.surfaces.stub` | Surfaces, in the language of events: a `Surface` receives the events its interests match and emits actions in response; an `Authority` accepts or rejects actions on its things; the `Kernel` turns accepted actions into events in an `EventLog` and delivers them. `Projects` is a stub authority. Test fixtures (`khora.surfaces.contract`): `AuthorityContract` and `SurfaceContract`, the tests every authority and surface must pass, as scenarios through the kernel; `Echo`, a reference surface. |
+| `events` | `khora.events`, `khora.events.json`, `khora.events.log` | Events and the log. An `Event` is a fact by whoever emitted it, and names at most one other event, its trigger: the event it responds to. An emitted action, whose asserts are tuples `(identity, attribute, value)`, is its one kind so far. Ids are salted hashes of canonical JSON; recorded time is a hybrid logical clock. `Statements` is one reading of events, the reference for datastores. `EventLog` stores events; it does not judge them. Test fixtures: `InMemoryEventLog` and `EventLogContract`, the tests every log must pass. No dependencies. |
+| `surfaces` | `khora.surfaces`, `khora.surfaces.stub` | Surfaces, in the language of events: a `Surface` receives the events its interests match, reads them its own way, and emits actions in response, each triggered by what it received; a `Gate` guards a shape that needs prevention, and may refuse an action on it before it becomes an event; the `Kernel` turns actions into events in an `EventLog` and delivers them. `Projects` is a stub gate for project names; `Entities` a reference surface that answers reads. Test fixtures (`khora.surfaces.contract`): `GateContract` and `SurfaceContract`, the tests every gate and surface must pass, as scenarios through the kernel; `Echo`, a reference surface. |
 | `log-nats` | `khora.events.log.nats` | `NatsEventLog`: the event log on NATS JetStream. Tests run against real NATS in Docker. `bench` source set: `LogBench`. |
-| `query` | `khora.query` | Searches as data: a `Query` is an envelope (frontier, set or multiset, returned columns, order, page) around a body of operators, `Scan`, `Filter`, `Not` and `Aggregate`, checked when it is built. Its canonical JSON is stored as the value of the `khora/query` attribute. A `Datastore` answers queries; `EventsDatastore` works answers out from a log's events, through `Evaluator` over a `Graph`. Test fixture: `DatastoreContract`, the tests every datastore must pass. Depends on `events`. |
+| `query` | `khora.query` | Searches as data: a `Query` is an envelope (log position, set or multiset, returned columns, order, page) around a body of operators, `Scan`, `Filter`, `Not` and `Aggregate`, checked when it is built. Its canonical JSON is stored as the value of the `khora/query` attribute. A `Datastore` answers queries; `EventsDatastore` works answers out from a log's events, through `Evaluator` over a `Graph`. Test fixture: `DatastoreContract`, the tests every datastore must pass. Depends on `events`. |
 | `datastore-neo4j` | `khora.query.neo4j` | The graph datastore on Neo4j: `Neo4jDatastore` takes in a log's events (`catchUp`, `follow`) and keeps what they assert as it stands now. An entity is a node, its literal attributes are properties, and a reference is a relationship; a retraction deletes what its target asserted. Events are not stored. It answers queries at everything it has taken in, through `Evaluator`. A `Snapshot` is its content at a position, as JSON lines; `rebuild` restores one and catches up with the log. Tests run against real Neo4j in Docker. Depends on `query`. |
 
 ## Layout and build files
@@ -46,7 +46,7 @@ The words the module build files use:
 
 To add a module: create `src/<module>/build.gradle.kts`, add two lines to `settings.gradle.kts` as for the others, and depend on `events` with `api` or `implementation`.
 
-Design, decisions and measurements: the runs `blob/Issue #18 Event types ids and clock.md` (`events`, `surfaces`), `blob/Issue #21 Surface contract types.md`, `blob/Issue #19 Log store on NATS.md` (`log-nats`), `blob/Issue #22 Contract tests for surfaces and authorities.md` (the contracts), `blob/Issue #25 Query as a data structure.md` (`query`) and `blob/Issue #23 Graph datastore on Neo4j.md` (`datastore-neo4j`).
+Design, decisions and measurements: the runs `blob/Issue #18 Event types ids and clock.md` (`events`, `surfaces`), `blob/Issue #21 Surface contract types.md`, `blob/Issue #19 Log store on NATS.md` (`log-nats`), `blob/Issue #22 Contract tests for surfaces and authorities.md` (the contracts, before gates), `blob/Issue #25 Query as a data structure.md` (`query`) and `blob/Issue #23 Graph datastore on Neo4j.md` (`datastore-neo4j`).
 
 ## Prerequisites
 
@@ -77,8 +77,8 @@ On macOS, keep the machine awake for long runs (`caffeinate -i ./gradlew test`):
 
 ```java
 try (EventLog log = NatsEventLog.open("nats://localhost:4222")) {
-    var anna = new By("anna", Optional.empty(), "g3", "projects");
-    var created = Event.create(List.of(), Hlc.system().next(), Optional.empty(), new AcceptedAction(anna,
+    var anna = new By("anna", Optional.empty(), "g3", "kernel");
+    var created = Event.create(Optional.empty(), Hlc.system().next(), Optional.empty(), new Emitted(anna,
         Assertion.action(Assertion.entity(),          // /0: a new thing
             Assertion.of(Identity.local(0), Identity.named("name"), new Assertion.Literal(new Json.Str("Kitchen"))))));
     List<Long> positions = log.append(List.of(created));
@@ -92,7 +92,7 @@ try (EventLog log = NatsEventLog.open("nats://localhost:4222")) {
 }
 ```
 
-Most code goes through the `Kernel` instead, which checks `Causality`, asks the `Authority`, appends and delivers. What the log promises is in the Javadoc of `EventLog`. In short:
+Most code goes through the `Kernel` instead, which asks the gates that guard an action, appends and delivers. What the log promises is in the Javadoc of `EventLog`. In short:
 
 - `append` stores all events or none. An exception does not always mean "not stored": after a timeout the batch may be stored whole. Appending the same events again is safe.
 - An event is stored once: within NATS's deduplication window (2 minutes) by its id; beyond it, ids are salted content hashes, so different events never share one.
@@ -113,15 +113,15 @@ try (var store = Neo4jDatastore.open("bolt://localhost:7687", "neo4j", "khora-de
 ```
 
 - The datastore owns its database: `clear()` and `restore` delete what it holds.
-- It answers only at everything it has taken in. A query at any other frontier is refused; it neither waits nor reads the past.
+- It answers only at everything it has taken in. A query at any other position is refused; it neither waits nor reads the past.
 - Attribute identities are used as they are, as property keys and relationship types.
 - `rebuild(Snapshot.read(file), log)` restores a snapshot and takes in the rest of the log. It refuses a snapshot of another log.
 
-To check a new `Authority` or `Surface`, depend on the `surfaces` module's test fixtures and extend `AuthorityContract` or `SurfaceContract` with your scenarios (`Scenario.named(...).given(...).when(...).then(...)`); each scenario is also held to the contract's general rules. `ProjectsContractTest` and `EchoContractTest` are examples. Some things to know when writing scenarios:
+To check a new `Gate` or `Surface`, depend on the `surfaces` module's test fixtures and extend `GateContract` or `SurfaceContract` with your scenarios (`Scenario.named(...).given(...).when(...).then(...)`); each scenario is also held to the contract's general rules. `ProjectsContractTest` and `EchoContractTest` are examples. Some things to know when writing scenarios:
 
-- A write based on a read needs both `.knew(read)` and `.link("based_on", read)`.
+- A rename says what it replaces: a retraction of the statement it read, `TupleSpec.retraction(Ref.tuple(step, 1))`. A step in response to another names it with `.after(step)`.
 - A thing's first tuple, `/0`, is the entity itself, so its first attribute is `Ref.tuple(step, 1)`.
-- Give `Then.rejected` the reason text; without it, a scenario may pass for the wrong reason.
+- Give `Then.refused` the reason text; without it, a scenario may pass for the wrong reason.
 - `SurfaceContract` checks what a surface receives and emits, not what a view shows.
 
 ## Run NATS locally

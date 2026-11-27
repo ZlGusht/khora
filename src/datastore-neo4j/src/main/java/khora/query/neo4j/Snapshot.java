@@ -11,10 +11,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.TreeSet;
 import khora.events.Assertion;
 import khora.events.EventId;
-import khora.events.Frontier;
 import khora.events.Identity;
 import khora.events.json.Json;
 
@@ -30,18 +28,16 @@ import khora.events.json.Json;
  * <p>Provisional: kept whole in memory and in one file; no compression, no checksum.
  *
  * @param position the last log position taken in
- * @param at the frontier of everything taken in
  * @param last the id of the event at {@code position}, if any
  * @param rows the rows, things first by id, then relations by statement
  */
-public record Snapshot(long position, Frontier at, Optional<EventId> last, List<String> rows) {
-    static final int VERSION = 2;
+public record Snapshot(long position, Optional<EventId> last, List<String> rows) {
+    static final int VERSION = 3;
 
     public Snapshot {
         if (position < 0) {
             throw new IllegalArgumentException("position is negative: " + position);
         }
-        Objects.requireNonNull(at, "at");
         Objects.requireNonNull(last, "last");
         if ((position == 0) != last.isEmpty()) {
             throw new IllegalArgumentException("a snapshot has a last event exactly when its position is not 0");
@@ -56,7 +52,6 @@ public record Snapshot(long position, Frontier at, Optional<EventId> last, List<
         header.put("type", new Json.Str("snapshot"));
         header.put("version", new Json.Int(VERSION));
         header.put("position", new Json.Int(position));
-        header.put("at", new Json.Arr(at.heads().stream().<Json>map(h -> new Json.Str(h.value())).toList()));
         last.ifPresent(l -> header.put("last", new Json.Str(l.value())));
         var lines = new ArrayList<String>(rows.size() + 1);
         lines.add(Json.Obj.of(header).canonical());
@@ -78,15 +73,8 @@ public record Snapshot(long position, Frontier at, Optional<EventId> last, List<
         if (header.integer("version") != VERSION) {
             throw new IllegalArgumentException("snapshot version " + header.integer("version") + " is not " + VERSION);
         }
-        var heads = new TreeSet<EventId>();
-        for (var h : header.arr("at").items()) {
-            if (!(h instanceof Json.Str s)) {
-                throw new IllegalArgumentException("a head is an event id");
-            }
-            heads.add(new EventId(s.value()));
-        }
         var last = header.get("last").isPresent() ? Optional.of(new EventId(header.str("last"))) : Optional.<EventId>empty();
-        return new Snapshot(header.integer("position"), new Frontier(heads), last, lines.subList(1, lines.size()));
+        return new Snapshot(header.integer("position"), last, lines.subList(1, lines.size()));
     }
 
     /** The rows, parsed. */

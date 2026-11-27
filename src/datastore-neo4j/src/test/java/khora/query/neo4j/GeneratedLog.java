@@ -4,15 +4,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Random;
-import java.util.TreeSet;
-import khora.events.AcceptedAction;
+import khora.events.Emitted;
 import khora.events.Assertion;
 import khora.events.Assertion.Literal;
 import khora.events.Assertion.Ref;
 import khora.events.By;
 import khora.events.Event;
-import khora.events.EventId;
-import khora.events.Frontier;
 import khora.events.Identity;
 import khora.events.json.Json;
 import khora.events.log.EventLog;
@@ -43,15 +40,6 @@ final class GeneratedLog {
     }
 
     private void append(int n) {
-        var causes = new TreeSet<EventId>();
-        if (!events.isEmpty()) {
-            // Mostly the latest event; sometimes an older one, which starts a branch; sometimes two, which joins.
-            int pick = random.nextInt(10);
-            causes.add(events.get(pick < 7 ? events.size() - 1 : random.nextInt(events.size())).id());
-            if (pick == 9) {
-                causes.add(events.get(random.nextInt(events.size())).id());
-            }
-        }
         var tuples = new ArrayList<Assertion>();
         int size = 1 + random.nextInt(4);
         for (int i = 0; i < size; i++) {
@@ -74,7 +62,7 @@ final class GeneratedLog {
                 }
             }
         }
-        var event = Event.create(causes, 1000 + n, Optional.empty(), new AcceptedAction(BY, Assertion.action(tuples)));
+        var event = Event.create(Optional.empty(), 1000 + n, Optional.empty(), new Emitted(BY, Assertion.action(tuples)));
         log.append(List.of(event));
         events.add(event);
         for (int i = 0; i < tuples.size(); i++) {
@@ -90,12 +78,4 @@ final class GeneratedLog {
         return things.get(random.nextInt(things.size()));
     }
 
-    /** The frontier of one event: it and its causes. */
-    static Frontier at(Event... events) {
-        var ids = new TreeSet<EventId>();
-        for (var e : events) {
-            ids.add(e.id());
-        }
-        return new Frontier(ids);
-    }
 }

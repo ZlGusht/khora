@@ -8,33 +8,27 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.TreeSet;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import khora.events.AcceptedAction;
+import khora.events.Emitted;
 import khora.events.Action;
 import khora.events.Assertion;
 import khora.events.Event;
 import khora.events.EventId;
-import khora.events.Frontier;
-import khora.events.FrontierCheck;
 import khora.events.Hlc;
 import khora.events.Identity;
-import khora.events.Order;
 import khora.events.json.Json;
 import khora.events.log.EventLog;
 import khora.events.log.EventLogException;
 import khora.events.log.Following;
 import khora.events.log.InMemoryEventLog;
 import khora.events.log.Logged;
-import khora.surfaces.stub.Projects;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-/** How the kernel delivers events to surfaces: once each, after their causes, never their own. */
+/** How the kernel delivers events to surfaces: once each, in log order, never their own. */
 class DeliveryTest {
 
     static final Identity NOTE = Identity.named("note");
@@ -72,7 +66,7 @@ class DeliveryTest {
     }
 
     static String by(Event e) {
-        return ((AcceptedAction) e.body()).by().principal();
+        return ((Emitted) e.body()).by().principal();
     }
 
     InMemoryEventLog log;
@@ -81,29 +75,21 @@ class DeliveryTest {
     @BeforeEach
     void kernel() {
         log = new InMemoryEventLog();
-        kernel = new Kernel(new Projects(), log, new Hlc(() -> 1000));
+        kernel = new Kernel(log, new Hlc(() -> 1000));
     }
 
     Event submit(Action action) {
-        return assertInstanceOf(Answer.Accepted.class, kernel.submit(action, ANNA, kernel.frontier(), Map.of())).event();
+        return assertInstanceOf(Answer.Logged.class, kernel.submit(action, ANNA)).event();
     }
 
-    /** Every event a surface received came after all of its causes that the surface also received. */
-    static void assertAfterCauses(Probe probe) {
-        var seen = new java.util.HashSet<khora.events.EventId>();
-        for (var e : probe.received) {
-            for (var earlier : probe.received) {
-                if (earlier == e) {
-                    break;
-                }
-                seen.add(earlier.id());
+    /** Every event a surface received came after its trigger, if the surface received that too. */
+    static void assertAfterTriggers(Probe probe) {
+        for (int i = 0; i < probe.received.size(); i++) {
+            var trigger = probe.received.get(i).trigger();
+            for (int j = i; j < probe.received.size(); j++) {
+                assertFalse(trigger.equals(Optional.of(probe.received.get(j).id())),
+                        probe.name + " got an event before its trigger");
             }
-            for (var other : probe.received) {
-                if (other != e && e.causes().contains(other.id())) {
-                    assertTrue(seen.contains(other.id()), probe.name + " got " + e.id() + " before its cause " + other.id());
-                }
-            }
-            seen.clear();
         }
     }
 
@@ -111,13 +97,13 @@ class DeliveryTest {
     void anEmissionReachesOthersAfterItsCause() {
         var echo = new Probe("echo", e -> by(e).equals("anna") ? List.of(note("seen")) : List.of());
         var watcher = new Probe("watcher", e -> List.of());
-        kernel.attach(echo, Frontier.empty());
-        kernel.attach(watcher, Frontier.empty());
+        kernel.attach(echo, 0);
+        kernel.attach(watcher, 0);
         var e = submit(note("hello"));
         assertEquals(2, watcher.received.size());
         assertEquals(e, watcher.received.getFirst());
         assertEquals("echo", by(watcher.received.get(1)));
-        assertAfterCauses(watcher);
+        assertAfterTriggers(watcher);
     }
 
     @Test
@@ -126,11 +112,11 @@ class DeliveryTest {
         submit(note("v1"));
         submit(note("v2"));
         var replier = new Probe("replier", e -> by(e).equals("late") ? List.of(note("reply")) : List.of());
-        kernel.attach(replier, kernel.frontier());
+        kernel.attach(replier, kernel.position());
         var late = new Probe("late", e -> e.equals(v0) ? List.of(note("from late")) : List.of());
-        kernel.attach(late, Frontier.empty());
+        kernel.attach(late, 0);
         assertEquals(List.of("anna", "anna", "anna", "replier"), late.received.stream().map(DeliveryTest::by).toList());
-        assertAfterCauses(late);
+        assertAfterTriggers(late);
         assertEquals(List.of("late"), replier.received.stream().map(DeliveryTest::by).toList());
     }
 
@@ -140,9 +126,9 @@ class DeliveryTest {
             submit(note("n" + i));
         }
         var replier = new Probe("replier", e -> by(e).equals("late") ? List.of(note("reply")) : List.of());
-        kernel.attach(replier, kernel.frontier());
+        kernel.attach(replier, kernel.position());
         var late = new Probe("late", e -> by(e).equals("anna") && late(e) ? List.of(note("from late")) : List.of());
-        kernel.attach(late, Frontier.empty());
+        kernel.attach(late, 0);
         var ids = late.received.stream().map(Event::id).toList();
         assertEquals(ids.size(), Set.copyOf(ids).size());
         assertTrue(late.received.stream().noneMatch(e -> by(e).equals("late")));
@@ -150,7 +136,7 @@ class DeliveryTest {
     }
 
     static boolean late(Event e) {
-        return ((AcceptedAction) e.body()).action().args().canonical().contains("\"n0\"");
+        return ((Emitted) e.body()).action().args().canonical().contains("\"n0\"");
     }
 
     @Test
@@ -159,8 +145,8 @@ class DeliveryTest {
             throw new IllegalStateException("broken surface");
         });
         var watcher = new Probe("watcher", e -> List.of());
-        kernel.attach(failing, Frontier.empty());
-        kernel.attach(watcher, Frontier.empty());
+        kernel.attach(failing, 0);
+        kernel.attach(watcher, 0);
         var e = submit(note("hello"));
         assertEquals(List.of(e), watcher.received);
     }
@@ -174,36 +160,55 @@ class DeliveryTest {
             }
         };
         var watcher = new Probe("watcher", e -> List.of());
-        kernel.attach(broken, Frontier.empty());
-        kernel.attach(watcher, Frontier.empty());
+        kernel.attach(broken, 0);
+        kernel.attach(watcher, 0);
         var e = submit(note("hello"));
         assertEquals(List.of(e), watcher.received);
         assertEquals(1, log.read(1, 100).size());
     }
 
     @Test
-    void anEmissionThatFailsDoesNotFailTheSubmit() {
-        kernel.attach(new Probe("bad", e -> List.of(new Action(Identity.named("orders/place"), Json.Obj.of(Map.of())))),
-                Frontier.empty());
+    void anEmissionThatIsRefusedDoesNotFailTheSubmit() {
+        var orders = Identity.named("orders/place");
+        kernel = new Kernel(log, new Hlc(() -> 1000), new Gate() {
+            @Override
+            public String name() {
+                return "orders";
+            }
+
+            @Override
+            public boolean guards(Action action) {
+                return action.definition().equals(orders);
+            }
+
+            @Override
+            public Verdict decide(Action action, khora.events.By by) {
+                return new Refuse("no orders");
+            }
+
+            @Override
+            public void take(Event event) {}
+        });
+        kernel.attach(new Probe("bad", e -> List.of(new Action(orders, Json.Obj.of(java.util.Map.of())))), 0);
         var watcher = new Probe("watcher", e -> List.of());
-        kernel.attach(watcher, Frontier.empty());
+        kernel.attach(watcher, 0);
         var e = submit(note("hello"));
         assertEquals(List.of(e), watcher.received);
     }
 
     @Test
-    void aSurfacesOwnEmissionsAreCausallyOrdered() {
+    void aSurfacesEmissionsAreTriggeredByWhatItReceivedInOrder() {
         var twice = new Probe("twice", e -> by(e).equals("anna") ? List.of(note("first"), note("second")) : List.of());
         var watcher = new Probe("watcher", e -> List.of());
-        kernel.attach(twice, Frontier.empty());
-        kernel.attach(watcher, Frontier.empty());
+        kernel.attach(twice, 0);
+        kernel.attach(watcher, 0);
         submit(note("hello"));
         var first = watcher.received.get(1);
         var second = watcher.received.get(2);
         assertEquals("twice", by(first));
         assertEquals("twice", by(second));
-        assertEquals(Order.BEFORE, FrontierCheck.compare(
-                new Frontier(new TreeSet<>(Set.of(first.id()))), new Frontier(new TreeSet<>(Set.of(second.id()))), log));
+        assertEquals(first.trigger(), second.trigger());
+        assertTrue(first.recorded() < second.recorded());
     }
 
     /** A log whose next appends fail, after storing the events or before. */
@@ -260,10 +265,10 @@ class DeliveryTest {
     void anAppendWithAnUnknownOutcomeIsRetriedWithTheSameEvent() {
         for (boolean storedBeforeFailing : new boolean[] {true, false}) {
             var flaky = new FlakyLog();
-            var k = new Kernel(new Projects(), flaky, new Hlc(() -> 1000));
+            var k = new Kernel(flaky, new Hlc(() -> 1000));
             flaky.failures = 1;
             flaky.storeBeforeFailing = storedBeforeFailing;
-            var e = assertInstanceOf(Answer.Accepted.class, k.submit(note("once"), ANNA, Frontier.empty(), Map.of())).event();
+            var e = assertInstanceOf(Answer.Logged.class, k.submit(note("once"), ANNA)).event();
             assertEquals(List.of(e), stored(flaky));
             assertEquals(2, flaky.appends);
         }
@@ -272,10 +277,10 @@ class DeliveryTest {
     @Test
     void anAppendThatKeepsFailingCarriesTheEvent() {
         var flaky = new FlakyLog();
-        var k = new Kernel(new Projects(), flaky, new Hlc(() -> 1000));
+        var k = new Kernel(flaky, new Hlc(() -> 1000));
         flaky.failures = Kernel.APPEND_ATTEMPTS;
         flaky.storeBeforeFailing = true;
-        var failed = assertThrows(Kernel.Unconfirmed.class, () -> k.submit(note("once"), ANNA, Frontier.empty(), Map.of()));
+        var failed = assertThrows(Kernel.Unconfirmed.class, () -> k.submit(note("once"), ANNA));
         assertEquals(List.of(failed.event()), stored(flaky));
         flaky.append(List.of(failed.event()));
         assertEquals(List.of(failed.event()), stored(flaky));
@@ -283,20 +288,17 @@ class DeliveryTest {
 
     @Test
     void surfacesEchoingEachOtherStop() {
-        kernel.attach(new Probe("ping", e -> List.of(note("ping"))), Frontier.empty());
-        kernel.attach(new Probe("pong", e -> List.of(note("pong"))), Frontier.empty());
+        kernel.attach(new Probe("ping", e -> List.of(note("ping"))), 0);
+        kernel.attach(new Probe("pong", e -> List.of(note("pong"))), 0);
         submit(note("start"));
         var stored = log.read(1, 100_000).size();
         assertTrue(stored <= 2 * Kernel.MAX_GENERATIONS + 1, "stored " + stored);
     }
 
     @Test
-    void aKernelOnAFilledLogKnowsItsHeads() {
-        var e = submit(note("one"));
-        var f = submit(note("two"));
-        var again = new Kernel(new Projects(), log, new Hlc(() -> 1000));
-        assertEquals(kernel.frontier(), again.frontier());
-        assertFalse(again.frontier().heads().isEmpty());
-        assertTrue(FrontierCheck.closure(again.frontier().heads(), log).containsAll(Set.of(e.id(), f.id())));
+    void aKernelOnAFilledLogKnowsItsPosition() {
+        submit(note("one"));
+        submit(note("two"));
+        assertEquals(2, new Kernel(log, new Hlc(() -> 1000)).position());
     }
 }

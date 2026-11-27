@@ -12,16 +12,15 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
-import khora.events.AcceptedAction;
+import khora.events.Emitted;
 import khora.events.Action;
 import khora.events.Assertion;
 import khora.events.Basic;
 import khora.events.Event;
 import khora.events.EventId;
 import khora.events.EventSource;
-import khora.events.FrontierCheck;
 import khora.events.Identity;
-import khora.surfaces.Authority;
+import khora.surfaces.Gate;
 import khora.surfaces.Surface;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DynamicContainer;
@@ -30,28 +29,28 @@ import org.junit.jupiter.api.TestFactory;
 
 /**
  * The contract every surface passes. A subclass gives the surface, its scenarios and, if it wants,
- * the authority (by default {@link AcceptAll}). Each scenario runs once through a fresh kernel and
+ * the gates they run with (by default none). Each scenario runs once through a fresh kernel and
  * becomes a container named after it, holding the test {@code expectation} (its {@link Then} holds)
  * and one test per surface rule, each judged over the deliveries to the surface under test:
  *
  * <ul>
- *   <li>{@value #MATCH}: each event it received matches one of its interests, and came after those
- *       of its causes it also received; every cause was in the log;
+ *   <li>{@value #MATCH}: each event it received matches one of its interests, came in log order,
+ *       and came after its trigger was in the log;
  *   <li>{@value #OWN}: no event it received is one it emitted;
- *   <li>{@value #CAUSED}: the actions it returned for an event became events, in order, linked to
- *       that event as {@code source}, knowing every event it had received so far;
+ *   <li>{@value #TRIGGERED}: the actions it returned for an event became events, in order, each
+ *       naming that event as its trigger;
  *   <li>{@value #SAME}: the scenario is played a second time from scratch, with a new surface and
- *       authority, and the surface receives the same events and returns the same actions, compared
+ *       gates, and the surface receives the same events and returns the same actions, compared
  *       symbolically.
  * </ul>
  *
- * <p>The events a surface emitted are those of the log by its name whose {@code source} is an event
- * it received. A scenario attaches the surface once: among its given steps
+ * <p>The events a surface emitted are those of the log by its name whose trigger is an event it
+ * received. A scenario attaches the surface once: among its given steps
  * ({@link Given.AttachSurface}), after which later steps and a submitted {@code When} are delivered
  * live, or as its {@code When} ({@link When.Attach}), when it only catches up.
  *
- * <p>Rules {@value #MATCH}, {@value #OWN} and {@value #CAUSED} mostly judge the kernel: it decides
- * what a surface receives, keeps its own emissions from it, and links what it emits to their cause.
+ * <p>Rules {@value #MATCH}, {@value #OWN} and {@value #TRIGGERED} mostly judge the kernel: it decides
+ * what a surface receives, keeps its own emissions from it, and links what it emits to their trigger.
  * What holds a surface to the right interests and the right answers are its scenarios, through their
  * {@code expectation}.
  *
@@ -61,9 +60,8 @@ import org.junit.jupiter.api.TestFactory;
  * compared as text, and ids differ between runs, so such a surface fails {@value #SAME} and its
  * expectation even when it is right.
  *
- * <p>Rule {@value #CAUSED} fails when the contract's authority rejects what the surface emits, so
- * run a surface contract with an authority that accepts what the surface emits (the default
- * {@link AcceptAll} does).
+ * <p>Rule {@value #TRIGGERED} fails when a gate refuses what the surface emits, so run a surface
+ * contract with gates that let through what the surface emits (the default, none, does).
  *
  * <p>A scenario the runner cannot play fails every test of its container with the runner's message.
  * A scenario in which the surface received nothing aborts the four rule tests rather than pass them
@@ -71,9 +69,9 @@ import org.junit.jupiter.api.TestFactory;
  */
 public abstract class SurfaceContract {
 
-    public static final String MATCH = "receives only what its interests match, after its causes";
+    public static final String MATCH = "receives only what its interests match, in log order";
     public static final String OWN = "never receives what it emitted";
-    public static final String CAUSED = "what it emits is caused by what it received";
+    public static final String TRIGGERED = "what it emits is triggered by what it received";
     public static final String SAME = "the same events give the same actions";
 
     /** A new instance of the surface under test; called once per scenario run. */
@@ -82,9 +80,9 @@ public abstract class SurfaceContract {
     /** The scenarios the surface is held to. Their names are distinct. */
     protected abstract List<Scenario> scenarios();
 
-    /** A new instance of the authority the scenarios run with; called once per scenario run. */
-    protected Authority authority() {
-        return new AcceptAll();
+    /** New instances of the gates the scenarios run with; called once per scenario run. */
+    protected List<Gate> gates() {
+        return List.of();
     }
 
     /** A run, and the surface it was played with. */
@@ -110,14 +108,14 @@ public abstract class SurfaceContract {
                     DynamicTest.dynamicTest("expectation", () -> expect(s, played.get().run())),
                     rule(MATCH, s, played, SurfaceContract::receivesWhatMatches),
                     rule(OWN, s, played, SurfaceContract::neverItsOwn),
-                    rule(CAUSED, s, played, SurfaceContract::causedByWhatItReceived),
+                    rule(TRIGGERED, s, played, SurfaceContract::triggeredByWhatItReceived),
                     rule(SAME, s, played, (scenario, first) -> sameTwice(scenario, first, play(scenario)))));
         });
     }
 
     private Played play(Scenario s) {
         var surface = surface();
-        return new Played(surface, ScenarioRunner.run(s, authority(), Optional.of(surface)));
+        return new Played(surface, ScenarioRunner.run(s, gates(), Optional.of(surface)));
     }
 
     private interface Rule {
@@ -142,15 +140,15 @@ public abstract class SurfaceContract {
     }
 
     /** The events the surface emitted, in log order, by the event they respond to. */
-    private static Map<EventId, List<Event>> emittedBySource(Played p) {
+    private static Map<EventId, List<Event>> emittedByTrigger(Played p) {
         var received = new HashSet<EventId>();
         p.run().deliveries().forEach(d -> received.add(d.event().id()));
         var emitted = new HashMap<EventId, List<Event>>();
         for (var e : p.run().events()) {
-            if (e.body() instanceof AcceptedAction a && a.by().principal().equals(p.surface().name())) {
-                var source = a.links().getOrDefault("source", Set.of());
-                if (source.size() == 1 && received.contains(source.iterator().next())) {
-                    emitted.computeIfAbsent(source.iterator().next(), k -> new ArrayList<>()).add(e);
+            if (e.body() instanceof Emitted a && a.by().principal().equals(p.surface().name())) {
+                var trigger = e.trigger();
+                if (trigger.isPresent() && received.contains(trigger.get())) {
+                    emitted.computeIfAbsent(trigger.get(), k -> new ArrayList<>()).add(e);
                 }
             }
         }
@@ -165,32 +163,33 @@ public abstract class SurfaceContract {
     static void receivesWhatMatches(Scenario s, Played p) {
         var run = p.run();
         var source = source(run);
-        var earlier = new HashSet<EventId>();
-        var received = new HashSet<EventId>();
-        run.deliveries().forEach(d -> received.add(d.event().id()));
+        var order = new HashMap<EventId, Integer>();
+        for (int i = 0; i < run.events().size(); i++) {
+            order.put(run.events().get(i).id(), i);
+        }
+        int last = -1;
         for (int i = 0; i < run.deliveries().size(); i++) {
             var d = run.deliveries().get(i);
             var event = d.event();
             if (p.surface().interests().stream().noneMatch(interest -> interest.matches(event, source))) {
                 fail(about(s, i, run) + ": matches none of its interests");
             }
-            for (var cause : event.causes()) {
-                if (!d.logBefore().contains(cause)) {
-                    fail(about(s, i, run) + ": received before its cause " + render(cause, run.bindings())
-                            + " was in the log");
-                }
-                if (received.contains(cause) && !earlier.contains(cause)) {
-                    fail(about(s, i, run) + ": received before its cause " + render(cause, run.bindings()));
-                }
+            if (event.trigger().isPresent() && !d.logBefore().contains(event.trigger().get())) {
+                fail(about(s, i, run) + ": received before its trigger " + render(event.trigger().get(), run.bindings())
+                        + " was in the log");
             }
-            earlier.add(event.id());
+            int at = order.getOrDefault(event.id(), -1);
+            if (at <= last) {
+                fail(about(s, i, run) + ": received out of log order");
+            }
+            last = at;
         }
     }
 
     static void neverItsOwn(Scenario s, Played p) {
         var run = p.run();
         var own = new HashSet<EventId>();
-        emittedBySource(p).values().forEach(es -> es.forEach(e -> own.add(e.id())));
+        emittedByTrigger(p).values().forEach(es -> es.forEach(e -> own.add(e.id())));
         for (int i = 0; i < run.deliveries().size(); i++) {
             if (own.contains(run.deliveries().get(i).event().id())) {
                 fail(about(s, i, run) + ": the surface received an event it emitted");
@@ -198,28 +197,16 @@ public abstract class SurfaceContract {
         }
     }
 
-    static void causedByWhatItReceived(Scenario s, Played p) {
+    static void triggeredByWhatItReceived(Scenario s, Played p) {
         var run = p.run();
         var bindings = run.bindings();
-        var source = source(run);
-        var bySource = emittedBySource(p);
-        var received = new HashSet<EventId>();
+        var byTrigger = emittedByTrigger(p);
         for (int i = 0; i < run.deliveries().size(); i++) {
             var d = run.deliveries().get(i);
-            received.add(d.event().id());
-            var events = bySource.getOrDefault(d.event().id(), List.of());
+            var events = byTrigger.getOrDefault(d.event().id(), List.of());
             assertEquals(symbolic(d.returned(), bindings),
-                    symbolic(events.stream().map(e -> ((AcceptedAction) e.body()).action()).toList(), bindings),
+                    symbolic(events.stream().map(e -> ((Emitted) e.body()).action()).toList(), bindings),
                     about(s, i, run) + ": the actions it returned, and the events they became");
-            for (var e : events) {
-                var knew = FrontierCheck.closure(e.causes(), source);
-                assertTrue(e.causes().contains(d.event().id()),
-                        about(s, i, run) + ": " + render(e.id(), bindings) + " is not caused by the event it responds to");
-                for (var r : received) {
-                    assertTrue(knew.contains(r), about(s, i, run) + ": " + render(e.id(), bindings)
-                            + " does not know " + render(r, bindings) + ", which the surface had received");
-                }
-            }
         }
     }
 
@@ -244,7 +231,7 @@ public abstract class SurfaceContract {
      */
     static void expect(Scenario s, Run run) {
         if (!(s.then() instanceof Then.Emits emits)) {
-            AuthorityContract.expect(s, run);
+            GateContract.expect(s, run);
             return;
         }
         var steps = new HashSet<String>();
@@ -290,7 +277,7 @@ public abstract class SurfaceContract {
         }
         var tuples = Assertion.in(action);
         if (tuples.isPresent()) {
-            return "assert " + tuples.get().stream().map(t -> AuthorityContract.symbolic(t, bindings)).toList();
+            return "assert " + tuples.get().stream().map(t -> GateContract.symbolic(t, bindings)).toList();
         }
         return action.definition().value() + " " + action.args().canonical();
     }

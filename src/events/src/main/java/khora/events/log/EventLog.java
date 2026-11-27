@@ -16,8 +16,8 @@ import khora.events.Identity;
  * the same append, stores nothing and gives the stored position. Its id is a salted hash of its
  * content, so two different events never share one.
  *
- * <p>The log stores; it does not judge. Whether an event's causes are present and its links in its
- * causal past is checked before it is appended ({@code Causality}).
+ * <p>The log stores; it does not judge. Events are facts, so logs combine by putting their events
+ * together; what the events mean is for the surfaces that read them.
  */
 public interface EventLog extends EventSource, AutoCloseable {
 

@@ -8,49 +8,48 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
-import khora.events.AcceptedAction;
 import khora.events.Assertion;
 import khora.events.Basic;
 import khora.events.Identity;
 import khora.events.Statement;
 import khora.events.json.Json;
 import khora.surfaces.Answer;
-import khora.surfaces.Authority;
+import khora.surfaces.Gate;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DynamicContainer;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
 
 /**
- * The contract every authority passes. A subclass gives the authority and its scenarios; each
- * scenario runs once through a fresh kernel and becomes a container named after it, holding the test
- * {@code expectation} (its {@link Then} holds) and one test per authority rule, each judged over
- * every decision of the run:
+ * The contract every gate passes. A subclass gives the gate and its scenarios; each scenario runs
+ * once through a fresh kernel and becomes a container named after it, holding the test
+ * {@code expectation} (its {@link Then} holds) and one test per gate rule, each judged over every
+ * decision of the run:
  *
  * <ul>
- *   <li>{@value #LOG}: it neither appends to, follows nor closes the log while deciding;
- *   <li>{@value #REASON}: a rejection's reason is not blank;
- *   <li>{@value #READ}: see {@link #readIsNotRejected}.
+ *   <li>{@value #REASON}: a refusal's reason is not blank;
+ *   <li>{@value #READ}: a read is not refused;
+ *   <li>{@value #SAME}: the scenario is played a second time from scratch, with a new gate, and it
+ *       decides the same actions the same way, compared symbolically.
  * </ul>
  *
- * <p>Authority rules are judged in an authority's own contract run, on the steps its scenarios
- * submit. A surface contract run records the decisions on the actions its surface emitted, but does
- * not judge them: an authority is held to its rules on such actions by scenarios in its own contract.
+ * <p>A gate judges against what it has taken in, never the log, so it cannot change the log while
+ * deciding.
  *
  * <p>A scenario the runner cannot play fails every test of its container with the runner's message.
- * A scenario in which the authority was never asked (the kernel rejected everything before it) aborts
- * the three rule tests rather than pass them with nothing to judge.
+ * A scenario in which the gate was never asked (it guards none of its actions) aborts the rule tests
+ * rather than pass them with nothing to judge.
  */
-public abstract class AuthorityContract {
+public abstract class GateContract {
 
-    public static final String LOG = "authority does not change the log";
-    public static final String REASON = "a rejection has a reason";
-    public static final String READ = "a read is not rejected for a conflict";
+    public static final String REASON = "a refusal has a reason";
+    public static final String READ = "a read is not refused";
+    public static final String SAME = "the same events give the same verdicts";
 
-    /** A new instance of the authority under test; called once per scenario run. */
-    protected abstract Authority authority();
+    /** A new instance of the gate under test; called once per scenario run. */
+    protected abstract Gate gate();
 
-    /** The scenarios the authority is held to. Their names are distinct. */
+    /** The scenarios the gate is held to. Their names are distinct. */
     protected abstract List<Scenario> scenarios();
 
     /**
@@ -68,83 +67,82 @@ public abstract class AuthorityContract {
             }
         }
         return scenarios.stream().map(s -> {
-            var run = new Once<>(() -> ScenarioRunner.run(s, authority(), Optional.empty()));
+            var run = new Once<>(() -> play(s));
             return DynamicContainer.dynamicContainer(s.name(), Stream.of(
                     DynamicTest.dynamicTest("expectation", () -> expect(s, run.get())),
-                    rule(LOG, s, run, AuthorityContract::logIsUnchanged),
-                    rule(REASON, s, run, AuthorityContract::rejectionHasReason),
-                    rule(READ, s, run, AuthorityContract::readIsNotRejected)));
+                    rule(REASON, s, run, (scenario, r) -> r.decisions().forEach(d -> refusalHasReason(scenario, r, d))),
+                    rule(READ, s, run, (scenario, r) -> r.decisions().forEach(d -> readIsNotRefused(scenario, r, d))),
+                    rule(SAME, s, run, (scenario, r) -> sameTwice(scenario, r, play(scenario)))));
         });
     }
 
+    private Run play(Scenario s) {
+        return ScenarioRunner.run(s, List.of(gate()), Optional.empty());
+    }
+
     private interface Rule {
-        void check(Scenario s, Run run, Run.Decision decision);
+        void check(Scenario s, Run run);
     }
 
     private static DynamicTest rule(String name, Scenario s, Once<Run> once, Rule rule) {
         return DynamicTest.dynamicTest(name, () -> {
             var run = once.get();
             if (run.decisions().isEmpty()) {
-                Assumptions.abort("the authority was not asked in this scenario");
+                Assumptions.abort("the gate was not asked in this scenario");
             }
-            run.decisions().forEach(d -> rule.check(s, run, d));
+            rule.check(s, run);
         });
     }
 
-    /**
-     * The decision on {@code d}'s candidate, for messages: {@code step X} for the step that submitted
-     * it, {@code emitted#k} for an emitted one.
-     */
+    /** A decision, for messages: the action and who it was by. */
     private static String about(Scenario s, Run run, Run.Decision d) {
-        var id = d.candidate().id().value();
-        var name = run.bindings().render(new Identity(id));
-        if (!name.equals(id)) {
-            return s.name() + ": " + (name.startsWith("emitted#") ? name : "step " + name);
-        }
-        // not in the log: the rejected submit of the When, or a rejected emission
-        var emitted = ((AcceptedAction) d.candidate().body()).links().containsKey("source");
-        return s.name() + ": " + (!emitted && s.when() instanceof When.Submit submit
-                ? "step " + submit.step().name() : "a rejected emission");
+        return s.name() + ": " + d.by().principal() + "'s " + SurfaceContract.symbolic(List.of(d.action()), run.bindings());
     }
 
-    static void logIsUnchanged(Scenario s, Run run, Run.Decision d) {
-        if (d.appendedDuringDecide()) {
-            fail(about(s, run, d) + ": the authority tried to change the log while deciding");
-        }
-    }
-
-    static void rejectionHasReason(Scenario s, Run run, Run.Decision d) {
-        if (d.verdict() instanceof Authority.Reject r && r.reason().isBlank()) {
-            fail(about(s, run, d) + ": rejected with a blank reason");
+    static void refusalHasReason(Scenario s, Run run, Run.Decision d) {
+        if (d.verdict() instanceof Gate.Refuse r && r.reason().isBlank()) {
+            fail(about(s, run, d) + ": refused with a blank reason");
         }
     }
 
     /**
-     * A submitted read is not rejected. Stage 1 has no access checks, so the only reason to reject a
-     * read would be a conflict, which [[Reads return statements and writes follow a read]] forbids.
-     * When access checks arrive, this must narrow to "not rejected for a conflict".
+     * A read is not refused. Stage 1 has no access checks, so the only reason to refuse a read would
+     * be a conflict, and a read conflicts with nothing. When access checks arrive, this must narrow to
+     * "not refused for a conflict".
      */
-    static void readIsNotRejected(Scenario s, Run run, Run.Decision d) {
-        var action = ((AcceptedAction) d.candidate().body()).action();
-        if (Basic.readOf(action).isPresent() && d.verdict() instanceof Authority.Reject r) {
-            fail(about(s, run, d) + ": a read was rejected: " + r.reason());
+    static void readIsNotRefused(Scenario s, Run run, Run.Decision d) {
+        if (Basic.readOf(d.action()).isPresent() && d.verdict() instanceof Gate.Refuse r) {
+            fail(about(s, run, d) + ": a read was refused: " + r.reason());
         }
+    }
+
+    static void sameTwice(Scenario s, Run first, Run second) {
+        assertEquals(verdicts(first), verdicts(second),
+                s.name() + ": played again from scratch, the gate decided something else");
+    }
+
+    /** Each decision as the action and whether it passed, symbolically. */
+    private static List<String> verdicts(Run run) {
+        return run.decisions().stream()
+                .map(d -> d.by().principal() + " " + SurfaceContract.symbolic(List.of(d.action()), run.bindings())
+                        + " -> " + (d.verdict() instanceof Gate.Pass ? "pass" : "refuse"))
+                .toList();
     }
 
     /** Checks that the run of {@code s} meets its {@link Then}. */
     static void expect(Scenario s, Run run) {
         switch (s.then()) {
-            case Then.Accepted ignored -> {
-                if (!(answer(s, run) instanceof Answer.Accepted)) {
-                    fail(s.name() + ": expected accepted, was " + answer(s, run));
+            case Then.Logged ignored -> {
+                if (!(answer(s, run) instanceof Answer.Logged)) {
+                    fail(s.name() + ": expected logged, was " + answer(s, run));
                 }
             }
-            case Then.Rejected rejected -> {
-                if (!(answer(s, run) instanceof Answer.Rejected r)) {
-                    fail(s.name() + ": expected rejected, was accepted");
+            case Then.Refused refused -> {
+                if (!(answer(s, run) instanceof Answer.Refused r)) {
+                    fail(s.name() + ": expected refused, was logged");
                     return;
                 }
-                rejected.reasonContains().ifPresent(text -> assertTrue(r.reason().contains(text),
+                refused.reasonContains().ifPresent(text -> assertTrue(r.reason().contains(text),
                         s.name() + ": the reason \"" + r.reason() + "\" does not contain \"" + text + "\""));
             }
             case Then.Statements expected -> {
@@ -155,8 +153,8 @@ public abstract class AuthorityContract {
                             fail(s.name() + ": broken scenario: expects statements, but submits "
                                     + submit.step().name() + ", which is not a read");
                         }
-                        if (answer(s, run) instanceof Answer.Rejected r) {
-                            fail(s.name() + ": expected the read's statements, but it was rejected: " + r.reason());
+                        if (answer(s, run) instanceof Answer.Refused r) {
+                            fail(s.name() + ": expected the read's statements, but it was refused: " + r.reason());
                         }
                     }
                     case When.Attach ignored -> fail(s.name() + ": an attach answers with no statements");
@@ -166,7 +164,7 @@ public abstract class AuthorityContract {
                                 .map(t -> symbolic(t.resolve(bindings, Optional.empty()), bindings)).toList(),
                         symbolic(run.statements(), bindings), s.name() + ": statements");
             }
-            case Then.Emits ignored -> fail(s.name() + ": the authority contract does not check emissions");
+            case Then.Emits ignored -> fail(s.name() + ": the gate contract does not check emissions");
         }
     }
 

@@ -5,19 +5,20 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import khora.events.Action;
+import khora.events.By;
 import khora.events.Event;
 import khora.events.EventId;
 import khora.events.Statement;
 import khora.surfaces.Answer;
-import khora.surfaces.Authority;
+import khora.surfaces.Gate;
 
 /**
  * What happened when a scenario ran.
  *
  * @param bindings the step names and emitted events of the run
  * @param answer the answer to a {@link When.Submit}; empty for any other {@code When}
- * @param statements what a {@link When.Read} found, or what a submitted read answered with
- * @param decisions every decision the authority made, in order
+ * @param statements what the reference reader answered a read with
+ * @param decisions every decision the gates made, in order
  * @param deliveries every event the surface under test received, in order
  * @param events every event of the log when the run ended, in log order
  */
@@ -32,10 +33,11 @@ public record Run(Bindings bindings, Optional<Answer> answer, List<Statement> st
         events = List.copyOf(events);
     }
 
-    /** One decision of the authority: its verdict, and whether it tried to change the log while deciding. */
-    public record Decision(Event candidate, Authority.Verdict verdict, boolean appendedDuringDecide) {
+    /** One decision of a gate: the action, who it was by, and the verdict. */
+    public record Decision(Action action, By by, Gate.Verdict verdict) {
         public Decision {
-            Objects.requireNonNull(candidate, "candidate");
+            Objects.requireNonNull(action, "action");
+            Objects.requireNonNull(by, "by");
             Objects.requireNonNull(verdict, "verdict");
         }
     }

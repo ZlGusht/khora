@@ -6,22 +6,22 @@ import java.util.Optional;
 
 /** What a scenario expects. */
 public sealed interface Then {
-    /** The submission is accepted. */
-    static Then accepted() {
-        return new Accepted();
+    /** The submission becomes an event. */
+    static Then logged() {
+        return new Logged();
     }
 
-    /** The submission is rejected, for any reason. */
-    static Then rejected() {
-        return new Rejected(Optional.empty());
+    /** A gate refuses the submission, for any reason. */
+    static Then refused() {
+        return new Refused(Optional.empty());
     }
 
-    /** The submission is rejected, for a reason containing {@code text}. */
-    static Then rejected(String text) {
-        return new Rejected(Optional.of(text));
+    /** A gate refuses the submission, for a reason containing {@code text}. */
+    static Then refused(String text) {
+        return new Refused(Optional.of(text));
     }
 
-    /** The read answers with exactly these tuples, in recorded order. */
+    /** The reference reader answers the read with exactly these tuples, in log order. */
     static Then statements(TupleSpec... tuples) {
         return new Statements(List.of(tuples));
     }
@@ -31,12 +31,12 @@ public sealed interface Then {
         return new Emits(groups);
     }
 
-    /** The submission is accepted. */
-    record Accepted() implements Then {}
+    /** The submission becomes an event. */
+    record Logged() implements Then {}
 
-    /** The submission is rejected, for a reason containing the text if given. */
-    record Rejected(Optional<String> reasonContains) implements Then {
-        public Rejected {
+    /** A gate refuses the submission, for a reason containing the text if given. */
+    record Refused(Optional<String> reasonContains) implements Then {
+        public Refused {
             Objects.requireNonNull(reasonContains, "reasonContains");
         }
     }

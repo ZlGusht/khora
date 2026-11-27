@@ -5,10 +5,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import khora.events.Event;
 import khora.events.Assertion;
 import khora.events.Assertion.Value;
-import khora.events.EventId;
-import khora.events.Frontier;
 import khora.events.Identity;
 import khora.events.Statements;
 import khora.events.log.EventLog;
@@ -17,8 +16,7 @@ import khora.events.log.EventLog;
  * A datastore that keeps nothing of its own: it works every answer out from the events of a log,
  * as {@link Statements} does. It is the reference other datastores are checked against.
  *
- * <p>Provisional: reads every event of the frontier on each answer, and the whole log to find its
- * heads when a query names no frontier.
+ * <p>Provisional: reads the log up to the query's position on each answer.
  */
 public final class EventsDatastore implements Datastore {
     private static final int PAGE = 1000;
@@ -31,26 +29,29 @@ public final class EventsDatastore implements Datastore {
 
     @Override
     public Answer answer(Query query) {
-        var at = query.at().orElseGet(this::heads);
-        return Evaluator.answer(query, at, graph(at));
-    }
-
-    private Frontier heads() {
-        var ids = new ArrayList<EventId>();
-        for (long from = 1;; from += PAGE) {
-            var page = log.read(from, PAGE);
-            page.forEach(l -> ids.add(l.event().id()));
-            if (page.size() < PAGE) {
-                return Frontier.of(ids, log);
+        var events = new ArrayList<Event>();
+        long end = query.at().orElse(Long.MAX_VALUE);
+        long last = 0;
+        for (long from = 1; from <= end; ) {
+            var page = log.read(from, (int) Math.min(PAGE, end - from + 1));
+            if (page.isEmpty()) {
+                break;
             }
+            page.forEach(l -> events.add(l.event()));
+            last = page.getLast().position();
+            from = last + 1;
         }
+        if (query.at().isPresent() && last < end) {
+            throw new IllegalArgumentException("position " + end + " is past the log's end, " + last);
+        }
+        return Evaluator.answer(query, last, graph(events));
     }
 
-    private Graph graph(Frontier at) {
+    private Graph graph(List<Event> events) {
         var things = new ArrayList<Identity>();
         var byAttribute = new HashMap<Identity, List<Graph.Fact>>();
         var byThing = new HashMap<Identity, Map<Identity, List<Value>>>();
-        for (var s : Statements.at(at, log)) {
+        for (var s : Statements.of(events)) {
             var tuple = s.assertion();
             if (tuple.equals(Assertion.entity())) {
                 things.add(s.id());

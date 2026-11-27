@@ -20,14 +20,14 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
-import khora.events.AcceptedAction;
+import khora.events.Emitted;
 import khora.events.Action;
 import khora.events.Assertion;
 import khora.events.Event;
 import khora.events.Identity;
 import khora.events.json.Json;
-import khora.events.log.EventLog;
-import khora.surfaces.Authority;
+import khora.surfaces.Gate;
+import khora.events.By;
 import khora.surfaces.Interest;
 import khora.surfaces.Surface;
 import org.junit.jupiter.api.DynamicContainer;
@@ -38,7 +38,7 @@ import org.opentest4j.TestAbortedException;
 
 /** Each surface rule fails for a surface that breaks it; Echo keeps them all. */
 class SurfaceRulesTest {
-    static final List<String> RULES = List.of(SurfaceContract.MATCH, SurfaceContract.OWN, SurfaceContract.CAUSED,
+    static final List<String> RULES = List.of(SurfaceContract.MATCH, SurfaceContract.OWN, SurfaceContract.TRIGGERED,
             SurfaceContract.SAME);
 
     /** A project is created; the surface is attached from nothing. */
@@ -47,7 +47,7 @@ class SurfaceRulesTest {
             .when(new When.Attach(List.of()))
             .then(labels("create"));
 
-    static SurfaceContract contract(Supplier<Surface> surface, Supplier<Authority> authority, Scenario... scenarios) {
+    static SurfaceContract contract(Supplier<Surface> surface, Supplier<List<Gate>> gates, Scenario... scenarios) {
         return new SurfaceContract() {
             @Override
             protected Surface surface() {
@@ -55,8 +55,8 @@ class SurfaceRulesTest {
             }
 
             @Override
-            protected Authority authority() {
-                return authority.get();
+            protected List<Gate> gates() {
+                return gates.get();
             }
 
             @Override
@@ -109,29 +109,36 @@ class SurfaceRulesTest {
 
     @Test
     void aSurfaceThatEmitsRandomlyBreaksTheSameEventsRule() {
-        var tests = results(contract(SurfaceRulesTest::randomLabeller, AcceptAll::new, CREATED).contract()).get("created");
+        var tests = results(contract(SurfaceRulesTest::randomLabeller, List::of, CREATED).contract()).get("created");
         assertInstanceOf(AssertionError.class, tests.get(SurfaceContract.SAME));
         assertNull(tests.get(SurfaceContract.MATCH));
         assertNull(tests.get(SurfaceContract.OWN));
-        assertNull(tests.get(SurfaceContract.CAUSED));
+        assertNull(tests.get(SurfaceContract.TRIGGERED));
     }
 
     @Test
-    void anEmissionTheAuthorityRejectsBreaksTheCausedRule() {
-        Supplier<Authority> rejectsSurfaces = () -> new Authority() {
+    void anEmissionAGateRefusesBreaksTheTriggeredRule() {
+        Supplier<List<Gate>> rejectsSurfaces = () -> List.of(new Gate() {
             @Override
             public String name() {
                 return "no-surfaces";
             }
 
             @Override
-            public Verdict decide(Event candidate, EventLog log) {
-                return ((AcceptedAction) candidate.body()).by().grant().equals("surface")
-                        ? new Reject("no emissions") : new Accept();
+            public boolean guards(Action action) {
+                return true;
             }
-        };
+
+            @Override
+            public Verdict decide(Action action, By by) {
+                return by.grant().equals("surface") ? new Refuse("no emissions") : new Pass();
+            }
+
+            @Override
+            public void take(Event event) {}
+        });
         var tests = results(contract(EchoContractTest::labeller, rejectsSurfaces, CREATED).contract()).get("created");
-        assertInstanceOf(AssertionError.class, tests.get(SurfaceContract.CAUSED));
+        assertInstanceOf(AssertionError.class, tests.get(SurfaceContract.TRIGGERED));
         assertNull(tests.get(SurfaceContract.MATCH));
         assertNull(tests.get(SurfaceContract.SAME));
     }
@@ -152,7 +159,7 @@ class SurfaceRulesTest {
                 .given(tell("invoice", Ref.named("invoice"), NAME, "INV-1"))
                 .when(new When.Attach(List.of()))
                 .then(new Then.Emits(List.of()));
-        var tests = results(contract(EchoContractTest::labeller, AcceptAll::new, nothing).contract()).get("nothing");
+        var tests = results(contract(EchoContractTest::labeller, List::of, nothing).contract()).get("nothing");
         assertNull(tests.get("expectation"));
         for (var rule : RULES) {
             assertInstanceOf(TestAbortedException.class, tests.get(rule), rule);
@@ -164,23 +171,23 @@ class SurfaceRulesTest {
     @Test
     void aWrongEmissionFailsTheExpectation() {
         var wrong = Scenario.named("wrong")
-                .given(tell("create", PROJECT, NAME, "Kitchen"), tell("rename", PROJECT, NAME, "Studio", "create"))
+                .given(tell("create", PROJECT, NAME, "Kitchen"), tell("rename", PROJECT, NAME, "Studio"))
                 .when(new When.Attach(List.of()))
                 .then(labels("rename", "create"));
-        var tests = results(contract(EchoContractTest::labeller, AcceptAll::new, wrong).contract()).get("wrong");
+        var tests = results(contract(EchoContractTest::labeller, List::of, wrong).contract()).get("wrong");
         assertInstanceOf(AssertionError.class, tests.get("expectation"));
     }
 
     /** A creation and a rename of it; Echo is attached from nothing, so it answers each in turn. */
     static Scenario twoEvents(Then then) {
         return Scenario.named("two")
-                .given(tell("create", PROJECT, NAME, "Kitchen"), tell("rename", PROJECT, NAME, "Studio", "create"))
+                .given(tell("create", PROJECT, NAME, "Kitchen"), tell("rename", PROJECT, NAME, "Studio"))
                 .when(new When.Attach(List.of()))
                 .then(then);
     }
 
     static Throwable expectation(Scenario s) {
-        return results(contract(EchoContractTest::labeller, AcceptAll::new, s).contract()).get(s.name()).get("expectation");
+        return results(contract(EchoContractTest::labeller, List::of, s).contract()).get(s.name()).get("expectation");
     }
 
     @Test
@@ -230,7 +237,7 @@ class SurfaceRulesTest {
                 return null;
             }
         };
-        var tests = results(contract(nulls, AcceptAll::new, CREATED).contract()).get("created");
+        var tests = results(contract(nulls, List::of, CREATED).contract()).get("created");
         assertEquals(5, tests.size());
         tests.forEach((test, thrown) -> {
             assertInstanceOf(AssertionError.class, thrown, test);
@@ -247,7 +254,7 @@ class SurfaceRulesTest {
                 new Echo.Rule(about("invoice"), List.of(new ActionSpec.Read(Ref.named("invoice")))),
                 new Echo.Rule(Interest.any(), List.of(new ActionSpec.Assert(List.of(
                         TupleSpec.of(PROJECT, LABEL, ValueSpec.ref(Ref.received(1)))))))));
-        var run = ScenarioRunner.run(CREATED, new AcceptAll(), Optional.of(echo));
+        var run = ScenarioRunner.run(CREATED, List.of(), Optional.of(echo));
         var event = run.deliveries().getFirst().event();
         assertEquals(List.of(khora.events.Basic.read(Identity.of(event.id(), 0)),
                 Assertion.action(Assertion.of(Identity.named("project"), Identity.named("khora/basic/label"),
