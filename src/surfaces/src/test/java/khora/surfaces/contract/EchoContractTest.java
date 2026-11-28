@@ -36,9 +36,9 @@ class EchoContractTest extends SurfaceContract {
                 List.of(label()))));
     }
 
-    /** Asserts {@code (thing, attribute, value)}, knowing {@code knew}. */
-    static Step tell(String step, Ref thing, Ref attribute, String value, String... knew) {
-        return Step.named(step).by(ANNA).knew(knew)
+    /** Asserts {@code (thing, attribute, value)}. */
+    static Step tell(String step, Ref thing, Ref attribute, String value) {
+        return Step.named(step).by(ANNA)
                 .does(ActionSpec.asserts(TupleSpec.of(thing, attribute, ValueSpec.text(value))));
     }
 
@@ -62,24 +62,24 @@ class EchoContractTest extends SurfaceContract {
         return List.of(
                 Scenario.named("anAttachedSurfaceCatchesUpThenReceivesWhatMatches")
                         .given(tell("create", PROJECT, NAME, "Kitchen"), Given.attach(),
-                                tell("invoice", Ref.named("invoice"), NAME, "INV-1", "create"))
-                        .when(When.submit(tell("rename", PROJECT, NAME, "Studio", "invoice")))
+                                tell("invoice", Ref.named("invoice"), NAME, "INV-1"))
+                        .when(When.submit(tell("rename", PROJECT, NAME, "Studio")))
                         .then(labels("create", "rename")),
-                Scenario.named("attachingFromAFrontierSkipsWhatIsInIt")
+                Scenario.named("attachingFromAPositionSkipsWhatIsBeforeIt")
                         .given(tell("create", PROJECT, NAME, "Kitchen"),
-                                tell("rename", PROJECT, NAME, "Studio", "create"),
-                                tell("again", PROJECT, NAME, "Atelier", "rename"))
+                                tell("rename", PROJECT, NAME, "Studio"),
+                                tell("again", PROJECT, NAME, "Atelier"))
                         .when(When.attach("rename"))
                         .then(labels("again")),
                 Scenario.named("readsAreReceivedToo")
                         .given(tell("create", PROJECT, NAME, "Kitchen"), Given.attach("create"))
-                        .when(When.submit(Step.named("read").by(ANNA).knew("create").does(ActionSpec.read(PROJECT))))
+                        .when(When.submit(Step.named("read").by(ANNA).does(ActionSpec.read(PROJECT))))
                         .then(labels("read")),
-                Scenario.named("whatASurfaceEmitsIsAnEventCausedByWhatItKnew")
+                Scenario.named("whatASurfaceEmitsIsAnEventTriggeredByWhatItReceived")
                         .given(tell("create", PROJECT, NAME, "Kitchen"), Given.attach("create"))
-                        .when(When.submit(tell("rename", PROJECT, NAME, "Studio", "create")))
+                        .when(When.submit(tell("rename", PROJECT, NAME, "Studio")))
                         .then(labels("rename")),
-                Scenario.named("anEmissionComesAfterItsCause")
+                Scenario.named("anEmissionComesAfterItsTrigger")
                         .given(Given.attach())
                         .when(When.submit(tell("hello", PROJECT, NOTE, "hello")))
                         .then(labels("hello")),

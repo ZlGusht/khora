@@ -14,17 +14,17 @@ class AboutTest {
     static final By BY = new By("anna", Optional.empty(), "g3", "projects");
     static final Identity NAME = Identity.named("name");
 
-    static Event event(List<EventId> causes, long recorded, Assertion... tuples) {
-        return Event.create(causes, recorded, Optional.empty(), new AcceptedAction(BY, Assertion.action(tuples)));
+    static Event event(long recorded, Assertion... tuples) {
+        return Event.create(Optional.empty(), recorded, Optional.empty(), new Emitted(BY, Assertion.action(tuples)));
     }
 
     @Test
     void aRetractionIsAboutTheThingItChanges() {
         var log = new InMemoryEventLog();
-        var e = event(List.of(), 1000, Assertion.entity(),
+        var e = event(1000, Assertion.entity(),
                 Assertion.of(Identity.local(0), NAME, new Assertion.Literal(new Json.Str("Kitchen"))));
         var project = Identity.of(e.id(), 0);
-        var f = event(List.of(e.id()), 1001, Assertion.retraction(Identity.of(e.id(), 1)));
+        var f = event(1001, Assertion.retraction(Identity.of(e.id(), 1)));
         log.append(List.of(e, f));
         assertTrue(About.of(f, log).contains(project));
         assertTrue(log.about(project).contains(f));
@@ -35,7 +35,7 @@ class AboutTest {
         var log = new InMemoryEventLog();
         var anna = Identity.named("anna");
         var p = Identity.named("p");
-        var owns = event(List.of(), 1000, Assertion.of(anna, Identity.named("owns"), new Assertion.Ref(p)));
+        var owns = event(1000, Assertion.of(anna, Identity.named("owns"), new Assertion.Ref(p)));
         log.append(List.of(owns));
         assertTrue(About.of(owns, log).contains(anna));
         assertFalse(About.of(owns, log).contains(p));
@@ -43,7 +43,7 @@ class AboutTest {
 
     @Test
     void aNewThingIsAboutItself() {
-        var e = event(List.of(), 1000, Assertion.entity());
+        var e = event(1000, Assertion.entity());
         assertTrue(About.of(e, new InMemoryEventLog()).contains(Identity.of(e.id(), 0)));
     }
 }

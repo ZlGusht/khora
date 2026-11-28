@@ -3,7 +3,7 @@ package khora.surfaces;
 import java.util.Objects;
 import java.util.Set;
 import khora.events.About;
-import khora.events.AcceptedAction;
+import khora.events.Emitted;
 import khora.events.Event;
 import khora.events.EventSource;
 import khora.events.Identity;
@@ -37,7 +37,7 @@ public record Interest(Set<Identity> definitions, Set<Identity> about) {
 
     /** Whether {@code event} is one this interest wants, given the events of {@code source}. */
     public boolean matches(Event event, EventSource source) {
-        if (!(event.body() instanceof AcceptedAction accepted)) {
+        if (!(event.body() instanceof Emitted accepted)) {
             return false;
         }
         if (!definitions.isEmpty() && !definitions.contains(accepted.action().definition())) {

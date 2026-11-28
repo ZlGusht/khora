@@ -5,16 +5,15 @@ import java.util.Map;
 import java.util.Optional;
 import khora.events.Identity;
 import khora.events.json.Json;
-import khora.surfaces.Authority;
 import khora.surfaces.Context;
+import khora.surfaces.Gate;
 import khora.surfaces.stub.Projects;
 
 /**
- * {@link Projects} against the authority contract, with the scenarios of {@code KernelTest}. Who
- * acted ({@code by}), an event's causes and a read's {@code at} link are kernel guarantees, and stay
- * covered by {@code KernelTest}.
+ * {@link Projects} against the gate contract, with the scenarios of {@code KernelTest}. Who acted
+ * ({@code by}) and an event's trigger are kernel guarantees, and stay covered by {@code KernelTest}.
  */
-class ProjectsContractTest extends AuthorityContract {
+class ProjectsContractTest extends GateContract {
     static final Context ANNA = new Context("anna", Optional.empty(), "g3", 10);
     static final Context IVAN = new Context("ivan", Optional.empty(), "g3", 10);
     static final Context MIA = new Context("mia", Optional.empty(), "g3", 10);
@@ -22,6 +21,7 @@ class ProjectsContractTest extends AuthorityContract {
 
     static final Ref NAME = Ref.named("name");
     static final Ref PROJECT = Ref.tuple("create", 0);
+    static final Ref KITCHEN = Ref.tuple("create", 1);
 
     static Step create() {
         return Step.named("create").by(ANNA).does(ActionSpec.asserts(TupleSpec.entity(),
@@ -29,82 +29,78 @@ class ProjectsContractTest extends AuthorityContract {
     }
 
     static Step read(String name, Context who) {
-        return Step.named(name).by(who).knew("create").does(ActionSpec.read(PROJECT));
+        return Step.named(name).by(who).does(ActionSpec.read(PROJECT));
     }
 
-    /** Renames the project from Kitchen, based on the read {@code basedOn}. */
-    static Step rename(String name, Context who, String basedOn, String to) {
-        return Step.named(name).by(who).knew(basedOn).link("based_on", basedOn)
-                .does(ActionSpec.asserts(TupleSpec.retraction(Ref.tuple("create", 1)),
-                        TupleSpec.of(PROJECT, NAME, ValueSpec.text(to))));
+    /** Renames the project, replacing the name {@code replaces}. */
+    static Step rename(String name, Context who, Ref replaces, String to) {
+        return Step.named(name).by(who).does(ActionSpec.asserts(TupleSpec.retraction(replaces),
+                TupleSpec.of(PROJECT, NAME, ValueSpec.text(to))));
     }
 
     @Override
-    protected Authority authority() {
+    protected Gate gate() {
         return new Projects();
     }
 
     @Override
     protected List<Scenario> scenarios() {
         return List.of(
-                Scenario.named("anAcceptedActionIsAnEventByItsCaller")
+                Scenario.named("aNewProjectIsLogged")
                         .when(When.submit(create()))
-                        .then(Then.accepted()),
-                Scenario.named("aReadIsAnEventAndAnswersWithStatements")
+                        .then(Then.logged()),
+                Scenario.named("aReadIsAnsweredWithStatements")
                         .given(create())
                         .when(When.submit(read("read", IVAN)))
                         .then(Then.statements(TupleSpec.entity(),
                                 TupleSpec.of(PROJECT, NAME, ValueSpec.text("Kitchen")))),
-                Scenario.named("aWriteFollowsTheReadItWasBasedOn")
+                Scenario.named("aRenameOfTheCurrentNameIsLogged")
                         .given(create(), read("read", IVAN))
-                        .when(When.submit(rename("rename", IVAN, "read", "Studio")))
-                        .then(Then.accepted()),
-                Scenario.named("theRenamedNameHoldsAtTheRename")
-                        .given(create(), read("read", IVAN), rename("rename", IVAN, "read", "Studio"))
-                        .when(When.read(PROJECT, "rename"))
+                        .when(When.submit(rename("rename", IVAN, KITCHEN, "Studio")))
+                        .then(Then.logged()),
+                Scenario.named("theNewNameStands")
+                        .given(create(), rename("rename", IVAN, KITCHEN, "Studio"))
+                        .when(When.read(PROJECT))
                         .then(Then.statements(TupleSpec.entity(),
                                 TupleSpec.of(PROJECT, NAME, ValueSpec.text("Studio")))),
-                Scenario.named("aReadAtAnEarlierFrontierIgnoresLaterWrites")
-                        .given(create(), read("read", IVAN), rename("rename", IVAN, "read", "Studio"))
-                        .when(When.read(PROJECT, "create"))
-                        .then(Then.statements(TupleSpec.entity(),
-                                TupleSpec.of(PROJECT, NAME, ValueSpec.text("Kitchen")))),
-                Scenario.named("aConcurrentRenameOfTheSameNameIsRejected")
+                Scenario.named("aSecondRenameOfOneNameIsRefused")
                         .given(create(), read("ivanRead", IVAN), read("miaRead", MIA),
-                                rename("ivanRename", IVAN, "ivanRead", "Studio"))
-                        .when(When.submit(rename("miaRename", MIA, "miaRead", "Atelier")))
-                        .then(Then.rejected("conflicts with")),
+                                rename("ivanRename", IVAN, KITCHEN, "Studio"))
+                        .when(When.submit(rename("miaRename", MIA, KITCHEN, "Atelier")))
+                        .then(Then.refused("already replaced")),
+                Scenario.named("aRenameOfTheNewNameIsLogged")
+                        .given(create(), rename("ivanRename", IVAN, KITCHEN, "Studio"))
+                        .when(When.submit(rename("miaRename", MIA, Ref.tuple("ivanRename", 1), "Atelier")))
+                        .then(Then.logged()),
                 Scenario.named("anUnrelatedWriteDoesNotConflict")
-                        .given(create(), read("read", IVAN),
-                                Step.named("invoice").by(BOB).does(ActionSpec.asserts(
-                                        TupleSpec.of(Ref.named("invoice"), NAME, ValueSpec.text("INV-1")))))
-                        .when(When.submit(rename("rename", IVAN, "read", "Studio")))
-                        .then(Then.accepted()),
-                Scenario.named("aBlindWriteIsAccepted")
-                        .given(create(), read("read", IVAN), rename("rename", IVAN, "read", "Studio"))
-                        .when(When.submit(Step.named("blind").by(MIA).knew("create").does(ActionSpec.asserts(
-                                TupleSpec.of(PROJECT, NAME, ValueSpec.text("Atelier"))))))
-                        .then(Then.accepted()),
-                Scenario.named("aWriteAboutAThingItDoesNotKnowIsRejected")
-                        .given(create(), read("read", IVAN), rename("rename", IVAN, "read", "Studio"))
+                        .given(create(), Step.named("invoice").by(BOB).does(ActionSpec.asserts(
+                                TupleSpec.of(Ref.named("invoice"), NAME, ValueSpec.text("INV-1")))))
+                        .when(When.submit(rename("rename", IVAN, KITCHEN, "Studio")))
+                        .then(Then.logged()),
+                Scenario.named("aBlindWriteIsLogged")
+                        .given(create(), rename("rename", IVAN, KITCHEN, "Studio"))
                         .when(When.submit(Step.named("blind").by(MIA).does(ActionSpec.asserts(
                                 TupleSpec.of(PROJECT, NAME, ValueSpec.text("Atelier"))))))
-                        .then(Then.rejected("STATEMENT_OUTSIDE_PAST")),
-                Scenario.named("anUnknownFrontierIsRejected")
+                        .then(Then.logged()),
+                Scenario.named("replacingAStatementTheGateDoesNotKnowIsRefused")
                         .given(create())
-                        .when(When.submit(Step.named("read").by(IVAN).knew(Step.UNKNOWN)
+                        .when(When.submit(rename("rename", MIA, Ref.tuple("create", 5), "Atelier")))
+                        .then(Then.refused("not a statement projects knows")),
+                Scenario.named("anUnknownTriggerIsRefused")
+                        .given(create())
+                        .when(When.submit(Step.named("read").by(IVAN).after(Step.UNKNOWN)
                                 .does(ActionSpec.read(PROJECT))))
-                        .then(Then.rejected("unknown event")),
-                Scenario.named("actionsTheAuthorityDoesNotTakeAreRejected")
+                        .then(Then.refused("unknown trigger")),
+                Scenario.named("actionsNoGateGuardsAreLogged")
                         .given(create())
-                        .when(When.submit(Step.named("order").by(ANNA).knew("create")
+                        .when(When.submit(Step.named("order").by(ANNA)
                                 .does(new ActionSpec.Raw(Identity.named("orders/place"), Json.Obj.of(Map.of())))))
-                        .then(Then.rejected("projects takes only reads and asserts")),
+                        .then(Then.logged()),
                 Scenario.named("retractingARetractionDoesNotRestoreTheStatement")
-                        .given(create(), read("read", IVAN), rename("rename", IVAN, "read", "Studio"),
-                                Step.named("unretract").by(IVAN).knew("rename")
+                        .given(create(), rename("rename", IVAN, KITCHEN, "Studio"),
+                                Step.named("unretract").by(IVAN)
                                         .does(ActionSpec.asserts(TupleSpec.retraction(Ref.tuple("rename", 0)))))
-                        .when(When.read(PROJECT, "unretract"))
+                        .when(When.read(PROJECT))
                         .then(Then.statements(TupleSpec.entity(),
                                 TupleSpec.of(PROJECT, NAME, ValueSpec.text("Studio")))));
     }

@@ -4,6 +4,7 @@ jnats = "2.27.0"
 batch-publish = "0.4.0"
 testcontainers = "2.0.5"
 slf4j = "1.7.36"
+neo4j-driver = "6.3.0"
 
 [libraries]
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
@@ -11,4 +12,6 @@ junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher
 jnats = { module = "io.nats:jnats", version.ref = "jnats" }
 batch-publish = { module = "io.synadia:batch-publish", version.ref = "batch-publish" }
 testcontainers = { module = "org.testcontainers:testcontainers", version.ref = "testcontainers" }
+neo4j-driver = { module = "org.neo4j.driver:neo4j-java-driver", version.ref = "neo4j-driver" }
+testcontainers-neo4j = { module = "org.testcontainers:testcontainers-neo4j", version.ref = "testcontainers" }
 slf4j-nop = { module = "org.slf4j:slf4j-nop", version.ref = "slf4j" }

@@ -8,7 +8,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-import khora.events.AcceptedAction;
+import khora.events.Emitted;
 import khora.events.Assertion;
 import khora.events.By;
 import khora.events.Event;
@@ -42,7 +42,7 @@ public abstract class EventLogContract {
 
     /** An event that names {@code thing}; each call makes a new event. */
     protected static Event naming(Identity thing, String name) {
-        return Event.create(List.of(), 1000, Optional.empty(), new AcceptedAction(BY,
+        return Event.create(Optional.empty(), 1000, Optional.empty(), new Emitted(BY,
                 Assertion.action(Assertion.of(thing, NAME, new Assertion.Literal(new Json.Str(name))))));
     }
 

@@ -9,8 +9,11 @@ import khora.events.Event;
  * Something that receives events and emits events in response, and nothing else
  * ([[Surfaces receive and emit events by interest]]).
  *
- * <p>Provisional: what it emits is submitted to the kernel's authority like any action; delivery is
- * synchronous, and a surface does not receive what it emitted.
+ * <p>A surface owns its reading of the events: what a thing is for it, and whether two events
+ * clash. Another surface may read the same events otherwise.
+ *
+ * <p>Provisional: what it emits becomes an event triggered by what it received, through the gates
+ * that guard it; delivery is synchronous, and a surface does not receive what it emitted.
  */
 public interface Surface {
 

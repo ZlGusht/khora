@@ -3,27 +3,26 @@ package khora.surfaces;
 import java.util.List;
 import java.util.Objects;
 import khora.events.Event;
-import khora.events.Statement;
 
 /**
- * What submitting an action answers. Only an accepted action becomes an event
- * ([[An accepted action is one kind of event]]).
+ * What submitting an action answers: logged as an event, or refused by a gate.
  *
- * <p>Provisional: a rejection is returned, not kept.
+ * <p>Exploration: a read is logged like any action; its answers are the events surfaces emitted in
+ * response to it, each naming it as its trigger.
  */
-public sealed interface Answer permits Answer.Accepted, Answer.Rejected {
+public sealed interface Answer permits Answer.Logged, Answer.Refused {
 
-    /** Accepted, as {@code event}; a read also answers with the statements that hold. */
-    record Accepted(Event event, List<Statement> statements) implements Answer {
-        public Accepted {
+    /** Logged as {@code event}; {@code responses} are what surfaces emitted in response to it. */
+    record Logged(Event event, List<Event> responses) implements Answer {
+        public Logged {
             Objects.requireNonNull(event, "event");
-            statements = List.copyOf(statements);
+            responses = List.copyOf(responses);
         }
     }
 
-    /** Rejected, and why. Nothing was appended. */
-    record Rejected(String reason) implements Answer {
-        public Rejected {
+    /** Refused, and why. Nothing was appended. */
+    record Refused(String reason) implements Answer {
+        public Refused {
             Objects.requireNonNull(reason, "reason");
         }
     }

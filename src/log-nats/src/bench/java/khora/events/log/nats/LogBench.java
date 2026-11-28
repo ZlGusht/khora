@@ -25,7 +25,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.Optional;
-import khora.events.AcceptedAction;
+import khora.events.Emitted;
 import khora.events.Assertion;
 import khora.events.By;
 import khora.events.Event;
@@ -210,7 +210,7 @@ public final class LogBench {
 
     /** An accepted assert of one value, about {@code entity}, with a body of about {@value #BODY_BYTES} bytes. */
     private Event event(String entity) {
-        return Event.create(List.of(), clock.next(), Optional.empty(), new AcceptedAction(BY, Assertion.action(
+        return Event.create(Optional.empty(), clock.next(), Optional.empty(), new Emitted(BY, Assertion.action(
                 Assertion.of(Identity.named(entity), VALUE, new Assertion.Literal(new Json.Str(body))))));
     }
 

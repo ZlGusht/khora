@@ -5,7 +5,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import khora.events.Assertion;
 import khora.events.Basic;
@@ -78,7 +77,7 @@ class ScenarioFormatTest {
         assertEquals(name.value(), bindings.render(name), "not yet resolved");
         assertEquals(name, bindings.identity(Ref.named("name"), Optional.empty()));
         assertEquals("name", bindings.render(name));
-        assertEquals("(create/0, name, \"Kitchen\")", AuthorityContract.symbolic(Assertion.of(
+        assertEquals("(create/0, name, \"Kitchen\")", GateContract.symbolic(Assertion.of(
                 Identity.of(CREATE, 0), name, new Assertion.Literal(new Json.Str("Kitchen"))), bindings));
     }
 
@@ -93,11 +92,11 @@ class ScenarioFormatTest {
         var anna = new Context("anna", Optional.empty(), "g", 1);
         var action = new ActionSpec.Assert(List.of(TupleSpec.entity()));
         var built = Scenario.named("s")
-                .given(Step.named("create").by(anna).knew("a").link("at", "a", "b").does(action))
+                .given(Step.named("create").by(anna).after("a").does(action))
                 .when(new When.Attach(List.of("create")))
-                .then(new Then.Accepted());
-        var step = new Step("create", anna, List.of("a"), Map.of("at", List.of("a", "b")), action);
-        assertEquals(new Scenario("s", List.of(step), new When.Attach(List.of("create")), new Then.Accepted()),
+                .then(new Then.Logged());
+        var step = new Step("create", anna, Optional.of("a"), action);
+        assertEquals(new Scenario("s", List.of(step), new When.Attach(List.of("create")), new Then.Logged()),
                 built);
     }
 }

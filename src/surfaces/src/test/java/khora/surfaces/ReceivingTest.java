@@ -9,19 +9,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.TreeSet;
 import java.util.function.Function;
-import khora.events.AcceptedAction;
+import khora.events.Emitted;
 import khora.events.Action;
 import khora.events.Assertion;
 import khora.events.Basic;
 import khora.events.Event;
-import khora.events.Frontier;
 import khora.events.Hlc;
 import khora.events.Identity;
 import khora.events.json.Json;
 import khora.events.log.InMemoryEventLog;
-import khora.surfaces.stub.Projects;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -58,6 +55,7 @@ class ReceivingTest {
         }
     }
 
+    InMemoryEventLog log;
     Kernel kernel;
     Event created;
     Identity project;
@@ -67,12 +65,13 @@ class ReceivingTest {
     }
 
     Event submit(Action action) {
-        return assertInstanceOf(Answer.Accepted.class, kernel.submit(action, ANNA, kernel.frontier(), Map.of())).event();
+        return assertInstanceOf(Answer.Logged.class, kernel.submit(action, ANNA)).event();
     }
 
     @BeforeEach
     void createAProject() {
-        kernel = new Kernel(new Projects(), new InMemoryEventLog(), new Hlc(() -> 1000));
+        log = new InMemoryEventLog();
+        kernel = new Kernel(log, new Hlc(() -> 1000));
         created = submit(Assertion.action(Assertion.entity()));
         project = Identity.of(created.id(), 0);
     }
@@ -80,16 +79,16 @@ class ReceivingTest {
     @Test
     void anAttachedSurfaceCatchesUpThenReceivesWhatMatches() {
         var recorder = new Recorder(Set.of(Interest.about(project)), e -> List.of());
-        kernel.attach(recorder, Frontier.empty());
+        kernel.attach(recorder, 0);
         var renamed = submit(name(project, "Kitchen"));
         submit(name(Identity.named("invoice"), "INV-1"));
         assertEquals(List.of(created, renamed), recorder.received);
     }
 
     @Test
-    void attachingFromAFrontierSkipsWhatIsInIt() {
+    void attachingFromAPositionSkipsWhatIsBeforeIt() {
         var recorder = new Recorder(Set.of(Interest.any()), e -> List.of());
-        kernel.attach(recorder, new Frontier(new TreeSet<>(Set.of(created.id()))));
+        kernel.attach(recorder, 1);
         var renamed = submit(name(project, "Kitchen"));
         assertEquals(List.of(renamed), recorder.received);
     }
@@ -97,27 +96,24 @@ class ReceivingTest {
     @Test
     void readsAreReceivedToo() {
         var recorder = new Recorder(Set.of(new Interest(Set.of(Basic.READ), Set.of())), e -> List.of());
-        kernel.attach(recorder, kernel.frontier());
+        kernel.attach(recorder, kernel.position());
         var read = submit(Basic.read(project));
         assertEquals(List.of(read), recorder.received);
     }
 
     @Test
-    void whatASurfaceEmitsIsAnEventCausedByWhatItKnew() {
+    void whatASurfaceEmitsIsAnEventTriggeredByWhatItReceived() {
         var labeller = new Recorder(Set.of(new Interest(Set.of(Basic.ASSERT), Set.of(project))), e ->
-                Assertion.in(((AcceptedAction) e.body()).action()).orElseThrow().stream()
+                Assertion.in(((Emitted) e.body()).action()).orElseThrow().stream()
                         .filter(t -> t.attribute().equals(Optional.of(NAME)))
                         .map(t -> Assertion.action(Assertion.of(project, Basic.LABEL, t.value().orElseThrow())))
                         .toList());
-        kernel.attach(labeller, kernel.frontier());
+        kernel.attach(labeller, kernel.position());
         var renamed = submit(name(project, "Kitchen"));
 
-        var label = kernel.statements(project, kernel.frontier()).stream()
-                .filter(s -> s.assertion().attribute().equals(Optional.of(Basic.LABEL))).findFirst().orElseThrow();
-        var emitted = kernel.event(label.id()).orElseThrow();
-        var body = (AcceptedAction) emitted.body();
-        assertTrue(emitted.causes().contains(renamed.id()));
-        assertEquals(Map.of("source", Set.of(renamed.id())), body.links());
+        var emitted = log.read(3, 1).getFirst().event();
+        var body = (Emitted) emitted.body();
+        assertEquals(Optional.of(renamed.id()), emitted.trigger());
         assertEquals("recorder", body.by().principal());
         assertEquals(List.of(renamed), labeller.received);
     }

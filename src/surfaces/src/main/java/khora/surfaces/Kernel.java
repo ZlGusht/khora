@@ -3,49 +3,41 @@ package khora.surfaces;
 import java.io.Serial;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.TreeSet;
-import khora.events.AcceptedAction;
 import khora.events.Action;
-import khora.events.Basic;
-import khora.events.Causality;
+import khora.events.Emitted;
 import khora.events.Event;
 import khora.events.EventId;
-import khora.events.Frontier;
-import khora.events.FrontierCheck;
 import khora.events.Hlc;
 import khora.events.Identity;
 import khora.events.Statement;
-import khora.events.Statements;
+import khora.events.Assertion;
 import khora.events.log.EventLog;
 import khora.events.log.EventLogException;
 
 /**
- * An event log, a clock and the authority: where actions are submitted, become events, and are
+ * An event log, a clock and the gates: where actions are submitted, become events, and are
  * delivered ([[Surfaces receive and emit events by interest]]).
  *
- * <p>An action's causes are what the caller knew, a frontier, and the events it links to. A read
- * links the frontier it reads at as {@code at}, and answers with the statements that hold there.
+ * <p>Exploration: events are facts by whoever emitted them, and the kernel does not judge them. It
+ * links an event to its trigger, the event it was emitted in response to, and to nothing else. The
+ * gates that guard an action decide first; an action no gate guards always becomes an event.
  *
- * <p>Accepted events are delivered in the order they were appended, which is after their causes:
- * each attached surface receives each event its interests match once, and never one it emitted.
- * What a surface emits in response is submitted as an action by that surface, knowing what it had
- * taken in, linked to its {@code source}; a chain of emissions in response to emissions stops after
- * {@value #MAX_GENERATIONS} steps. A surface's emissions are causally ordered: each knows the ones
- * before it. A surface that throws, or whose emission fails, loses that event; delivery goes on, and
- * no failure in delivery reaches the submitter.
+ * <p>Events are delivered in log order. Each attached surface has taken in the log up to a
+ * position, and receives each later event its interests match once, and never one it emitted. What
+ * a surface emits in response is submitted as an action by that surface, triggered by the event it
+ * received; a chain of emissions in response to emissions stops after {@value #MAX_GENERATIONS}
+ * steps. A surface that throws, or whose emission fails, loses that event; delivery goes on, and no
+ * failure in delivery reaches the submitter.
  *
  * <p>An append whose outcome is unknown is retried with the same event, which the log stores once;
  * if it still fails, {@link Unconfirmed} carries the event.
  *
- * <p>Provisional: one authority, synchronous delivery under one lock, no access checks at
- * delivery, and an emitted action the authority rejects is dropped without a trace.
+ * <p>Provisional: synchronous delivery under one lock, and no access checks at delivery.
  */
 public final class Kernel {
     /** How many emissions in response to emissions are delivered before a chain is cut off. */
@@ -54,151 +46,183 @@ public final class Kernel {
     /** How often an append whose outcome is unknown is tried with the same event. */
     public static final int APPEND_ATTEMPTS = 3;
 
+    /** What an event no gate guarded went {@code via}. */
+    public static final String VIA = "kernel";
+
     private static final System.Logger LOG = System.getLogger(Kernel.class.getName());
 
-    private final Authority authority;
     private final EventLog log;
     private final Hlc clock;
-    private Frontier heads;
+    private final List<Gate> gates;
+    private long position;
     private final List<Attachment> attached = new ArrayList<>();
     private final ArrayDeque<Delivery> queue = new ArrayDeque<>();
+    private final List<Event> appended = new ArrayList<>();
     private boolean draining;
 
-    /** An attached surface: what it has taken in, and what it emitted. */
+    /** An attached surface: the position it has taken in up to, and what it emitted. */
     private static final class Attachment {
         final Surface surface;
-        Frontier taken;
-        final Set<EventId> received = new HashSet<>();
+        long position;
         final Set<EventId> emitted = new HashSet<>();
-        boolean catchingUp = true;
 
-        Attachment(Surface surface, Frontier taken) {
+        Attachment(Surface surface, long position) {
             this.surface = surface;
-            this.taken = taken;
+            this.position = position;
         }
     }
 
-    /** An accepted event waiting to be delivered, and how many emissions led to it. */
-    private record Delivery(Event event, int generation) {}
+    /** An appended event waiting to be delivered, its position, and how many emissions led to it. */
+    private record Delivery(Event event, long position, int generation) {}
 
-    /** A kernel over {@code log}, which may already hold events. */
-    public Kernel(Authority authority, EventLog log, Hlc clock) {
-        this.authority = Objects.requireNonNull(authority, "authority");
+    /** A kernel over {@code log}, which may already hold events; each gate takes in what it holds. */
+    public Kernel(EventLog log, Hlc clock, List<Gate> gates) {
         this.log = Objects.requireNonNull(log, "log");
         this.clock = Objects.requireNonNull(clock, "clock");
-        this.heads = headsOf(log);
+        this.gates = List.copyOf(gates);
+        for (long from = 1; ; ) {
+            var page = log.read(from, EventLog.MAX_APPEND);
+            if (page.isEmpty()) {
+                break;
+            }
+            for (var logged : page) {
+                this.gates.forEach(g -> take(g, logged.event()));
+            }
+            position = page.getLast().position();
+            from = position + 1;
+        }
+    }
+
+    /** A kernel over {@code log} with {@code gates}. */
+    public Kernel(EventLog log, Hlc clock, Gate... gates) {
+        this(log, clock, List.of(gates));
+    }
+
+    /** Submits {@code action} by {@code context}'s caller, in response to nothing. */
+    public synchronized Answer submit(Action action, Context context) {
+        return submit(action, context, Optional.empty());
     }
 
     /**
-     * Submits {@code action} by {@code context}'s caller, who knew {@code knew}, with named
-     * {@code links}. If the authority accepts it, it is appended as an event and delivered.
+     * Submits {@code action} by {@code context}'s caller, in response to {@code trigger}. If no gate
+     * that guards it refuses, it is appended as an event and delivered.
      */
-    public synchronized Answer submit(Action action, Context context, Frontier knew, Map<String, Set<EventId>> links) {
-        return accept(action, context, knew, links, null, 0);
+    public synchronized Answer submit(Action action, Context context, Optional<EventId> trigger) {
+        int from = appended.size();
+        var answer = accept(action, context, trigger, null, 0);
+        if (!(answer instanceof Answer.Logged logged)) {
+            return answer;
+        }
+        var responses = new ArrayList<Event>();
+        for (var e : appended.subList(from, appended.size())) {
+            if (e.trigger().equals(Optional.of(logged.event().id()))) {
+                responses.add(e);
+            }
+        }
+        if (!draining) {
+            appended.clear();
+        }
+        return new Answer.Logged(logged.event(), responses);
     }
 
     /**
-     * Attaches {@code surface}, which has taken in {@code from}: it is sent every matching event not in
-     * {@code from}, in log order, then each new one that matches.
-     *
-     * @throws IllegalArgumentException if the log lacks an event of {@code from}
+     * Attaches {@code surface}, which has taken in the log up to {@code position}: it is sent every
+     * later event it wants, in log order, then each new one.
      */
-    public synchronized void attach(Surface surface, Frontier from) {
-        var known = FrontierCheck.closure(from.heads(), log);
-        var attachment = new Attachment(Objects.requireNonNull(surface, "surface"), from);
+    public synchronized void attach(Surface surface, long position) {
+        var attachment = new Attachment(Objects.requireNonNull(surface, "surface"), position);
         attached.add(attachment);
         boolean outer = !draining;
         draining = true;
         try {
-            long position = 1;
             while (true) {
-                var page = log.read(position, EventLog.MAX_APPEND);
-                for (var logged : page) {
-                    if (!known.contains(logged.event().id())) {
-                        offer(attachment, logged.event(), 0);
-                    }
-                }
+                var page = log.read(attachment.position + 1, EventLog.MAX_APPEND);
                 if (page.isEmpty()) {
                     break;
                 }
-                position = page.getLast().position() + 1;
+                for (var logged : page) {
+                    offer(attachment, logged.event(), logged.position(), 0);
+                }
             }
         } finally {
-            attachment.catchingUp = false;
             if (outer) {
                 draining = false;
             }
         }
         if (outer) {
             drain();
+            appended.clear();
         }
     }
 
-    private Answer accept(Action action, Context context, Frontier knew, Map<String, Set<EventId>> links,
-            Attachment origin, int generation) {
-        if (FrontierCheck.validate(knew, log) instanceof FrontierCheck.Invalid invalid) {
-            return new Answer.Rejected("unknown event " + invalid.missing().value());
-        }
-        var read = Basic.readOf(action);
-        var allLinks = new HashMap<>(links);
-        if (read.isPresent() && !knew.heads().isEmpty()) {
-            allLinks.put("at", knew.heads());
-        }
-        var causes = new TreeSet<EventId>(knew.heads());
-        allLinks.values().forEach(causes::addAll);
+    private Answer accept(Action action, Context context, Optional<EventId> trigger, Attachment origin,
+            int generation) {
         long after = Long.MIN_VALUE;
-        for (var cause : causes) {
-            var known = log.get(cause);
+        if (trigger.isPresent()) {
+            var known = log.get(trigger.get());
             if (known.isEmpty()) {
-                return new Answer.Rejected("unknown event " + cause.value());
+                return new Answer.Refused("unknown trigger " + trigger.get().value());
             }
-            after = Math.max(after, known.get().recorded());
+            after = known.get().recorded();
+        }
+        var via = new ArrayList<String>();
+        for (var gate : gates) {
+            if (!gate.guards(action)) {
+                continue;
+            }
+            Gate.Verdict verdict;
+            try {
+                verdict = gate.decide(action, context.by(gate.name()));
+            } catch (RuntimeException e) {
+                verdict = new Gate.Refuse("gate " + gate.name() + " failed: " + e.getMessage());
+            }
+            if (verdict instanceof Gate.Refuse refuse) {
+                return new Answer.Refused(refuse.reason());
+            }
+            via.add(gate.name());
         }
         Event event;
         try {
-            event = Event.create(causes, clock.next(after), Optional.empty(),
-                    new AcceptedAction(context.by(authority.name()), action, allLinks));
+            event = Event.create(trigger, clock.next(after), Optional.empty(),
+                    new Emitted(context.by(via.isEmpty() ? VIA : String.join(",", via)), action));
         } catch (IllegalArgumentException e) {
-            return new Answer.Rejected(e.getMessage());
+            return new Answer.Refused(e.getMessage());
         }
-        if (authority.decide(event, log) instanceof Authority.Reject reject) {
-            return new Answer.Rejected(reject.reason());
-        }
-        var flaw = Causality.check(event, log);
-        if (flaw.isPresent()) {
-            return new Answer.Rejected(flaw.get().name());
-        }
-        // Answered before appending: what holds at knew does not depend on the new event, and
-        // nothing may fail between the append and the return.
-        var answer = new Answer.Accepted(event, read.map(thing -> Statements.about(thing, knew, log)).orElse(List.of()));
-        append(event);
-        var newHeads = new TreeSet<EventId>(heads.heads());
-        newHeads.removeAll(event.causes());
-        newHeads.add(event.id());
-        heads = new Frontier(newHeads);
+        long at = append(event);
+        position = Math.max(position, at);
+        gates.forEach(g -> take(g, event));
+        appended.add(event);
         if (origin != null) {
             origin.emitted.add(event.id());
-            origin.taken = FrontierCheck.combine(origin.taken, new Frontier(new TreeSet<>(Set.of(event.id()))), log);
         }
-        queue.add(new Delivery(event, generation));
+        queue.add(new Delivery(event, at, generation));
         if (!draining) {
             drain();
         }
-        return answer;
+        return new Answer.Logged(event, List.of());
+    }
+
+    private static void take(Gate gate, Event event) {
+        try {
+            gate.take(event);
+        } catch (RuntimeException e) {
+            LOG.log(System.Logger.Level.WARNING, "gate " + gate.name() + " failed to take in event "
+                    + event.id().value(), e);
+        }
     }
 
     /**
      * Appends {@code event}, retrying the same event when the outcome is unknown: the log stores an
      * id once, so a retry never stores it twice.
      *
+     * @return its position
      * @throws Unconfirmed if every attempt failed
      */
-    private void append(Event event) {
+    private long append(Event event) {
         EventLogException last = null;
         for (int attempt = 0; attempt < APPEND_ATTEMPTS; attempt++) {
             try {
-                log.append(List.of(event));
-                return;
+                return log.append(List.of(event)).getFirst();
             } catch (EventLogException e) {
                 last = e;
             }
@@ -207,8 +231,8 @@ public final class Kernel {
     }
 
     /**
-     * An accepted event the log did not confirm storing: it may be stored or not. Appending
-     * {@link #event()} itself again is safe; submitting the action again makes a new event.
+     * An event the log did not confirm storing: it may be stored or not. Appending {@link #event()}
+     * itself again is safe; submitting the action again makes a new event.
      */
     public static final class Unconfirmed extends RuntimeException {
         @Serial
@@ -227,16 +251,14 @@ public final class Kernel {
         }
     }
 
-    /** Delivers queued events, in order, to every attached surface that is not catching up. */
+    /** Delivers queued events, in order, to every attached surface. */
     private void drain() {
         draining = true;
         try {
             Delivery next;
             while ((next = queue.poll()) != null) {
                 for (var attachment : List.copyOf(attached)) {
-                    if (!attachment.catchingUp) {
-                        offer(attachment, next.event(), next.generation());
-                    }
+                    offer(attachment, next.event(), next.position(), next.generation());
                 }
             }
         } finally {
@@ -245,26 +267,26 @@ public final class Kernel {
     }
 
     /**
-     * Hands {@code event} to the attachment if it wants it and has neither received nor emitted it.
-     * Nothing escapes: a failure loses this event for this attachment only, so it never reaches the
-     * submitter of an event already appended.
+     * Hands {@code event} to the attachment if it is past what the attachment has taken in, it wants
+     * it, and did not emit it. Nothing escapes: a failure loses this event for this attachment only.
      */
-    private void offer(Attachment attachment, Event event, int generation) {
+    private void offer(Attachment attachment, Event event, long at, int generation) {
         try {
-            deliver(attachment, event, generation);
+            deliver(attachment, event, at, generation);
         } catch (RuntimeException e) {
             LOG.log(System.Logger.Level.WARNING, "delivering event " + event.id().value() + " to surface "
                     + attachment.surface.name() + " failed; delivery goes on", e);
         }
     }
 
-    private void deliver(Attachment attachment, Event event, int generation) {
-        if (attachment.received.contains(event.id()) || attachment.emitted.contains(event.id())
-                || !wants(attachment.surface, event, log)) {
+    private void deliver(Attachment attachment, Event event, long at, int generation) {
+        if (at <= attachment.position) {
             return;
         }
-        attachment.received.add(event.id());
-        attachment.taken = FrontierCheck.combine(attachment.taken, new Frontier(new TreeSet<>(Set.of(event.id()))), log);
+        attachment.position = at;
+        if (attachment.emitted.contains(event.id()) || !wants(attachment.surface, event, log)) {
+            return;
+        }
         List<Action> emitted;
         try {
             emitted = attachment.surface.receive(event);
@@ -283,7 +305,10 @@ public final class Kernel {
         var by = new Context(attachment.surface.name(), Optional.empty(), "surface", 0);
         for (var action : emitted) {
             try {
-                accept(action, by, attachment.taken, Map.of("source", Set.of(event.id())), attachment, generation + 1);
+                if (accept(action, by, Optional.of(event.id()), attachment, generation + 1) instanceof Answer.Refused r) {
+                    LOG.log(System.Logger.Level.WARNING, "an action surface " + attachment.surface.name()
+                            + " emitted on event " + event.id().value() + " was refused: " + r.reason());
+                }
             } catch (RuntimeException e) {
                 LOG.log(System.Logger.Level.WARNING, "an action surface " + attachment.surface.name()
                         + " emitted on event " + event.id().value() + " failed; delivery goes on", e);
@@ -295,30 +320,9 @@ public final class Kernel {
         return surface.interests().stream().anyMatch(interest -> interest.matches(event, log));
     }
 
-    private static Frontier headsOf(EventLog log) {
-        var heads = new TreeSet<EventId>();
-        var caused = new HashSet<EventId>();
-        long position = 1;
-        while (true) {
-            var page = log.read(position, EventLog.MAX_APPEND);
-            for (var logged : page) {
-                var event = logged.event();
-                caused.addAll(event.causes());
-                heads.removeAll(event.causes());
-                if (!caused.contains(event.id())) {
-                    heads.add(event.id());
-                }
-            }
-            if (page.isEmpty()) {
-                return new Frontier(heads);
-            }
-            position = page.getLast().position() + 1;
-        }
-    }
-
-    /** Every event so far, by its newest events. */
-    public synchronized Frontier frontier() {
-        return heads;
+    /** The position of the last event in the log. */
+    public synchronized long position() {
+        return position;
     }
 
     /** The event a tuple belongs to. */
@@ -326,8 +330,15 @@ public final class Kernel {
         return tuple.event().flatMap(log::get);
     }
 
-    /** What holds about {@code thing} at {@code at}, without recording a read. */
-    public synchronized List<Statement> statements(Identity thing, Frontier at) {
-        return Statements.about(thing, at, log);
+    /** The statement {@code id} names, if its event is in the log and holds it. */
+    public synchronized Optional<Statement> statement(Identity id) {
+        if (id.index().isEmpty()) {
+            return Optional.empty();
+        }
+        int index = id.index().getAsInt();
+        return event(id).flatMap(e -> e.body() instanceof Emitted emitted
+                ? Assertion.in(emitted.action()).filter(t -> index < t.size())
+                        .map(t -> new Statement(id, t.get(index).in(e.id())))
+                : Optional.empty());
     }
 }
