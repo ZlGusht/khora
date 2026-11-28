@@ -1,0 +1,443 @@
+{
+	"nodes": [
+		{
+			"id": "header",
+			"type": "text",
+			"x": 0,
+			"y": -420,
+			"width": 1900,
+			"height": 200,
+			"text": "## Architecture\nThe code as it stands: modules, their main types, and how an action becomes an event. Updated in every Issue run's Observe, to the code on the run's branch.\n\nColours: purple = types, orange = runtime flow, green = reference stubs, red = open. Arrows: grey = depends on or implements, orange = runtime, numbered in order.\n\nState of branch `explore/facts-and-shapes` (PRs 36, 39, 40, 41 and the facts-and-shapes exploration). Rendered 2026-11-28 by agent:claude-opus-5-5",
+			"color": "2"
+		},
+		{
+			"id": "caller",
+			"type": "text",
+			"x": 0,
+			"y": 120,
+			"width": 260,
+			"height": 140,
+			"text": "**Caller**\nA person or agent, as a `Context`: principal, delegate, group.\nSubmits an action, optionally naming its trigger.",
+			"color": "2"
+		},
+		{
+			"id": "g-surfaces",
+			"type": "group",
+			"x": 360,
+			"y": -80,
+			"width": 760,
+			"height": 640,
+			"label": "surfaces  (khora.surfaces)"
+		},
+		{
+			"id": "kernel",
+			"type": "text",
+			"x": 400,
+			"y": 40,
+			"width": 320,
+			"height": 260,
+			"text": "**Kernel**\nSubmit: ask the gates that guard the action, append it as an event, let every gate take it in, deliver it.\nAn unknown trigger is refused; the clock follows the trigger's time.\nDelivers by log position, once each, never a surface's own emissions; stops after 64 generations.",
+			"color": "6"
+		},
+		{
+			"id": "answer",
+			"type": "text",
+			"x": 400,
+			"y": 340,
+			"width": 320,
+			"height": 120,
+			"text": "**Answer**\n`Logged(event, responses)` or `Refused(reason)`.\nResponses: events triggered by this one during the submit.",
+			"color": "6"
+		},
+		{
+			"id": "gate",
+			"type": "text",
+			"x": 780,
+			"y": 0,
+			"width": 300,
+			"height": 170,
+			"text": "**Gate**\nGuards some actions. `decide(action, by)` against its own view: `Pass` or `Refuse(reason)`. `take(event)` of every appended event.",
+			"color": "6"
+		},
+		{
+			"id": "projects",
+			"type": "text",
+			"x": 780,
+			"y": 200,
+			"width": 300,
+			"height": 110,
+			"text": "**Projects** (stub gate)\nGuards names. Refuses replacing a statement it does not know, or one already replaced.",
+			"color": "4"
+		},
+		{
+			"id": "surface",
+			"type": "text",
+			"x": 780,
+			"y": 340,
+			"width": 300,
+			"height": 110,
+			"text": "**Surface**\nInterests; `receive(event)` returns actions, emitted as events triggered by it.",
+			"color": "6"
+		},
+		{
+			"id": "entities",
+			"type": "text",
+			"x": 780,
+			"y": 470,
+			"width": 300,
+			"height": 70,
+			"text": "**Entities** (stub surface)\nAnswers a read with `basic/answer`.",
+			"color": "4"
+		},
+		{
+			"id": "g-events",
+			"type": "group",
+			"x": 1200,
+			"y": -80,
+			"width": 700,
+			"height": 640,
+			"label": "events  (khora.events, .json, .log)"
+		},
+		{
+			"id": "event",
+			"type": "text",
+			"x": 1240,
+			"y": -40,
+			"width": 300,
+			"height": 200,
+			"text": "**Event**\nA fact by its emitter: id (salted hash of canonical JSON), trigger (at most one earlier event), recorded (HLC), occurred, body.\nBody: `Emitted(by, action)`.",
+			"color": "6"
+		},
+		{
+			"id": "action",
+			"type": "text",
+			"x": 1580,
+			"y": -40,
+			"width": 280,
+			"height": 200,
+			"text": "**Action, Assertion, Identity**\nAn action is a definition and args. Asserts are tuples (identity, attribute, value); a retraction names the statement it replaces.\n`Basic`: assert, read, answer.",
+			"color": "6"
+		},
+		{
+			"id": "log",
+			"type": "text",
+			"x": 1240,
+			"y": 200,
+			"width": 300,
+			"height": 150,
+			"text": "**EventLog**\nAppend all or none, read by position, get by id, about a thing, follow from a position.\n`InMemoryEventLog` and `EventLogContract` are test fixtures.",
+			"color": "6"
+		},
+		{
+			"id": "hlc",
+			"type": "text",
+			"x": 1580,
+			"y": 200,
+			"width": 280,
+			"height": 90,
+			"text": "**Hlc**\nRecorded time: a hybrid logical clock.",
+			"color": "6"
+		},
+		{
+			"id": "statements",
+			"type": "text",
+			"x": 1580,
+			"y": 320,
+			"width": 280,
+			"height": 130,
+			"text": "**Statements**\nOne reading: what is asserted and not retracted, in event order. A reference interpretation, kept in `events` for now.",
+			"color": "1"
+		},
+		{
+			"id": "json",
+			"type": "text",
+			"x": 1240,
+			"y": 380,
+			"width": 300,
+			"height": 90,
+			"text": "**Json, EventJson**\nCanonical JSON; the event's wire form.",
+			"color": "6"
+		},
+		{
+			"id": "g-nats",
+			"type": "group",
+			"x": 1200,
+			"y": 640,
+			"width": 700,
+			"height": 200,
+			"label": "log-nats  (khora.events.log.nats)"
+		},
+		{
+			"id": "nats",
+			"type": "text",
+			"x": 1240,
+			"y": 690,
+			"width": 620,
+			"height": 110,
+			"text": "**NatsEventLog**\nThe event log on NATS JetStream 2.12.15: atomic batches, deduplication by id. Tested against real NATS in Docker.",
+			"color": "6"
+		},
+		{
+			"id": "g-query",
+			"type": "group",
+			"x": 360,
+			"y": 640,
+			"width": 760,
+			"height": 360,
+			"label": "query  (khora.query)"
+		},
+		{
+			"id": "query",
+			"type": "text",
+			"x": 400,
+			"y": 690,
+			"width": 320,
+			"height": 130,
+			"text": "**Query**\nData, not text: columns, conditions on attributes, and `at`, a log position. JSON form in `QueryJson`.",
+			"color": "6"
+		},
+		{
+			"id": "datastore",
+			"type": "text",
+			"x": 780,
+			"y": 690,
+			"width": 300,
+			"height": 130,
+			"text": "**Datastore**\n`answer(query)`: `Answer(at, rows)`. `DatastoreContract` is the test every datastore passes.",
+			"color": "6"
+		},
+		{
+			"id": "eventsds",
+			"type": "text",
+			"x": 780,
+			"y": 850,
+			"width": 300,
+			"height": 120,
+			"text": "**EventsDatastore**\nReads the log up to the position and evaluates in memory (`Evaluator`, `Graph`).",
+			"color": "4"
+		},
+		{
+			"id": "g-neo4j",
+			"type": "group",
+			"x": 360,
+			"y": 1080,
+			"width": 760,
+			"height": 200,
+			"label": "datastore-neo4j  (khora.query.neo4j)"
+		},
+		{
+			"id": "neo4j",
+			"type": "text",
+			"x": 400,
+			"y": 1130,
+			"width": 680,
+			"height": 110,
+			"text": "**Neo4jDatastore**\nFollows the log and keeps entities materialized in Neo4j; answers only at its own position. `Snapshot` (version 3): position, last event, rows.",
+			"color": "6"
+		},
+		{
+			"id": "g-open",
+			"type": "group",
+			"x": 0,
+			"y": 1360,
+			"width": 1900,
+			"height": 220,
+			"label": "Open",
+			"color": "1"
+		},
+		{
+			"id": "o1",
+			"type": "text",
+			"x": 40,
+			"y": 1410,
+			"width": 430,
+			"height": 130,
+			"text": "Reads cost two log events: the read and its answer. Whether reads stay in the log is its own decision.",
+			"color": "1"
+		},
+		{
+			"id": "o2",
+			"type": "text",
+			"x": 500,
+			"y": 1410,
+			"width": 430,
+			"height": 130,
+			"text": "A gate judges against what it has taken in. Across processes that is \"ask the owner\": not designed.",
+			"color": "1"
+		},
+		{
+			"id": "o3",
+			"type": "text",
+			"x": 960,
+			"y": 1410,
+			"width": 430,
+			"height": 130,
+			"text": "Which gate guards what is configuration; nothing stops two gates guarding overlapping shapes.",
+			"color": "1"
+		},
+		{
+			"id": "o4",
+			"type": "text",
+			"x": 1420,
+			"y": 1410,
+			"width": 440,
+			"height": 130,
+			"text": "`Statements` is one interpretation in the base module; it belongs with a surface.",
+			"color": "1"
+		}
+	],
+	"edges": [
+		{
+			"id": "f1",
+			"fromNode": "caller",
+			"fromSide": "right",
+			"toNode": "kernel",
+			"toSide": "left",
+			"label": "1 submit(action, trigger)",
+			"color": "2"
+		},
+		{
+			"id": "f2",
+			"fromNode": "kernel",
+			"fromSide": "right",
+			"toNode": "gate",
+			"toSide": "left",
+			"label": "2 decide",
+			"color": "2"
+		},
+		{
+			"id": "f3",
+			"fromNode": "kernel",
+			"fromSide": "right",
+			"toNode": "log",
+			"toSide": "left",
+			"label": "3 append event",
+			"color": "2"
+		},
+		{
+			"id": "f4",
+			"fromNode": "kernel",
+			"fromSide": "top",
+			"toNode": "gate",
+			"toSide": "top",
+			"label": "4 take",
+			"color": "2"
+		},
+		{
+			"id": "f5",
+			"fromNode": "kernel",
+			"fromSide": "bottom",
+			"toNode": "surface",
+			"toSide": "left",
+			"label": "5 deliver by position",
+			"color": "2"
+		},
+		{
+			"id": "f6",
+			"fromNode": "surface",
+			"fromSide": "left",
+			"toNode": "kernel",
+			"toSide": "right",
+			"label": "6 emit, triggered by what it received",
+			"color": "2"
+		},
+		{
+			"id": "f7",
+			"fromNode": "kernel",
+			"fromSide": "bottom",
+			"toNode": "answer",
+			"toSide": "top",
+			"label": "7 answer",
+			"color": "2"
+		},
+		{
+			"id": "f8",
+			"fromNode": "answer",
+			"fromSide": "left",
+			"toNode": "caller",
+			"toSide": "bottom",
+			"label": "",
+			"color": "2"
+		},
+		{
+			"id": "d1",
+			"fromNode": "projects",
+			"fromSide": "top",
+			"toNode": "gate",
+			"toSide": "bottom",
+			"label": "is a"
+		},
+		{
+			"id": "d2",
+			"fromNode": "entities",
+			"fromSide": "top",
+			"toNode": "surface",
+			"toSide": "bottom",
+			"label": "is a"
+		},
+		{
+			"id": "d3",
+			"fromNode": "nats",
+			"fromSide": "top",
+			"toNode": "log",
+			"toSide": "bottom",
+			"label": "implements"
+		},
+		{
+			"id": "d4",
+			"fromNode": "eventsds",
+			"fromSide": "top",
+			"toNode": "datastore",
+			"toSide": "bottom",
+			"label": "implements"
+		},
+		{
+			"id": "d5",
+			"fromNode": "neo4j",
+			"fromSide": "right",
+			"toNode": "datastore",
+			"toSide": "right",
+			"label": "implements"
+		},
+		{
+			"id": "d6",
+			"fromNode": "eventsds",
+			"fromSide": "right",
+			"toNode": "log",
+			"toSide": "bottom",
+			"label": "reads up to `at`"
+		},
+		{
+			"id": "d7",
+			"fromNode": "neo4j",
+			"fromSide": "right",
+			"toNode": "log",
+			"toSide": "bottom",
+			"label": "follows"
+		},
+		{
+			"id": "d8",
+			"fromNode": "query",
+			"fromSide": "right",
+			"toNode": "datastore",
+			"toSide": "left",
+			"label": "answered by"
+		},
+		{
+			"id": "d9",
+			"fromNode": "entities",
+			"fromSide": "right",
+			"toNode": "statements",
+			"toSide": "bottom",
+			"label": "reads with"
+		},
+		{
+			"id": "d10",
+			"fromNode": "event",
+			"fromSide": "right",
+			"toNode": "action",
+			"toSide": "left",
+			"label": "body carries"
+		}
+	]
+}
